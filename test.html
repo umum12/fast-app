@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Uji API FAST APP</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 640px; margin: 24px auto; padding: 0 16px; }
+  label { display: block; margin: 12px 0 4px; font-size: 13px; color: #555; }
+  input { width: 100%; padding: 10px; font-size: 14px; box-sizing: border-box; }
+  button { margin-top: 16px; padding: 12px 20px; font-size: 14px; font-weight: 700; }
+  pre { background: #f3f4f6; padding: 12px; overflow: auto; font-size: 12px; white-space: pre-wrap; }
+  .ok { color: #15803d; } .bad { color: #b91c1c; }
+</style>
+</head>
+<body>
+  <h1>Uji API FAST APP</h1>
+  <p>Menguji <code>getBootstrapData()</code> lewat <code>fetch()</code> dari GitHub Pages.</p>
+
+  <label>URL /exec (tanpa parameter)</label>
+  <input id="url" placeholder="https://script.google.com/macros/s/.../exec">
+  <label>Kode akses</label>
+  <input id="code" placeholder="mis. ADT" autocomplete="off">
+  <button id="go">Panggil getBootstrapData</button>
+
+  <p id="status"></p>
+  <pre id="out"></pre>
+
+<script>
+  var urlEl = document.getElementById('url');
+  var codeEl = document.getElementById('code');
+  try { urlEl.value = localStorage.getItem('fsapi_url') || ''; } catch (e) {}
+
+  function callApi(execUrl, fn, args) {
+    return fetch(execUrl + '?route=api', {
+      method: 'POST',
+      // text/plain = "simple request", menghindari preflight CORS
+      // yang tidak didukung Apps Script.
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ fn: fn, args: args }),
+      redirect: 'follow'
+    }).then(function (res) {
+      return res.text().then(function (text) {
+        try { return JSON.parse(text); }
+        catch (e) { throw new Error('Respons bukan JSON (HTTP ' + res.status + '): ' + text.slice(0, 200)); }
+      });
+    });
+  }
+
+  document.getElementById('go').addEventListener('click', function () {
+    var execUrl = urlEl.value.trim().replace(/\?.*$/, '');
+    var code = codeEl.value.trim().toUpperCase();
+    var status = document.getElementById('status');
+    var out = document.getElementById('out');
+    if (!execUrl || !code) { status.textContent = 'Isi URL dan kode akses.'; return; }
+    try { localStorage.setItem('fsapi_url', execUrl); } catch (e) {}
+
+    status.className = ''; status.textContent = 'Memanggil...'; out.textContent = '';
+    var t0 = performance.now();
+    callApi(execUrl, 'getBootstrapData', [code]).then(function (json) {
+      var ms = Math.round(performance.now() - t0);
+      status.className = json.success ? 'ok' : 'bad';
+      status.textContent = (json.success ? 'BERHASIL' : 'DITOLAK SERVER') + ' dalam ' + ms + ' ms';
+      out.textContent = JSON.stringify(json, null, 2);
+    }).catch(function (err) {
+      status.className = 'bad';
+      status.textContent = 'GAGAL: ' + err.message + ' (kemungkinan CORS atau redirect)';
+    });
+  });
+</script>
+</body>
+</html>
