@@ -1,0 +1,10 @@
+{
+  "name": "fast-app",
+  "private": true,
+  "version": "1.0.0",
+  "description": "FAST APP - frontend GitHub Pages (PWA) untuk backend Google Apps Script",
+  "scripts": {
+    "build": "node build.js",
+    "sync": "node tools/sync-from-folder.js"
+  }
+}
