@@ -36,7 +36,7 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* ===================== LOGIN ===================== */
+   
   #screen-login {
     min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
   }
@@ -63,7 +63,7 @@
     padding: 6px 14px; border-radius: 999px; margin: 14px 0 6px;
   }
 <?!= include('login-styles'); ?>
-  /* ===================== DASHBOARD SHELL ===================== */
+   
   #screen-dashboard { display: none; max-width: 760px; margin: 0 auto; padding: 14px 14px 40px; }
 
   header.dash-header {
@@ -78,7 +78,7 @@
     margin: 6px 0 14px;
   }
 
-  /* ===================== PERIOD TABS ===================== */
+   
   .period-tabs {
     display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto;
   }
@@ -98,14 +98,14 @@
   .card h2 { font-size: 14px; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
   .card .card-subtitle { font-size: 11px; color: var(--color-text-faint); margin: -8px 0 12px; }
 
-  /* ===================== QUICK STATS ===================== */
+   
   .quick-stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
   @media (min-width: 480px) { .quick-stats-grid { grid-template-columns: repeat(4, 1fr); } }
   .quick-stat-box { background: #f9fafb; border-radius: 12px; padding: 12px 8px; text-align: center; }
   .quick-stat-box .v { font-size: 20px; font-weight: 800; color: var(--color-primary); }
   .quick-stat-box .l { font-size: 10.5px; color: var(--color-text-muted); margin-top: 2px; line-height: 1.3; }
 
-  /* ===================== LINE CHART (Tren) ===================== */
+   
   .linechart-wrap { width: 100%; overflow-x: auto; }
   .linechart-svg { display: block; width: 100%; height: 190px; }
   .linechart-grid-line { stroke: var(--color-border); stroke-width: 1; }
@@ -118,7 +118,7 @@
   .trend-empty { text-align: center; color: var(--color-text-muted); font-size: 13px; padding: 30px 0; }
   .trend-peak-note { font-size: 11px; color: var(--color-text-muted); margin-top: 6px; text-align: right; }
 
-  /* ===================== DONUT (Status & Lantai) ===================== */
+   
   .donut-row { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
   .donut {
     width: 108px; height: 108px; border-radius: 50%; flex-shrink: 0;
@@ -138,7 +138,7 @@
   .legend-label { flex: 1; color: var(--color-text-muted); }
   .legend-value { font-weight: 700; }
 
-  /* ===================== PER JENIS BAR LIST ===================== */
+   
   .jenis-bar-row { margin-bottom: 12px; }
   .jenis-bar-row:last-child { margin-bottom: 0; }
   .jenis-bar-top { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 5px; }
@@ -147,7 +147,7 @@
   .jenis-bar-track { height: 10px; background: var(--md-surface-container); border-radius: var(--shape-full); overflow: hidden; }
   .jenis-bar-fill { height: 100%; background: var(--color-primary); border-radius: var(--shape-full); }
 
-  /* ===================== RANKING ===================== */
+   
   .rank-row {
     display: flex; align-items: center; gap: 12px; padding: 10px 0;
     border-bottom: 1px solid var(--color-border);
@@ -194,7 +194,7 @@
 
 
   <div id="screen-login">
-    <?!= include('login-card'); ?>
+    &lt;?!= include('login-card'); ?>
   </div>
 
   <div id="screen-dashboard">
@@ -259,11 +259,11 @@
   </div>
 
 <script>
-  // ============================================================
-  // SESSION — reuse fs_session yang sama dengan Web App utama, supaya
-  // pengguna yang sudah login di aplikasi utama TIDAK perlu login lagi
-  // di halaman ini (localStorage per-browser/device, bukan cookie).
-  // ============================================================
+  
+  
+  
+  
+  
 
   var SESSION_KEY = 'fs_session';
 
@@ -290,9 +290,9 @@
     if (e.key === 'Enter') handleLogin();
   });
 
-  // ============================================================
-  // STATE
-  // ============================================================
+  
+  
+  
 
   var currentAccessCode = null;
   var currentPeriod = 'mingguan';
@@ -322,9 +322,9 @@
     });
   }
 
-  // ============================================================
-  // FETCH (lazy per periode, cache client-side)
-  // ============================================================
+  
+  
+  
 
   function fetchPeriod(period, isManualLogin) {
     if (dashboardCache[period]) {
@@ -364,9 +364,9 @@
     document.getElementById('trend-chart').innerHTML = '<div class="inline-loading"><span class="spinner-sm"></span>Memuat statistik...</div>';
   }
 
-  // ============================================================
-  // RENDER
-  // ============================================================
+  
+  
+  
 
   var STATUS_COLORS = {
     TERBUKA: '#1d4ed8',
@@ -375,9 +375,9 @@
   };
   var STATUS_LABELS = { TERBUKA: 'Terbuka', DIKERJAKAN: 'Dikerjakan', SELESAI: 'Selesai' };
 
-  // Palet warna generik untuk donut dengan kategori dinamis (Per Lantai) —
-  // jumlah lantai bisa berubah (MASTER_FLOORS_DATA), jadi warna di-cycle
-  // dari palet ini, bukan hardcode per floor_code.
+  
+  
+  
   var DONUT_PALETTE = ['#2563eb', '#7c3aed', '#059669', '#d97706', '#db2777', '#0891b2', '#65a30d', '#dc2626'];
 
   function renderDashboard(data) {
@@ -409,9 +409,9 @@
     });
   }
 
-  // ============================================================
-  // TREND — Line Chart (SVG murni, tanpa library eksternal)
-  // ============================================================
+  
+  
+  
 
   function renderTrendChart(buckets, rangeLabel) {
     document.getElementById('trend-subtitle').textContent = rangeLabel;
@@ -487,9 +487,9 @@
     }
   }
 
-  // ============================================================
-  // DONUT — Status (3 kategori tetap) & Per Lantai (dinamis)
-  // ============================================================
+  
+  
+  
 
   function renderStatusDonut(status) {
     var total = status.TERBUKA + status.DIKERJAKAN + status.SELESAI;
@@ -520,11 +520,8 @@
       legendRow(STATUS_COLORS.SELESAI, STATUS_LABELS.SELESAI, status.SELESAI);
   }
 
-  /**
-   * Donut generik untuk kategori dinamis (jumlah lantai bisa berbeda-beda
-   * tergantung MASTER_FLOORS_DATA) — warna diambil berputar dari
-   * DONUT_PALETTE, bukan hardcode per lantai.
-   */
+  
+
   function renderLantaiDonut(perLantai) {
     var donut = document.getElementById('lantai-donut');
     var legend = document.getElementById('lantai-legend');
@@ -623,9 +620,9 @@
     });
   }
 
-  // ============================================================
-  // INIT
-  // ============================================================
+  
+  
+  
 
   renderPeriodTabs();
 

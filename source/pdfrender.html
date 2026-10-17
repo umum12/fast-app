@@ -269,10 +269,10 @@
     window.location.href = baseUrl;
   });
 
-  // ============================================================
-  // BOOTSTRAP — reuse getBootstrapData (sudah ada) untuk mengisi
-  // dropdown Jenis/Lantai/Petugas, TANPA endpoint baru.
-  // ============================================================
+  
+  
+  
+  
 
 
 function bootstrapPage(isManualLogin) {
@@ -298,9 +298,9 @@ function bootstrapPage(isManualLogin) {
       .getBootstrapData(currentAccessCode);
   }
 
-  // ============================================================
-  // RIWAYAT PDF TERSIMPAN — 10 file terakhir dari folder Exports
-  // ============================================================
+  
+  
+  
 
   function loadPdfHistory() {
     google.script.run
@@ -359,11 +359,11 @@ function bootstrapPage(isManualLogin) {
       floorSelect.appendChild(opt);
     });
 
-    // Filter "Petugas (Dibuat oleh)" hanya relevan untuk Admin/Demo —
-    // mereka bisa menyaring PDF berdasarkan FS tertentu. Untuk role FS,
-    // data yang terlihat SUDAH otomatis hanya miliknya sendiri (backend,
-    // getFilteredPekerjaanRiwayatRows_), jadi filter ini disembunyikan
-    // supaya tidak membingungkan (bukan pembatasan baru, murni UX).
+    
+    
+    
+    
+    
     var isAdminOrDemo = (bootstrap.currentUser.role === 'admin' || bootstrap.currentUser.role === 'demo');
     var ownerGroup = document.getElementById('filter-owner-group');
     if (isAdminOrDemo) {
@@ -382,8 +382,8 @@ function bootstrapPage(isManualLogin) {
       ownerGroup.style.display = 'none';
     }
 
-    // Prefill dari filter terakhir yang disimpan halaman utama (bila ada)
-    // — murni kenyamanan, bukan keharusan.
+    
+    
     var session = loadSession();
     var saved = (session && session.uiState && session.uiState.pekerjaanFilters) || {};
     if (saved.jenis) jenisSelect.value = saved.jenis;
@@ -424,9 +424,9 @@ function bootstrapPage(isManualLogin) {
     }
   }
 
-  // ============================================================
-  // OPSI 1 — UNDUH KE PERANGKAT (TIDAK menyentuh Google Drive)
-  // ============================================================
+  
+  
+  
 
   document.getElementById('btn-download-device').addEventListener('click', function () {
     showStatus('info', 'Membuat PDF, mohon tunggu...');
@@ -467,9 +467,9 @@ function bootstrapPage(isManualLogin) {
       .generatePekerjaanPdfBase64(currentAccessCode, getFilters());
   });
 
-  // ============================================================
-  // OPSI 2 — SIMPAN KE GOOGLE DRIVE (perilaku lama, dipertahankan)
-  // ============================================================
+  
+  
+  
 
   document.getElementById('btn-save-drive').addEventListener('click', function () {
     showStatus('info', 'Membuat PDF & menyimpan ke Drive...');
@@ -492,9 +492,9 @@ function bootstrapPage(isManualLogin) {
       .generatePekerjaanPdf(currentAccessCode, getFilters());
   });
 
-  // ============================================================
-  // INIT
-  // ============================================================
+  
+  
+  
 
   (function init() {
     var session = loadSession();

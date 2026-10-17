@@ -1,8 +1,8 @@
 <script>
-// ============================================================
-// RIWAYAT — Arsip Pribadi Pekerjaan (Tahap 4 Cutover, pengganti
-// Riwayat Laporan lama; Filter & Unduh PDF DIPINDAH ke Aktivitas)
-// ============================================================
+
+
+
+
 
 var riwayatSearchState = { full: [] };
 
@@ -37,7 +37,7 @@ function loadRiwayatPekerjaan(force) {
     }
   }
 
-  var cacheKey = 'default'; // Tahap 4 — filter granular dipindah ke Aktivitas; Riwayat tidak punya sub-filter server-side.
+  var cacheKey = 'default'; 
   var cached = pageDataCache.pekerjaanRiwayatByKey[cacheKey];
 
   if (cached && !force) {
@@ -81,16 +81,16 @@ function renderRiwayatPekerjaan(list) {
     return;
   }
 
-  // Kartu Riwayat memakai fungsi yang SAMA PERSIS dengan Aktivitas
-  // (buildPekerjaanListCard_) supaya identik by construction.
+  
+  
   list.forEach(function (p) {
     container.appendChild(buildPekerjaanListCard_(p));
   });
 }
 
-// ============================================================
-// JADWAL PIKET (Collaborative Schedule) — Patch 10.x Bagian 2
-// ============================================================
+
+
+
 
 var JADWAL_JENIS_COLOR = {
   piket_sabtu: { bg: 'var(--status-info-bg)', fg: 'var(--status-info-fg)' },
@@ -106,13 +106,8 @@ var JADWAL_JENIS_COLOR = {
 var INDO_DAY_NAMES_ = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 var INDO_MONTH_SHORT_ = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
 
-/**
- * Memecah sebuah Date menjadi komponen kalender/jam SECARA EKSPLISIT
- * dalam 'Asia/Jakarta' (lewat Intl.DateTimeFormat, bukan getter lokal),
- * dipakai SATU SUMBER KEBENARAN oleh seluruh fungsi format tanggal/waktu
- * ISO di frontend — konsisten dengan APP_TIMEZONE backend, apa pun
- * timezone perangkat pengguna.
- */
+
+
 function getJakartaDateParts_(date) {
   var formatter = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Jakarta',
@@ -136,8 +131,8 @@ function getJakartaDateParts_(date) {
   };
 }
 
-/** 'YYYY-MM-DD' -> "Minggu, 26 Jul 2026" (parse manual, hindari geser
- * zona waktu). */
+
+
 function formatJadwalDateLong_(dateStr) {
   var parts = (dateStr || '').split('-');
   if (parts.length !== 3) return dateStr || '';
@@ -146,7 +141,7 @@ function formatJadwalDateLong_(dateStr) {
   return dayName + ', ' + String(d.getDate()).padStart(2, '0') + ' ' + INDO_MONTH_SHORT_[d.getMonth()] + ' ' + d.getFullYear();
 }
 
-/** ISO timestamp -> "17 Jul 2026, 10:30" DALAM ZONA WAKTU Asia/Jakarta. */
+ 
 function formatJadwalTimestamp_(isoString) {
   if (!isoString) return '';
   var d = new Date(isoString);
@@ -155,7 +150,7 @@ function formatJadwalTimestamp_(isoString) {
   return parts.day + ' ' + INDO_MONTH_SHORT_[parts.monthIndex] + ' ' + parts.year + ', ' + parts.hour + ':' + parts.minute;
 }
 
-var jadwalFormEditId = null; // null = mode tambah; terisi = mode ubah
+var jadwalFormEditId = null; 
 var jadwalFormListenersAttached = false;
 
 function initJadwalPiketSection() {
@@ -494,7 +489,7 @@ function openJadwalDetail_(entry) {
   document.getElementById('activity-detail-overlay').classList.add('show');
 }
 
-/** Baris kecil "Dibuat oleh"/"Terakhir diubah". */
+ 
 function buildJadwalPersonChip_(userCode, isoTimestamp) {
   return '<div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">' +
     '<span class="avatar-circle" style="width:32px; height:32px; background:var(--md-surface-container); color:var(--color-text-muted);">' + userCode + '</span>' +
@@ -502,7 +497,7 @@ function buildJadwalPersonChip_(userCode, isoTimestamp) {
   '</div>';
 }
 
-// ------------------- AUDIT LOG (Admin-only) -------------------
+
 
 document.getElementById('btn-jadwal-piket-audit').addEventListener('click', function () {
   var session = loadSession();
@@ -575,9 +570,9 @@ function todayDateStr_() {
   return parts.year + '-' + String(parts.monthIndex + 1).padStart(2, '0') + '-' + parts.day;
 }
 
-// ============================================================
-// BERANDA — Sprint 5 (Dashboard), Patch 10.x (Content Management)
-// ============================================================
+
+
+
 
 function initBerandaPage() {
   if (!appBootstrap) return;
@@ -675,9 +670,9 @@ function renderDashboardStats(stats) {
   });
 }
 
-// ============================================================
-// CONTENT MANAGEMENT — Patch 10.x (menggantikan Reminder lama)
-// ============================================================
+
+
+
 
 var CONTENT_TYPE_BADGE = {
   announcement: { icon: 'notification', cls: 'badge-info' },
@@ -1222,22 +1217,22 @@ function renderContentManagementList_(list) {
   });
 }
 
-// ============================================================
-// KARTU BERSAMA PEKERJAAN (Riwayat & Aktivitas) — buildPekerjaanListCard_
-// ============================================================
-// Ditempatkan di sini (bukan di script-aktivitas.html) karena dipakai
-// LEBIH DULU oleh loadRiwayatPekerjaan() di atas — menghindari referensi
-// ke fungsi yang belum ter-include saat file ini dieksekusi lebih awal
-// dari script-aktivitas.html. Perilaku IDENTIK dengan index.html lama.
 
-/** Potong teks ke maksimal `maxLen` karakter + "..." bila lebih panjang. */
+
+
+
+
+
+
+
+ 
 function truncateText_(text, maxLen) {
   if (!text) return '';
   var str = String(text);
   return str.length > maxLen ? str.substring(0, maxLen) + '...' : str;
 }
 
-/** "17/07/2026 10:30" -> "Kam, 17 Jul 2026". */
+ 
 function formatAktivitasDateShort_(ddmmyyyyHHmm) {
   if (!ddmmyyyyHHmm) return '';
   var datePart = String(ddmmyyyyHHmm).split(' ')[0];
@@ -1248,11 +1243,8 @@ function formatAktivitasDateShort_(ddmmyyyyHHmm) {
   return INDO_DAY_NAMES_[d.getDay()].substring(0, 3) + ', ' + dp[0] + ' ' + INDO_MONTH_SHORT_[d.getMonth()] + ' ' + dp[2];
 }
 
-/**
- * Kartu daftar Pekerjaan (badge-pill+dot, tanggal, avatar+nama+
- * keterangan, thumbnail/placeholder+chevron) — SATU fungsi dipakai
- * BERSAMA oleh Aktivitas dan Riwayat.
- */
+
+
 function buildPekerjaanListCard_(p) {
   var jenisInfo = JENIS_PEKERJAAN_BADGE[p.jenis] || { label: p.jenis, cls: 'badge-neutral', icon: 'description' };
   var statusCls = STATUS_PEKERJAAN_BADGE_CLASS[p.status] || 'badge-neutral';
@@ -1278,8 +1270,8 @@ function buildPekerjaanListCard_(p) {
   main.appendChild(badgeRow);
 
 
-// PATCH — untuk arah Mandiri, utamakan performedAt (tujuan field ini:
-  // mencerminkan kapan pekerjaan BENAR-BENAR dilakukan).
+
+  
   var displayDate = (p.arah === 'mandiri' && p.performedAt) ? p.performedAt : (p.completedAt || p.startedAt || p.createdAt);
 
   var dateRow = document.createElement('div');

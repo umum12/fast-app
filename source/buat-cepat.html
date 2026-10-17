@@ -6,9 +6,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>Buat Laporan</title>
 
-<!-- PATCH — Add to Home Screen. Manifest dinamis dari core.gs
-     (buildBuatManifestJson_), tidak memerlukan file statis terpisah. -->
-<link rel="manifest" href="<?!= WEBAPP_EXEC_URL ?>?page=manifest-buat">
+
+<link rel="manifest" href="&lt;?!= WEBAPP_EXEC_URL ?&gt;?page=manifest-buat">
 <meta name="theme-color" content="#2563eb">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -18,7 +17,7 @@
 
 <?!= include('styles'); ?>
 
-/* Tambahan kecil khusus shortcut ini — seluruh style lain reuse styles.html */
+ 
 .quick-header-link {
   font-size: 12px;
   color: var(--color-primary);
@@ -40,13 +39,13 @@
 </head>
 <body>
 
-  <!-- ===================== LOGIN SCREEN ===================== -->
+  
 
   <div id="screen-login">
-    <?!= include('login-card'); ?>
+    &lt;?!= include('login-card'); ?>
   </div>
 
-  <!-- ===================== APP SHELL (RINGAN) ===================== -->
+  
   <div id="screen-app">
     <header class="app-header">
       <div class="app-title">📝 Buat Laporan</div>
@@ -178,7 +177,7 @@
     </main>
   </div>
 
-  <!-- ===================== OVERLAY FUNGSIONAL (nyata, dipakai) ===================== -->
+  
 
   <div id="confirm-modal-overlay">
     <div class="confirm-modal-card">
@@ -201,12 +200,8 @@
   <div id="global-spinner"><div class="spinner"></div></div>
   <div id="snackbar"></div>
 
-  <!-- ===================== STUB TERSEMBUNYI ===================== -->
-  <!-- Elemen di bawah ini TIDAK dipakai di halaman shortcut ini, tapi
-       WAJIB ada di DOM karena script-core.html (reuse apa adanya dari
-       app utama) memasang event listener ke ID-ID ini tanpa pengecekan
-       null — tanpa elemen ini, script akan error saat load dan
-       menghentikan seluruh inisialisasi (termasuk proses login). -->
+  
+  
   <div style="display:none;">
     <span id="header-avatar-initial"></span>
     <span id="akun-nama"></span>
@@ -220,28 +215,28 @@
     <div id="activity-detail-overlay"></div>
   </div>
 
-<?!= include('script-core'); ?>
-<?!= include('script-pekerjaan'); ?>
+&lt;?!= include('script-core'); ?>
+&lt;?!= include('script-pekerjaan'); ?>
 
 
 <script>
-  // ============================================================
-  // GLUE KHUSUS HALAMAN SHORTCUT — sengaja TIDAK meng-include
-  // script-jadwal.html/script-aktivitas.html (modul berat: Jadwal,
-  // Content Management, Riwayat, Aktivitas, PDF, gesture Photo Viewer)
-  // supaya halaman ini tetap ringan. Beberapa baris di bawah adalah
-  // duplikasi MINIMAL dari script-aktivitas.html — murni glue UI
-  // (counter karakter, tombol Reset, ikon statis, entry point init),
-  // BUKAN business logic (semua logic Buat Pekerjaan tetap 100% reuse
-  // dari script-pekerjaan.html, tidak diduplikasi).
-  // ============================================================
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
 
-  // Paksa landing page SELALU ke 'buat', apa pun role & defaultPage-nya
-  // (lihat patch renderApp di script-core.html).
+  
+  
   var FORCE_LANDING_PAGE = 'buat';
 
-  // Subset applyStaticIcons() (script-aktivitas.html) — hanya ikon yang
-  // relevan untuk halaman ini.
+  
+  
 
     function applyQuickIcons_() {
     var map = [
@@ -275,7 +270,7 @@
   }
   applyQuickIcons_();
 
-  // Counter karakter Keterangan — identik script-aktivitas.html.
+  
   var formDescEl = document.getElementById('form-description');
   var formDescCounter = document.getElementById('form-description-counter');
   if (formDescEl && formDescCounter) {
@@ -285,7 +280,7 @@
     });
   }
 
-  // Tombol Batal/Reset form — identik script-aktivitas.html.
+  
   document.getElementById('btn-cancel-report-form').addEventListener('click', function () {
     var hasUnsavedContent = document.getElementById('form-subject').value.trim() ||
       document.getElementById('form-description').value.trim() ||
@@ -310,7 +305,7 @@
     }
   });
 
-  // Link "← Aplikasi Utama" — aktif setelah login (appBootstrap terisi).
+  
   document.getElementById('link-app-utama').addEventListener('click', function () {
     if (appBootstrap && appBootstrap.webAppUrl) {
       window.location.href = appBootstrap.webAppUrl;
@@ -318,12 +313,12 @@
   });
 
 
-  // ============================================================
-  // RIPPLE EFFECT — versi ringan, reuse CSS .ripple-surface/.ripple-effect
-  // dari styles.html (sudah ter-include). Logic identik dengan
-  // attachRipple() di script-aktivitas.html, didefinisikan ulang di sini
-  // karena file itu TIDAK di-include di halaman shortcut ini.
-  // ============================================================
+  
+  
+  
+  
+  
+  
   function attachRipple_(el) {
     if (!el || el.dataset.rippleAttached) return;
     el.dataset.rippleAttached = '1';
@@ -342,9 +337,9 @@
   }
   document.querySelectorAll('.btn-primary, .btn-outlined').forEach(attachRipple_);
 
-  // ============================================================
-  // INIT — identik pola script-aktivitas.html.
-  // ============================================================
+  
+  
+  
 
   (function init() {
     var session = loadSession();
