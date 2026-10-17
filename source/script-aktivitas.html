@@ -153,6 +153,15 @@ function initPdfRenderButton_() {
     });
   }
 
+  var btnStat = document.getElementById('btn-open-statistik');
+  if (btnStat) {
+    btnStat.style.display = 'inline-flex';
+    btnStat.innerHTML = mdIcon('stats', 16) + '<span>Statistik</span>';
+    btnStat.addEventListener('click', function () {
+      window.open(appBootstrap.webAppUrl + '?page=statistik', '_blank');
+    });
+  }
+
   // Ringkasan collapsible; status diingat di localStorage (per perangkat).
   var toggle = document.getElementById('btn-toggle-ringkasan');
   var body = document.getElementById('ringkasan-body');

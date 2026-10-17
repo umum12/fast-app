@@ -265,8 +265,9 @@
   });
 
   document.getElementById('btn-back-to-app').addEventListener('click', function () {
-    var baseUrl = window.location.href.split('?')[0];
-    window.location.href = baseUrl;
+    // /exec -> buang query. GitHub Pages (.../pdfrender.html) -> folder aplikasi (index).
+    var baseUrl = window.location.href.split('?')[0].split('#')[0];
+    window.location.href = /\.html$/i.test(baseUrl) ? baseUrl.replace(/[^\/]*$/, '') : baseUrl;
   });
 
   // ============================================================
