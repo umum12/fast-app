@@ -1,0 +1,213 @@
+/* login-shared.html — CSS login IDENTIK dengan styles.html (halaman utama).
+   Dipakai halaman yang tidak memuat styles.html penuh (statistik). Jangan diubah sendiri-sendiri. */
+#screen-login button, #screen-login input { font-family: inherit; }
+#screen-login {
+  --color-primary-dark: #1d4ed8; --color-danger: #dc2626; --touch-min: 48px;
+  --shape-md: 12px; --shape-lg: 16px; --shape-full: 999px;
+  --motion-fast: 0.12s; --motion-easing: cubic-bezier(0.2, 0, 0, 1);
+}
+#screen-login {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--color-bg);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--color-surface);
+  border-radius: 24px;
+  padding: 40px 28px 28px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 12px 32px rgba(15,23,42,0.08);
+  text-align: center;
+}
+
+.login-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 18px;
+}
+
+.login-card h1 {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--color-text);
+  margin: 0 0 6px;
+}
+
+.login-card p.subtitle {
+  color: var(--color-text-muted);
+  font-size: 14px;
+  margin: 0 0 28px;
+}
+
+.login-input-label {
+  display: block;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin-bottom: 8px;
+}
+
+#input-access-code {
+  width: 100%;
+  min-height: 56px;
+  text-align: center;
+  letter-spacing: 2px;
+  font-size: 16px;
+  font-weight: 700;
+  text-transform: uppercase;
+  border: 1.5px solid #bfdbfe;
+  border-radius: var(--shape-lg);
+  padding: 0 12px;
+  margin-bottom: 20px;
+  color: var(--color-text);
+  background: #fff;
+  transition: border-color var(--motion-fast) var(--motion-easing), box-shadow var(--motion-fast) var(--motion-easing);
+}
+
+#input-access-code::placeholder {
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--color-text-faint);
+  font-weight: 400;
+}
+
+#input-access-code:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-soft);
+}
+
+.login-helper-text {
+  font-size: 12.5px;
+  color: var(--color-text-muted);
+  margin: 14px 0 0;
+  line-height: 1.5;
+}
+
+.login-demo-hint {
+  margin-top: 18px;
+  background: var(--color-primary-soft);
+  color: var(--color-primary-dark);
+  border-radius: var(--shape-md);
+  padding: 14px 16px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.login-demo-hint b { font-weight: 800; }
+
+.btn-primary, .btn-tonal, .btn-outlined, .btn-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--touch-min);
+  padding: 0 24px;
+  border-radius: var(--shape-full);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: background-color var(--motion-fast) var(--motion-easing), transform var(--motion-fast) var(--motion-easing), box-shadow var(--motion-fast) var(--motion-easing);
+}
+
+.btn-primary {
+  width: 100%;
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.btn-primary:active { background: var(--color-primary-dark); transform: scale(0.98); }
+.btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+.login-error {
+  color: var(--color-danger);
+  font-size: 13px;
+  margin-top: 12px;
+  min-height: 18px;
+}
+/* PATCH: desain login baru (FASTAPP). Dipakai partial login-card. */
+.login-card {
+  max-width: 400px;
+  padding: 28px 24px 24px;
+  text-align: left;
+  box-shadow: 0 2px 12px rgba(15,23,42,0.06);
+}
+
+.login-logo { display: flex; justify-content: center; margin-bottom: 6px; }
+.login-logo svg { width: 100%; max-width: 240px; height: auto; display: block; }
+
+.login-tagline {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1b3156;
+  margin: 8px 0 26px;
+  line-height: 1.4;
+}
+
+.login-card .login-input-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #6b7a99;
+  margin-bottom: 8px;
+}
+
+.login-input-wrap { position: relative; margin-bottom: 20px; }
+
+.login-input-icon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #6b7a99;
+  pointer-events: none;
+}
+
+.login-input-wrap #input-access-code {
+  text-align: left;
+  letter-spacing: 1px;
+  padding-left: 46px;
+  margin-bottom: 0;
+  border-radius: 999px;
+  border-color: #dbe4f3;
+}
+
+.login-input-wrap #input-access-code::placeholder {
+  font-weight: 400;
+  text-transform: none;
+}
+
+#btn-login {
+  position: relative;
+  min-height: 56px;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, #0a3c9c 0%, #0b7bf5 100%);
+  box-shadow: 0 8px 20px rgba(11,123,245,0.28);
+}
+
+#btn-login:active { background: linear-gradient(90deg, #08327f 0%, #0968d0 100%); }
+
+#btn-login .login-btn-arrow {
+  position: absolute;
+  right: 22px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.login-card .login-error { text-align: center; }
+.login-card .login-helper-text { text-align: center; margin-top: 10px; }
