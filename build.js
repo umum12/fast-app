@@ -34,15 +34,28 @@ const PAGES = [
 ];
 
 const INCLUDE_RE = /<\?!?=\s*include\(\s*(['"])([^'"]+)\1\s*\)\s*;?\s*\?>/g;
-const ANY_SCRIPTLET_RE = /<\?[\s\S]*?\?>/;
+const ANY_SCRIPTLET_RE = /<\?[\s\S]*?\?>|&lt;\?/;
 const THEME = '#1F4E9C';
 
 function fail(msg) { console.error('\n[BUILD GAGAL] ' + msg + '\n'); process.exit(1); }
 function warn(msg) { console.warn('[peringatan] ' + msg); }
+// Beberapa cara mengambil file dari editor Apps Script meng-escape scriptlet
+// menjadi teks (&lt;?!= include('x'); ?&gt;). Dikembalikan ke bentuk aslinya.
+function unescapeScriptlets(text, name) {
+  let n = 0;
+  const out = text.replace(/&lt;\?([\s\S]*?)\?&gt;/g, (m, inner) => {
+    n++;
+    inner = inner.replace(/&#0?39;|&apos;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+    return '<?' + inner + '?>';
+  });
+  if (n) warn('source/' + name + '.html: ' + n + ' scriptlet ter-escape dipulihkan. Sebaiknya publish ulang dengan github-sync.gs terbaru.');
+  return out;
+}
+
 function readSource(name) {
   const f = path.join(SRC, name + '.html');
   if (!fs.existsSync(f)) return null;
-  return fs.readFileSync(f, 'utf8');
+  return unescapeScriptlets(fs.readFileSync(f, 'utf8'), name);
 }
 
 function resolveIncludes(html, from, stack) {
