@@ -1,0 +1,1349 @@
+<script>
+// ============================================================
+// RIWAYAT — Arsip Pribadi Pekerjaan (Tahap 4 Cutover, pengganti
+// Riwayat Laporan lama; Filter & Unduh PDF DIPINDAH ke Aktivitas)
+// ============================================================
+
+var riwayatSearchState = { full: [] };
+
+function applyRiwayatSearchAndRender() {
+  var q = (document.getElementById('reports-search').value || '').trim().toLowerCase();
+  var filtered = riwayatSearchState.full;
+  if (q) {
+    filtered = riwayatSearchState.full.filter(function (p) {
+      return (p.subject || '').toLowerCase().indexOf(q) !== -1 ||
+             (p.description || '').toLowerCase().indexOf(q) !== -1;
+    });
+  }
+  renderRiwayatPekerjaan(filtered);
+}
+
+document.getElementById('reports-search').addEventListener('input', debounce_(applyRiwayatSearchAndRender, 200));
+
+function loadRiwayatPekerjaan(force) {
+  var session = loadSession();
+  if (!session) return;
+
+
+  var titleEl = document.getElementById('reports-card-title');
+  if (titleEl && appBootstrap) {
+    var role = appBootstrap.currentUser.role;
+    if (role === 'demo') {
+      titleEl.textContent = 'Riwayat Pekerjaan (Semua)';
+    } else if (role === 'admin') {
+      titleEl.textContent = 'Riwayat Penugasan Saya';
+    } else {
+      titleEl.textContent = 'Riwayat Pekerjaan Saya';
+    }
+  }
+
+  var cacheKey = 'default'; // Tahap 4 — filter granular dipindah ke Aktivitas; Riwayat tidak punya sub-filter server-side.
+  var cached = pageDataCache.pekerjaanRiwayatByKey[cacheKey];
+
+  if (cached && !force) {
+    riwayatSearchState.full = cached;
+    applyRiwayatSearchAndRender();
+    return;
+  }
+
+  if (!cached) {
+    renderListSkeleton_('my-reports-list', 3, 'Memuat riwayat pekerjaan...');
+  }
+
+  google.script.run
+    .withSuccessHandler(function (response) {
+      var container = document.getElementById('my-reports-list');
+      if (!response.success) {
+        if (!cached) container.innerHTML = '<p>' + response.error + '</p>';
+        return;
+      }
+      pageDataCache.pekerjaanRiwayatByKey[cacheKey] = response.data.pekerjaan;
+      riwayatSearchState.full = response.data.pekerjaan;
+      applyRiwayatSearchAndRender();
+    })
+    .withFailureHandler(function () {
+      if (!cached) document.getElementById('my-reports-list').innerHTML = '<p>Gagal memuat riwayat.</p>';
+    })
+    .getPekerjaanList(session.accessCode, { view: 'riwayat' });
+}
+
+function renderRiwayatPekerjaan(list) {
+  var container = document.getElementById('my-reports-list');
+  container.innerHTML = '';
+
+  if (!list || list.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('description', 26) + '</div>Belum ada riwayat pekerjaan.<br>' +
+      '<button class="btn-primary" id="empty-state-buat-pekerjaan">Buat Pekerjaan Sekarang</button></div>';
+    var ctaBtn = document.getElementById('empty-state-buat-pekerjaan');
+    if (ctaBtn) {
+      ctaBtn.addEventListener('click', function () { goToPage('buat'); });
+    }
+    return;
+  }
+
+  // Kartu Riwayat memakai fungsi yang SAMA PERSIS dengan Aktivitas
+  // (buildPekerjaanListCard_) supaya identik by construction.
+  list.forEach(function (p) {
+    container.appendChild(buildPekerjaanListCard_(p));
+  });
+}
+
+// ============================================================
+// JADWAL PIKET (Collaborative Schedule) — Patch 10.x Bagian 2
+// ============================================================
+
+var JADWAL_JENIS_COLOR = {
+  piket_sabtu: { bg: 'var(--status-info-bg)', fg: 'var(--status-info-fg)' },
+  piket_minggu: { bg: 'var(--status-info-bg)', fg: 'var(--status-info-fg)' },
+  piket_libur_nasional: { bg: 'var(--status-info-bg)', fg: 'var(--status-info-fg)' },
+  libur_pengganti: { bg: 'var(--status-completed-bg)', fg: 'var(--status-completed-fg)' },
+  cuti: { bg: 'var(--status-info-bg)', fg: 'var(--status-info-fg)' },
+  izin: { bg: 'var(--status-claimed-bg)', fg: 'var(--status-claimed-fg)' },
+  sakit: { bg: 'var(--status-alert-bg)', fg: 'var(--status-alert-fg)' },
+  alpa: { bg: 'var(--status-alert-bg)', fg: 'var(--status-alert-fg)' }
+};
+
+var INDO_DAY_NAMES_ = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+var INDO_MONTH_SHORT_ = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+/**
+ * Memecah sebuah Date menjadi komponen kalender/jam SECARA EKSPLISIT
+ * dalam 'Asia/Jakarta' (lewat Intl.DateTimeFormat, bukan getter lokal),
+ * dipakai SATU SUMBER KEBENARAN oleh seluruh fungsi format tanggal/waktu
+ * ISO di frontend — konsisten dengan APP_TIMEZONE backend, apa pun
+ * timezone perangkat pengguna.
+ */
+function getJakartaDateParts_(date) {
+  var formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false,
+    weekday: 'short'
+  });
+  var map = {};
+  formatter.formatToParts(date).forEach(function (p) {
+    if (p.type !== 'literal') map[p.type] = p.value;
+  });
+  var hour = map.hour === '24' ? '00' : map.hour;
+  var jsWeekdayIndex = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(map.weekday);
+  return {
+    year: map.year,
+    monthIndex: parseInt(map.month, 10) - 1,
+    day: map.day,
+    hour: hour,
+    minute: map.minute,
+    dayOfWeekIndex: jsWeekdayIndex !== -1 ? jsWeekdayIndex : new Date(date).getDay()
+  };
+}
+
+/** 'YYYY-MM-DD' -> "Minggu, 26 Jul 2026" (parse manual, hindari geser
+ * zona waktu). */
+function formatJadwalDateLong_(dateStr) {
+  var parts = (dateStr || '').split('-');
+  if (parts.length !== 3) return dateStr || '';
+  var d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+  var dayName = INDO_DAY_NAMES_[d.getDay()];
+  return dayName + ', ' + String(d.getDate()).padStart(2, '0') + ' ' + INDO_MONTH_SHORT_[d.getMonth()] + ' ' + d.getFullYear();
+}
+
+/** ISO timestamp -> "17 Jul 2026, 10:30" DALAM ZONA WAKTU Asia/Jakarta. */
+function formatJadwalTimestamp_(isoString) {
+  if (!isoString) return '';
+  var d = new Date(isoString);
+  if (isNaN(d.getTime())) return '';
+  var parts = getJakartaDateParts_(d);
+  return parts.day + ' ' + INDO_MONTH_SHORT_[parts.monthIndex] + ' ' + parts.year + ', ' + parts.hour + ':' + parts.minute;
+}
+
+var jadwalFormEditId = null; // null = mode tambah; terisi = mode ubah
+var jadwalFormListenersAttached = false;
+
+function initJadwalPiketSection() {
+  if (!appBootstrap) return;
+  var role = appBootstrap.currentUser.role;
+  var isDemo = role === 'demo';
+  var isAdmin = role === 'admin';
+
+  document.getElementById('btn-toggle-jadwal-form').style.display = isDemo ? 'none' : 'flex';
+  document.getElementById('btn-jadwal-piket-audit').style.display = isAdmin ? 'flex' : 'none';
+
+  if (!jadwalFormListenersAttached) {
+    jadwalFormListenersAttached = true;
+
+    var jenisSelect = document.getElementById('jadwal-form-jenis');
+    (appBootstrap.jadwalJenisList || []).forEach(function (j) {
+      var opt = document.createElement('option');
+      opt.value = j.value;
+      opt.textContent = j.label;
+      jenisSelect.appendChild(opt);
+    });
+
+    var userSelect = document.getElementById('jadwal-form-user');
+    (appBootstrap.master.fsUsers || []).forEach(function (u) {
+      var opt = document.createElement('option');
+      opt.value = u.userCode;
+      opt.textContent = u.displayName + ' (' + u.userCode + ')';
+      userSelect.appendChild(opt);
+    });
+  }
+
+  loadJadwalAktif();
+}
+
+document.getElementById('btn-toggle-jadwal-form').addEventListener('click', function () {
+  if (jadwalFormEditId !== null || document.getElementById('jadwal-form-panel').style.display === 'block') {
+    closeJadwalForm();
+  } else {
+    openJadwalForm(null);
+  }
+});
+
+document.getElementById('btn-cancel-jadwal-form').addEventListener('click', function () {
+  closeJadwalForm();
+});
+
+function openJadwalForm(entry) {
+  jadwalFormEditId = entry ? entry.jadwalId : null;
+  document.getElementById('jadwal-form-heading').textContent = entry ? 'Ubah Jadwal' : 'Tambah Jadwal';
+  document.getElementById('jadwal-form-date').value = entry ? entry.tanggal : '';
+  document.getElementById('jadwal-form-jenis').value = entry ? entry.jenis : (appBootstrap.jadwalJenisList[0] || {}).value || '';
+  document.getElementById('jadwal-form-user').value = entry ? entry.userCode : '';
+  document.getElementById('jadwal-form-notes').value = entry ? entry.catatan : '';
+  document.getElementById('jadwal-form-error').textContent = '';
+  document.getElementById('jadwal-form-panel').style.display = 'block';
+  document.getElementById('jadwal-form-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function closeJadwalForm() {
+  jadwalFormEditId = null;
+  document.getElementById('jadwal-form-panel').style.display = 'none';
+  document.getElementById('jadwal-form-error').textContent = '';
+}
+
+document.getElementById('btn-submit-jadwal').addEventListener('click', function () {
+  var errorEl = document.getElementById('jadwal-form-error');
+  errorEl.textContent = '';
+
+  var data = {
+    tanggal: document.getElementById('jadwal-form-date').value,
+    jenis: document.getElementById('jadwal-form-jenis').value,
+    userCode: document.getElementById('jadwal-form-user').value,
+    catatan: document.getElementById('jadwal-form-notes').value
+  };
+
+  if (!data.tanggal) { errorEl.textContent = 'Tanggal wajib diisi.'; return; }
+  if (!data.userCode) { errorEl.textContent = 'Petugas wajib dipilih.'; return; }
+
+  var session = loadSession();
+  var editId = jadwalFormEditId;
+  var submitBtn = document.getElementById('btn-submit-jadwal');
+  beginAction(submitBtn, 'Menyimpan...');
+
+  var call = google.script.run
+    .withSuccessHandler(function (response) {
+      endAction(submitBtn);
+      if (!response.success) { errorEl.textContent = response.error; showSnackbar(response.error, 'error'); return; }
+      showSnackbar(editId ? 'Jadwal berhasil diubah.' : 'Jadwal berhasil ditambahkan.', 'success');
+      closeJadwalForm();
+      pageDataCache.jadwalAktif = null;
+      loadJadwalAktif(true);
+    })
+    .withFailureHandler(function () {
+      endAction(submitBtn);
+      errorEl.textContent = 'Gagal terhubung ke server. Coba lagi.';
+      showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error');
+    });
+
+  if (editId) {
+    call.ubahJadwal(session.accessCode, editId, data);
+  } else {
+    call.buatJadwal(session.accessCode, data);
+  }
+});
+
+
+function confirmHapusJadwal(jadwalId) {
+  showConfirmModal('Hapus entri jadwal ini?', function () {
+    doHapusJadwal(jadwalId);
+  }, 'delete', true, 'Menghapus...');
+}
+
+function doHapusJadwal(jadwalId) {
+  var session = loadSession();
+  beginAction(null, 'Menghapus...');
+  google.script.run
+    .withSuccessHandler(function (response) {
+      endAction(null);
+      if (!response.success) { showSnackbar(response.error, 'error'); return; }
+      showSnackbar('Jadwal berhasil dihapus.', 'success');
+      pageDataCache.jadwalAktif = null;
+      loadJadwalAktif(true);
+    })
+    .withFailureHandler(function () {
+      endAction(null);
+      showSnackbar('Gagal menghapus jadwal. Coba lagi.', 'error');
+    })
+    .hapusJadwal(session.accessCode, jadwalId);
+}
+
+function loadJadwalAktif(force) {
+  var session = loadSession();
+  if (!session) return;
+
+  var cached = pageDataCache.jadwalAktif;
+  if (cached && !force) {
+    renderJadwalPiket_(cached);
+    return;
+  }
+
+  if (!cached) {
+    document.getElementById('jadwal-piket-summary').innerHTML = '<div class="inline-loading"><span class="spinner-sm"></span>Memuat jadwal...</div>';
+  }
+
+  google.script.run
+    .withSuccessHandler(function (response) {
+      if (!response.success) {
+        if (!cached) document.getElementById('jadwal-piket-summary').textContent = response.error;
+        return;
+      }
+      pageDataCache.jadwalAktif = response.data.jadwal;
+      renderJadwalPiket_(response.data.jadwal);
+    })
+    .withFailureHandler(function () {
+      if (!cached) document.getElementById('jadwal-piket-summary').textContent = 'Gagal memuat jadwal.';
+    })
+    .getJadwalAktif(session.accessCode);
+}
+
+function filterJadwalDalamJendela_(list) {
+  var today = todayDateStr_();
+  var windowDays = (appBootstrap && appBootstrap.scheduleDisplayWindowDays) || 21;
+  var end = new Date();
+  end.setDate(end.getDate() + windowDays);
+  var endStr = end.getFullYear() + '-' + String(end.getMonth() + 1).padStart(2, '0') + '-' + String(end.getDate()).padStart(2, '0');
+  return (list || []).filter(function (e) { return e.tanggal >= today && e.tanggal <= endStr; });
+}
+
+function renderJadwalPiket_(fullList) {
+  var inWindow = filterJadwalDalamJendela_(fullList);
+
+  var piketCount = inWindow.filter(function (e) { return e.jenis.indexOf('piket') === 0; }).length;
+  var liburCount = inWindow.filter(function (e) { return e.jenis === 'libur_pengganti'; }).length;
+  var lainnyaCount = inWindow.filter(function (e) {
+    return ['cuti', 'izin', 'sakit', 'alpa'].indexOf(e.jenis) !== -1;
+  }).length;
+  var windowDays = (appBootstrap && appBootstrap.scheduleDisplayWindowDays) || 21;
+  var windowWeeks = Math.round(windowDays / 7);
+
+  var summaryEl = document.getElementById('jadwal-piket-summary');
+  summaryEl.innerHTML =
+    '<div class="jadwal-summary-row">' +
+      '<span class="icon-slot">' + mdIcon('description', 16) + '</span>' +
+      '<span>' + inWindow.length + ' Jadwal aktif</span>' +
+      '<span class="jadwal-summary-divider">|</span>' +
+      '<span class="jadwal-summary-dot" style="background:var(--status-info-fg);"></span>' +
+      '<span>' + piketCount + ' Piket</span>' +
+      '<span class="jadwal-summary-dot" style="background:var(--status-completed-fg);"></span>' +
+      '<span>' + liburCount + ' Libur</span>' +
+      (lainnyaCount > 0 ?
+        '<span class="jadwal-summary-dot" style="background:var(--status-claimed-fg);"></span>' +
+        '<span>' + lainnyaCount + ' Cuti/Izin/Sakit/Alpa</span>'
+      : '') +
+    '</div>' +
+    '<div class="jadwal-summary-row">' +
+      '<span class="icon-slot">' + mdIcon('reminder', 16) + '</span>' +
+      '<span>' + windowWeeks + ' minggu ke depan</span>' +
+    '</div>';
+
+  renderJadwalTable_(inWindow);
+}
+
+function renderJadwalTable_(list) {
+  var container = document.getElementById('jadwal-piket-table');
+  container.innerHTML = '';
+
+  if (!list || list.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('calendarCheck', 22) + '</div>Belum ada jadwal dalam 3 minggu ke depan.</div>';
+    return;
+  }
+
+  list.forEach(function (e) {
+    var colors = JADWAL_JENIS_COLOR[e.jenis] || { bg: 'var(--status-neutral-bg)', fg: 'var(--status-neutral-fg)' };
+
+    var card = document.createElement('div');
+    card.className = 'list-card';
+
+    var badge = document.createElement('span');
+    badge.className = 'badge-pill';
+    badge.style.background = colors.bg;
+    badge.style.color = colors.fg;
+    var dot = document.createElement('span');
+    dot.className = 'dot';
+    badge.appendChild(dot);
+    badge.appendChild(document.createTextNode(e.jenisLabel));
+    card.appendChild(badge);
+
+    var dateRow = document.createElement('div');
+    dateRow.className = 'list-card-date-row';
+    var dateEl = document.createElement('span');
+    dateEl.className = 'list-card-date';
+    dateEl.innerHTML = '<span class="icon-slot">' + mdIcon('calendar', 16) + '</span><span>' + formatJadwalDateLong_(e.tanggal) + '</span>';
+    dateRow.appendChild(dateEl);
+    var chevron = document.createElement('span');
+    chevron.className = 'list-card-chevron';
+    chevron.innerHTML = mdIcon('chevronRight', 18);
+    dateRow.appendChild(chevron);
+    card.appendChild(dateRow);
+
+    var personRow = document.createElement('div');
+    personRow.className = 'list-card-person-row';
+    var avatar = document.createElement('span');
+    avatar.className = 'avatar-circle';
+    avatar.style.background = colors.bg;
+    avatar.style.color = colors.fg;
+    avatar.innerHTML = mdIcon('account', 18);
+    personRow.appendChild(avatar);
+    var personText = document.createElement('div');
+    personText.className = 'list-card-person-text';
+    personText.innerHTML = '<div class="name">' + e.userName + '</div><div class="subtext">' + e.jenisLabel + '</div>';
+    personRow.appendChild(personText);
+    card.appendChild(personRow);
+
+    card.addEventListener('click', function () { openJadwalDetail_(e); });
+    container.appendChild(card);
+  });
+}
+
+function openJadwalDetail_(entry) {
+  var colors = JADWAL_JENIS_COLOR[entry.jenis] || { bg: 'var(--status-neutral-bg)', fg: 'var(--status-neutral-fg)' };
+  var canEdit = appBootstrap.currentUser.role !== 'demo';
+  var dateLong = formatJadwalDateLong_(entry.tanggal);
+  var dayNameOnly = dateLong.split(',')[0];
+
+  var body = document.getElementById('activity-detail-body');
+  document.getElementById('activity-detail-title').textContent = 'DETAIL JADWAL';
+  var html = '';
+
+  html += '<div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">' +
+    '<div class="card-header-icon" style="background:' + colors.bg + '; color:' + colors.fg + ';">' + mdIcon('calendarCheck', 22) + '</div>' +
+    '<p style="font-size:18px; font-weight:800; color:' + colors.fg + '; margin:0;">' + entry.jenisLabel + '</p>' +
+  '</div>';
+
+  html += '<div style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:15px;">' +
+    mdIcon('calendar', 18) + '<span>' + dateLong + '</span>' +
+  '</div>' +
+  '<p class="md-body-sm" style="margin:2px 0 14px 26px;">(Hari ' + dayNameOnly + ')</p>';
+
+  html += '<p class="form-label" style="margin:14px 0 8px;">Petugas</p>' +
+    '<div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">' +
+      '<span class="avatar-circle" style="background:' + colors.bg + '; color:' + colors.fg + ';">' + mdIcon('account', 18) + '</span>' +
+      '<div><div style="font-weight:700; font-size:14px;">' + entry.userName + '</div><div class="md-body-sm">' + entry.jenisLabel + '</div></div>' +
+    '</div>';
+
+  if (entry.catatan) {
+    html += '<p class="form-label" style="margin:14px 0 4px;">Keterangan</p>' +
+      '<p style="font-size:14px; margin:0 0 14px; white-space:pre-wrap;">' + entry.catatan + '</p>';
+  }
+
+  html += '<div style="border-top:1px solid var(--color-border); margin:14px 0;"></div>';
+
+  html += '<p class="form-label" style="margin:0 0 8px;">Dibuat oleh</p>' + buildJadwalPersonChip_(entry.createdBy, entry.createdAt);
+
+  if (entry.updatedBy) {
+    html += '<p class="form-label" style="margin:14px 0 8px;">Terakhir diubah</p>' + buildJadwalPersonChip_(entry.updatedBy, entry.updatedAt);
+  }
+
+  body.innerHTML = html;
+
+  if (canEdit) {
+    var actionsWrap = document.createElement('div');
+    actionsWrap.style.marginTop = '20px';
+    actionsWrap.style.display = 'flex';
+    actionsWrap.style.flexDirection = 'column';
+    actionsWrap.style.gap = '10px';
+
+    var editBtn = document.createElement('button');
+    editBtn.className = 'btn-outlined primary';
+    editBtn.style.display = 'inline-flex';
+    editBtn.style.alignItems = 'center';
+    editBtn.style.justifyContent = 'center';
+    editBtn.style.gap = '8px';
+    editBtn.innerHTML = mdIcon('edit', 16) + '<span>Ubah Jadwal</span>';
+    editBtn.addEventListener('click', function () {
+      closeActivityDetail();
+      openJadwalForm(entry);
+    });
+    actionsWrap.appendChild(editBtn);
+
+    var deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn-outlined danger';
+    deleteBtn.style.display = 'inline-flex';
+    deleteBtn.style.alignItems = 'center';
+    deleteBtn.style.justifyContent = 'center';
+    deleteBtn.style.gap = '8px';
+    deleteBtn.innerHTML = mdIcon('delete', 16) + '<span>Hapus Jadwal</span>';
+    deleteBtn.addEventListener('click', function () {
+      closeActivityDetail();
+      confirmHapusJadwal(entry.jadwalId);
+    });
+    actionsWrap.appendChild(deleteBtn);
+
+    body.appendChild(actionsWrap);
+  }
+
+  document.getElementById('activity-detail-overlay').classList.add('show');
+}
+
+/** Baris kecil "Dibuat oleh"/"Terakhir diubah". */
+function buildJadwalPersonChip_(userCode, isoTimestamp) {
+  return '<div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">' +
+    '<span class="avatar-circle" style="width:32px; height:32px; background:var(--md-surface-container); color:var(--color-text-muted);">' + userCode + '</span>' +
+    '<div><div style="font-weight:700; font-size:13px;">' + userCode + '</div><div class="md-body-sm">' + formatJadwalTimestamp_(isoTimestamp) + '</div></div>' +
+  '</div>';
+}
+
+// ------------------- AUDIT LOG (Admin-only) -------------------
+
+document.getElementById('btn-jadwal-piket-audit').addEventListener('click', function () {
+  var session = loadSession();
+  if (!session) return;
+
+  var body = document.getElementById('activity-detail-body');
+  body.innerHTML = '<p class="card-header-title" style="margin:0 0 10px;">Riwayat Perubahan Jadwal</p><div class="inline-loading"><span class="spinner-sm"></span>Memuat...</div>';
+  document.getElementById('activity-detail-title').textContent = 'RIWAYAT PERUBAHAN';
+  document.getElementById('activity-detail-overlay').classList.add('show');
+
+  google.script.run
+    .withSuccessHandler(function (response) {
+      if (!response.success) {
+        body.innerHTML = '<p class="card-header-title" style="margin:0 0 10px;">Riwayat Perubahan Jadwal</p><p>' + response.error + '</p>';
+        return;
+      }
+      renderJadwalAuditLog_(response.data.log);
+    })
+    .withFailureHandler(function () {
+      body.innerHTML = '<p class="card-header-title" style="margin:0 0 10px;">Riwayat Perubahan Jadwal</p><p>Gagal memuat riwayat.</p>';
+    })
+    .getAuditLogJadwal(session.accessCode);
+});
+
+var JADWAL_AUDIT_ACTION_BADGE = { CREATE: 'badge-available', UPDATE: 'badge-claimed', DELETE: 'badge-alert' };
+
+function renderJadwalAuditLog_(log) {
+  var body = document.getElementById('activity-detail-body');
+  body.innerHTML = '<p class="card-header-title" style="margin:0 0 10px;">Riwayat Perubahan Jadwal</p>';
+
+  if (!log || log.length === 0) {
+    body.innerHTML += '<p class="md-body-sm">Belum ada riwayat perubahan.</p>';
+    return;
+  }
+
+  log.forEach(function (entry) {
+    var row = document.createElement('div');
+    row.className = 'activity-detail-row';
+    row.style.flexDirection = 'column';
+    row.style.alignItems = 'flex-start';
+
+    var top = document.createElement('div');
+    top.className = 'op-card-top';
+    top.style.marginBottom = '2px';
+    var badge = document.createElement('span');
+    badge.className = 'badge ' + (JADWAL_AUDIT_ACTION_BADGE[entry.action] || 'badge-neutral');
+    badge.textContent = entry.action;
+    top.appendChild(badge);
+    var who = document.createElement('span');
+    who.className = 'op-card-meta';
+    who.textContent = entry.user;
+    top.appendChild(who);
+    var when = document.createElement('span');
+    when.className = 'op-card-meta';
+    when.textContent = formatJadwalTimestamp_(entry.timestamp);
+    top.appendChild(when);
+    row.appendChild(top);
+
+    var summary = document.createElement('div');
+    summary.className = 'md-body-sm';
+    summary.textContent = entry.summary;
+    row.appendChild(summary);
+
+    body.appendChild(row);
+  });
+}
+
+function todayDateStr_() {
+  var parts = getJakartaDateParts_(new Date());
+  return parts.year + '-' + String(parts.monthIndex + 1).padStart(2, '0') + '-' + parts.day;
+}
+
+// ============================================================
+// BERANDA — Sprint 5 (Dashboard), Patch 10.x (Content Management)
+// ============================================================
+
+function initBerandaPage() {
+  if (!appBootstrap) return;
+
+  initJadwalPiketSection();
+  initContentManagementSection();
+
+  setTimeout(loadHomeBootstrap, 0);
+}
+
+function loadHomeBootstrap(force) {
+  var session = loadSession();
+  if (!session) return;
+
+  if (force) {
+    pageDataCache.dashboard = null;
+    pageDataCache.content = null;
+  }
+
+  if (pageDataCache.dashboard && pageDataCache.content) {
+    renderContentBanner_(pageDataCache.content);
+    if (appBootstrap.currentUser.role === 'admin') renderContentManagementList_(pageDataCache.content);
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function (response) {
+      if (!response.success) return;
+      pageDataCache.dashboard = response.data.dashboard;
+      pageDataCache.content = response.data.content;
+      renderContentBanner_(response.data.content);
+      if (appBootstrap.currentUser.role === 'admin') renderContentManagementList_(response.data.content);
+    })
+    .withFailureHandler(function () {})
+    .getHomeBootstrap(session.accessCode);
+}
+
+var STATS_LABELS = [
+  { key: 'reportsThisWeek', label: 'Laporan Minggu Ini' },
+  { key: 'reportsThisMonth', label: 'Laporan Bulan Ini' },
+  { key: 'tasksCompletedThisWeek', label: 'Tugas Selesai Minggu Ini' },
+  { key: 'tasksCompletedThisMonth', label: 'Tugas Selesai Bulan Ini' },
+  { key: 'tasksAvailableCount', label: 'Tugas Belum Diambil' },
+  { key: 'myClaimedCount', label: 'Tugas Saya (Diambil)' }
+];
+
+function fetchDashboardData_(onData) {
+  var session = loadSession();
+  if (!session) return;
+
+  if (pageDataCache.dashboard) {
+    onData(pageDataCache.dashboard);
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function (response) {
+      if (!response.success) { onData(null); return; }
+      pageDataCache.dashboard = response.data;
+      onData(response.data);
+    })
+    .withFailureHandler(function () { onData(null); })
+    .getDashboard(session.accessCode);
+}
+
+function loadAktivitasSummary(force) {
+  if (force) pageDataCache.dashboard = null;
+  var cached = pageDataCache.dashboard;
+  if (!cached) renderSkeleton('dashboard-stats', 3);
+  fetchDashboardData_(function (data) {
+    if (!data) { if (!cached) document.getElementById('dashboard-stats').innerHTML = '<p>Gagal memuat statistik.</p>'; return; }
+    renderDashboardStats(data.stats);
+  });
+}
+
+function renderDashboardStats(stats) {
+  var container = document.getElementById('dashboard-stats');
+  container.innerHTML = '';
+
+  STATS_LABELS.forEach(function (s) {
+    var box = document.createElement('div');
+    box.className = 'stat-box';
+
+    var value = document.createElement('div');
+    value.className = 'stat-value';
+    value.textContent = stats[s.key] != null ? stats[s.key] : 0;
+    box.appendChild(value);
+
+    var label = document.createElement('div');
+    label.className = 'stat-label';
+    label.textContent = s.label;
+    box.appendChild(label);
+
+    container.appendChild(box);
+  });
+}
+
+// ============================================================
+// CONTENT MANAGEMENT — Patch 10.x (menggantikan Reminder lama)
+// ============================================================
+
+var CONTENT_TYPE_BADGE = {
+  announcement: { icon: 'notification', cls: 'badge-info' },
+  reminder: { icon: 'reminder', cls: 'badge-claimed' },
+  information: { icon: 'description', cls: 'badge-available' },
+  warning: { icon: 'warning', cls: 'badge-alert' },
+  schedule: { icon: 'calendarCheck', cls: 'badge-neutral' }
+};
+
+var CONTENT_STATUS_BADGE_CLASS = { terjadwal: 'badge-neutral', tayang: 'badge-available', expired: 'badge-alert' };
+
+var CONTENT_EMOJI_LIST = ['📢', '✅', '⚠️', '🔧', '🕒', '😊'];
+
+var RICHTEXT_ALLOWED_TAGS = { B: 1, STRONG: 1, I: 1, EM: 1, U: 1, A: 1, BR: 1 };
+
+function sanitizeRichContentHtml_(html) {
+  var template = document.createElement('template');
+  template.innerHTML = html || '';
+
+  var walker = document.createTreeWalker(template.content, NodeFilter.SHOW_ELEMENT, null);
+  var toUnwrap = [];
+  var node = walker.currentNode;
+  while (node) {
+    if (node.nodeType === 1) {
+      var tag = node.tagName;
+      if (!RICHTEXT_ALLOWED_TAGS[tag]) {
+        toUnwrap.push(node);
+      } else {
+        Array.prototype.slice.call(node.attributes).forEach(function (attr) {
+          if (tag === 'A' && attr.name === 'href') return;
+          node.removeAttribute(attr.name);
+        });
+        if (tag === 'A') {
+          var href = node.getAttribute('href') || '';
+          if (!/^https?:\/\//i.test(href)) node.removeAttribute('href');
+          node.setAttribute('target', '_blank');
+          node.setAttribute('rel', 'noopener noreferrer');
+        }
+      }
+    }
+    node = walker.nextNode();
+  }
+  toUnwrap.forEach(function (el) {
+    var parent = el.parentNode;
+    while (el.firstChild) parent.insertBefore(el.firstChild, el);
+    parent.removeChild(el);
+  });
+
+  return template.innerHTML;
+}
+
+function initContentManagementSection() {
+  if (!appBootstrap) return;
+  var isAdmin = appBootstrap.currentUser.role === 'admin';
+  document.getElementById('admin-content-card').style.display = isAdmin ? 'block' : 'none';
+  if (!isAdmin) return;
+
+  if (!contentFormListenersAttached) {
+    contentFormListenersAttached = true;
+    attachContentFormListenersOnce_();
+  }
+}
+
+var contentFormListenersAttached = false;
+var contentFormEditId = null;
+var contentFormImage = null;
+var contentFormImageWasRemoved = false;
+var contentFormPdf = null;
+var contentFormPdfWasRemoved = false;
+
+function attachContentFormListenersOnce_() {
+  var typeSelect = document.getElementById('content-form-type');
+  (appBootstrap.contentTypeList || []).forEach(function (t) {
+    var opt = document.createElement('option');
+    opt.value = t.value;
+    opt.textContent = t.label;
+    typeSelect.appendChild(opt);
+  });
+
+  var emojiRow = document.getElementById('content-form-emoji-row');
+  CONTENT_EMOJI_LIST.forEach(function (emoji) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'richtext-emoji-btn';
+    btn.textContent = emoji;
+    btn.addEventListener('click', function () { insertContentEmoji_(emoji); });
+    emojiRow.appendChild(btn);
+  });
+
+  document.querySelectorAll('#content-form-toolbar .richtext-toolbar-btn[data-wrap]').forEach(function (btn) {
+    btn.addEventListener('click', function () { wrapContentSelection_(btn.dataset.wrap); });
+  });
+
+  document.getElementById('btn-content-link').addEventListener('click', function () {
+    var row = document.getElementById('content-link-input-row');
+    var showing = row.style.display === 'flex';
+    row.style.display = showing ? 'none' : 'flex';
+    if (!showing) document.getElementById('content-link-url').focus();
+  });
+
+  document.getElementById('btn-insert-content-link').addEventListener('click', function () {
+    var urlInput = document.getElementById('content-link-url');
+    var url = urlInput.value.trim();
+    if (!url) { showSnackbar('Isi URL terlebih dahulu.', 'error'); return; }
+    var ta = document.getElementById('content-form-body');
+    var start = ta.selectionStart, end = ta.selectionEnd;
+    var value = ta.value;
+    var selectedText = value.slice(start, end) || 'tautan';
+    var linkHtml = '<a href="' + url + '">' + selectedText + '</a>';
+    ta.value = value.slice(0, start) + linkHtml + value.slice(end);
+    urlInput.value = '';
+    document.getElementById('content-link-input-row').style.display = 'none';
+    ta.focus();
+    updateContentPreview_();
+  });
+
+  document.getElementById('content-form-body').addEventListener('input', updateContentPreview_);
+
+  document.getElementById('content-form-schedule-mode').addEventListener('change', function () {
+    document.getElementById('content-form-rule-group').style.display = this.value === 'scheduled' ? 'block' : 'none';
+  });
+  document.getElementById('content-form-rule-type').addEventListener('change', function () {
+    document.getElementById('content-form-rule-day').style.display = this.value === 'WEEKLY' ? 'block' : 'none';
+    document.getElementById('content-form-rule-date').style.display = this.value === 'DATE' ? 'block' : 'none';
+  });
+
+  document.getElementById('content-image-file-input').addEventListener('change', function (e) {
+    var file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    beginAction(null);
+    compressImage(file).then(function (result) {
+      endAction(null);
+      contentFormImage = { previewUrl: result.previewUrl, base64: result.base64, mimeType: result.mimeType };
+      contentFormImageWasRemoved = false;
+      renderContentImageSlot_();
+    }).catch(function () {
+      endAction(null);
+      showSnackbar('Gagal memproses gambar. Coba lagi.', 'error');
+    });
+  });
+
+  document.getElementById('content-pdf-file-input').addEventListener('change', function (e) {
+    var file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.type !== 'application/pdf') { showSnackbar('File harus berformat PDF.', 'error'); return; }
+    if (file.size > 5 * 1024 * 1024) { showSnackbar('Ukuran PDF maksimal 5MB.', 'error'); return; }
+
+    var reader = new FileReader();
+    reader.onload = function () {
+      contentFormPdf = { fileName: file.name, base64: reader.result.split(',')[1], mimeType: 'application/pdf' };
+      contentFormPdfWasRemoved = false;
+      renderContentPdfSlot_();
+    };
+    reader.onerror = function () { showSnackbar('Gagal membaca file PDF.', 'error'); };
+    reader.readAsDataURL(file);
+  });
+
+  document.getElementById('btn-toggle-content-form').addEventListener('click', function () {
+    if (document.getElementById('content-form-panel').style.display === 'block') {
+      closeContentForm_();
+    } else {
+      openContentForm_(null);
+    }
+  });
+  document.getElementById('btn-cancel-content-form').addEventListener('click', closeContentForm_);
+
+  document.getElementById('btn-submit-content').addEventListener('click', submitContentForm_);
+}
+
+function wrapContentSelection_(tag) {
+  var ta = document.getElementById('content-form-body');
+  var start = ta.selectionStart, end = ta.selectionEnd;
+  var value = ta.value;
+  var selected = value.slice(start, end);
+  var before = '<' + tag + '>';
+  var after = '</' + tag + '>';
+  ta.value = value.slice(0, start) + before + selected + after + value.slice(end);
+  var cursor = start + before.length + selected.length + after.length;
+  ta.focus();
+  ta.setSelectionRange(cursor, cursor);
+  updateContentPreview_();
+}
+
+function insertContentEmoji_(emoji) {
+  var ta = document.getElementById('content-form-body');
+  var start = ta.selectionStart, end = ta.selectionEnd;
+  var value = ta.value;
+  ta.value = value.slice(0, start) + emoji + value.slice(end);
+  var cursor = start + emoji.length;
+  ta.focus();
+  ta.setSelectionRange(cursor, cursor);
+  updateContentPreview_();
+}
+
+function updateContentPreview_() {
+  var preview = document.getElementById('content-form-preview');
+  var raw = document.getElementById('content-form-body').value;
+  var sanitized = sanitizeRichContentHtml_(raw);
+  preview.innerHTML = sanitized || '<span style="color:var(--color-text-faint);">Pratinjau akan tampil di sini...</span>';
+}
+
+function buildContentScheduleRule_() {
+  var mode = document.getElementById('content-form-schedule-mode').value;
+  if (mode !== 'scheduled') return '';
+  var ruleType = document.getElementById('content-form-rule-type').value;
+  if (ruleType === 'DAILY') return 'DAILY';
+  if (ruleType === 'WEEKLY') return 'WEEKLY:' + document.getElementById('content-form-rule-day').value;
+  if (ruleType === 'DATE') return 'DATE:' + document.getElementById('content-form-rule-date').value;
+  return '';
+}
+
+function openContentImageSourceSheet_() {
+  openPhotoSourceSheet('content-image-file-input');
+}
+
+function renderContentImageSlot_() {
+  var container = document.getElementById('content-image-slot-container');
+  container.innerHTML = '';
+  var slot = document.createElement('div');
+  slot.className = 'photo-slot';
+
+  if (contentFormImage && contentFormImage.previewUrl) {
+    var inner = document.createElement('div');
+    inner.className = 'photo-thumb-inner';
+    var img = document.createElement('img');
+    img.src = contentFormImage.previewUrl;
+    inner.appendChild(img);
+    inner.addEventListener('click', openContentImageSourceSheet_);
+    slot.appendChild(inner);
+
+    var removeBtn = document.createElement('button');
+    removeBtn.className = 'remove-btn';
+    removeBtn.textContent = '\u00d7';
+    removeBtn.setAttribute('aria-label', 'Hapus gambar');
+    removeBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      contentFormImage = null;
+      contentFormImageWasRemoved = true;
+      renderContentImageSlot_();
+    });
+    slot.appendChild(removeBtn);
+  } else {
+    slot.textContent = '+';
+    slot.addEventListener('click', openContentImageSourceSheet_);
+  }
+  container.appendChild(slot);
+}
+
+function renderContentPdfSlot_() {
+  var container = document.getElementById('content-pdf-slot-container');
+  container.innerHTML = '';
+
+  if (contentFormPdf) {
+    var chip = document.createElement('div');
+    chip.className = 'content-pdf-chip';
+    chip.innerHTML = mdIcon('description', 16) + '<span>' + (contentFormPdf.fileName || 'Dokumen PDF') + '</span>';
+    var removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.textContent = '\u00d7';
+    removeBtn.setAttribute('aria-label', 'Hapus PDF');
+    removeBtn.addEventListener('click', function () {
+      contentFormPdf = null;
+      contentFormPdfWasRemoved = true;
+      renderContentPdfSlot_();
+    });
+    chip.appendChild(removeBtn);
+    container.appendChild(chip);
+  } else {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-outlined';
+    btn.style.width = 'auto';
+    btn.innerHTML = mdIcon('upload', 16) + '<span>Pilih PDF</span>';
+    btn.addEventListener('click', function () { document.getElementById('content-pdf-file-input').click(); });
+    container.appendChild(btn);
+  }
+}
+
+function openContentForm_(entry) {
+  contentFormEditId = entry ? entry.contentId : null;
+  document.getElementById('content-form-heading').textContent = entry ? 'Ubah Konten' : 'Tambah Konten';
+  document.getElementById('content-form-type').value = entry ? entry.contentType : ((appBootstrap.contentTypeList || [])[0] || {}).value || '';
+  document.getElementById('content-form-title').value = entry ? entry.title : '';
+  document.getElementById('content-form-body').value = entry ? entry.content : '';
+  updateContentPreview_();
+
+  var scheduleMode = (entry && entry.scheduleRule) ? 'scheduled' : '';
+  document.getElementById('content-form-schedule-mode').value = scheduleMode;
+  document.getElementById('content-form-rule-group').style.display = scheduleMode === 'scheduled' ? 'block' : 'none';
+  document.getElementById('content-form-rule-day').style.display = 'none';
+  document.getElementById('content-form-rule-date').style.display = 'none';
+  document.getElementById('content-form-rule-type').value = 'DAILY';
+  if (scheduleMode === 'scheduled') {
+    var rule = entry.scheduleRule;
+    if (rule.indexOf('WEEKLY:') === 0) {
+      document.getElementById('content-form-rule-type').value = 'WEEKLY';
+      document.getElementById('content-form-rule-day').value = rule.split(':')[1];
+      document.getElementById('content-form-rule-day').style.display = 'block';
+    } else if (rule.indexOf('DATE:') === 0) {
+      document.getElementById('content-form-rule-type').value = 'DATE';
+      document.getElementById('content-form-rule-date').value = rule.split(':')[1];
+      document.getElementById('content-form-rule-date').style.display = 'block';
+    }
+  }
+
+  document.getElementById('content-form-start').value = entry ? entry.startDate : '';
+  document.getElementById('content-form-end').value = entry ? entry.endDate : '';
+
+  contentFormImage = (entry && entry.imageUrl) ? { previewUrl: entry.imageUrl, base64: null } : null;
+  contentFormImageWasRemoved = false;
+  renderContentImageSlot_();
+
+  contentFormPdf = (entry && entry.pdfUrl) ? { fileName: 'Dokumen PDF (tersimpan)', base64: null } : null;
+  contentFormPdfWasRemoved = false;
+  renderContentPdfSlot_();
+
+  document.getElementById('content-form-error').textContent = '';
+  document.getElementById('content-link-input-row').style.display = 'none';
+  document.getElementById('content-form-panel').style.display = 'block';
+  document.getElementById('content-form-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function closeContentForm_() {
+  contentFormEditId = null;
+  document.getElementById('content-form-panel').style.display = 'none';
+  document.getElementById('content-form-error').textContent = '';
+}
+
+function submitContentForm_() {
+  var errorEl = document.getElementById('content-form-error');
+  errorEl.textContent = '';
+
+  var title = document.getElementById('content-form-title').value;
+  var body = document.getElementById('content-form-body').value;
+  var startDate = document.getElementById('content-form-start').value;
+  var endDate = document.getElementById('content-form-end').value;
+
+  if (!title.trim()) { errorEl.textContent = 'Judul wajib diisi.'; return; }
+  if (!body.trim()) { errorEl.textContent = 'Isi konten wajib diisi.'; return; }
+  if (!startDate) { errorEl.textContent = 'Tanggal mulai wajib diisi.'; return; }
+  if (!endDate) { errorEl.textContent = 'Tanggal berakhir wajib diisi.'; return; }
+
+  var data = {
+    contentType: document.getElementById('content-form-type').value,
+    title: title,
+    content: body,
+    scheduleRule: buildContentScheduleRule_(),
+    startDate: startDate,
+    endDate: endDate
+  };
+
+  if (contentFormImage && contentFormImage.base64) {
+    data.image = { base64: contentFormImage.base64, mimeType: contentFormImage.mimeType };
+  } else if (!contentFormImage && contentFormImageWasRemoved) {
+    data.removeImage = true;
+  }
+
+  if (contentFormPdf && contentFormPdf.base64) {
+    data.pdf = { base64: contentFormPdf.base64, mimeType: contentFormPdf.mimeType };
+  } else if (!contentFormPdf && contentFormPdfWasRemoved) {
+    data.removePdf = true;
+  }
+
+  var session = loadSession();
+  var editId = contentFormEditId;
+  var submitBtn = document.getElementById('btn-submit-content');
+  beginAction(submitBtn, 'Menyimpan...');
+
+  var call = google.script.run
+    .withSuccessHandler(function (response) {
+      endAction(submitBtn);
+      if (!response.success) { errorEl.textContent = response.error; showSnackbar(response.error, 'error'); return; }
+      showSnackbar(editId ? 'Konten berhasil diubah.' : 'Konten berhasil ditambahkan.', 'success');
+      closeContentForm_();
+      pageDataCache.content = null;
+      loadContentAktif(true);
+    })
+    .withFailureHandler(function () {
+      endAction(submitBtn);
+      errorEl.textContent = 'Gagal terhubung ke server. Coba lagi.';
+      showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error');
+    });
+
+  if (editId) {
+    call.ubahContent(session.accessCode, editId, data);
+  } else {
+    call.buatContent(session.accessCode, data);
+  }
+}
+
+
+function confirmHapusContent_(contentId) {
+  showConfirmModal('Hapus konten ini?', function () { doHapusContent_(contentId); }, 'delete', true, 'Menghapus...');
+}
+
+function doHapusContent_(contentId) {
+  var session = loadSession();
+  beginAction(null, 'Menghapus...');
+  google.script.run
+    .withSuccessHandler(function (response) {
+      endAction(null);
+      if (!response.success) { showSnackbar(response.error, 'error'); return; }
+      showSnackbar('Konten berhasil dihapus.', 'success');
+      pageDataCache.content = null;
+      loadContentAktif(true);
+    })
+    .withFailureHandler(function () {
+      endAction(null);
+      showSnackbar('Gagal menghapus konten. Coba lagi.', 'error');
+    })
+    .hapusContent(session.accessCode, contentId);
+}
+
+function loadContentAktif(force) {
+  var session = loadSession();
+  if (!session) return;
+
+  var cached = pageDataCache.content;
+  if (cached && !force) {
+    renderContentBanner_(cached);
+    if (appBootstrap.currentUser.role === 'admin') renderContentManagementList_(cached);
+    return;
+  }
+
+  google.script.run
+    .withSuccessHandler(function (response) {
+      if (!response.success) return;
+      pageDataCache.content = response.data.content;
+      renderContentBanner_(response.data.content);
+      if (appBootstrap.currentUser.role === 'admin') renderContentManagementList_(response.data.content);
+    })
+    .withFailureHandler(function () {})
+    .getContentAktif(session.accessCode);
+}
+
+function renderContentBanner_(list) {
+  var container = document.getElementById('content-banner-container');
+  container.innerHTML = '';
+
+  (list || []).filter(function (c) { return c.status === 'tayang'; }).forEach(function (c) {
+    var card = document.createElement('div');
+    card.className = 'reminder-card' + (c.contentType === 'warning' ? ' sticky' : '');
+
+    var badgeRow = document.createElement('div');
+    badgeRow.className = 'op-card-top';
+    badgeRow.style.marginBottom = '4px';
+    var typeInfo = CONTENT_TYPE_BADGE[c.contentType] || { cls: 'badge-neutral' };
+    var badge = document.createElement('span');
+    badge.className = 'badge ' + typeInfo.cls;
+    badge.textContent = c.contentTypeLabel;
+    badgeRow.appendChild(badge);
+    card.appendChild(badgeRow);
+
+    var title = document.createElement('div');
+    title.className = 'reminder-title';
+    title.textContent = c.title;
+    card.appendChild(title);
+
+    var msg = document.createElement('div');
+    msg.className = 'reminder-message';
+    msg.innerHTML = sanitizeRichContentHtml_(c.content);
+    card.appendChild(msg);
+
+    if (c.imageUrl) {
+      var img = document.createElement('img');
+      img.className = 'content-card-image';
+      img.src = c.imageUrl;
+      img.alt = c.title;
+      img.addEventListener('click', function () { openPhotoViewer([c.imageUrl], 0); });
+      card.appendChild(img);
+    }
+
+    if (c.pdfUrl) {
+      var link = document.createElement('a');
+      link.className = 'content-card-pdf-link';
+      link.href = c.pdfUrl;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.innerHTML = mdIcon('description', 14) + '<span>Buka PDF</span>';
+      card.appendChild(link);
+    }
+
+    container.appendChild(card);
+  });
+}
+
+function renderContentManagementList_(list) {
+  var container = document.getElementById('content-management-list');
+  container.innerHTML = '';
+
+  if (!list || list.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('description', 26) + '</div>Belum ada konten.</div>';
+    return;
+  }
+
+  list.forEach(function (c) {
+    var row = document.createElement('div');
+    row.className = 'op-card';
+
+    var top = document.createElement('div');
+    top.className = 'op-card-top';
+    var typeInfo = CONTENT_TYPE_BADGE[c.contentType] || { cls: 'badge-neutral' };
+    var typeBadge = document.createElement('span');
+    typeBadge.className = 'badge ' + typeInfo.cls;
+    typeBadge.textContent = c.contentTypeLabel;
+    top.appendChild(typeBadge);
+    var statusBadge = document.createElement('span');
+    statusBadge.className = 'badge ' + (CONTENT_STATUS_BADGE_CLASS[c.status] || 'badge-neutral');
+    statusBadge.textContent = c.statusLabel;
+    top.appendChild(statusBadge);
+    var meta = document.createElement('span');
+    meta.className = 'op-card-meta';
+    meta.textContent = c.startDate + ' \u2013 ' + c.endDate;
+    top.appendChild(meta);
+    row.appendChild(top);
+
+    var title = document.createElement('div');
+    title.className = 'op-card-title';
+    title.textContent = c.title;
+    row.appendChild(title);
+
+    var actionsRow = document.createElement('div');
+    actionsRow.className = 'op-card-actions';
+    actionsRow.style.marginTop = '8px';
+
+    var editBtn = document.createElement('button');
+    editBtn.className = 'btn-card-action action-neutral';
+    editBtn.innerHTML = mdIcon('edit', 14) + '<span>Ubah</span>';
+    editBtn.addEventListener('click', function () { openContentForm_(c); });
+    actionsRow.appendChild(editBtn);
+
+    var deleteBtn = document.createElement('button');
+    deleteBtn.className = 'btn-card-action action-outline-danger';
+    deleteBtn.innerHTML = mdIcon('delete', 14) + '<span>Hapus</span>';
+    deleteBtn.addEventListener('click', function () { confirmHapusContent_(c.contentId); });
+    actionsRow.appendChild(deleteBtn);
+
+    row.appendChild(actionsRow);
+    container.appendChild(row);
+  });
+}
+
+// ============================================================
+// KARTU BERSAMA PEKERJAAN (Riwayat & Aktivitas) — buildPekerjaanListCard_
+// ============================================================
+// Ditempatkan di sini (bukan di script-aktivitas.html) karena dipakai
+// LEBIH DULU oleh loadRiwayatPekerjaan() di atas — menghindari referensi
+// ke fungsi yang belum ter-include saat file ini dieksekusi lebih awal
+// dari script-aktivitas.html. Perilaku IDENTIK dengan index.html lama.
+
+/** Potong teks ke maksimal `maxLen` karakter + "..." bila lebih panjang. */
+function truncateText_(text, maxLen) {
+  if (!text) return '';
+  var str = String(text);
+  return str.length > maxLen ? str.substring(0, maxLen) + '...' : str;
+}
+
+/** "17/07/2026 10:30" -> "Kam, 17 Jul 2026". */
+function formatAktivitasDateShort_(ddmmyyyyHHmm) {
+  if (!ddmmyyyyHHmm) return '';
+  var datePart = String(ddmmyyyyHHmm).split(' ')[0];
+  var dp = datePart.split('/');
+  if (dp.length !== 3) return ddmmyyyyHHmm;
+  var d = new Date(parseInt(dp[2], 10), parseInt(dp[1], 10) - 1, parseInt(dp[0], 10));
+  if (isNaN(d.getTime())) return ddmmyyyyHHmm;
+  return INDO_DAY_NAMES_[d.getDay()].substring(0, 3) + ', ' + dp[0] + ' ' + INDO_MONTH_SHORT_[d.getMonth()] + ' ' + dp[2];
+}
+
+/**
+ * Kartu daftar Pekerjaan (badge-pill+dot, tanggal, avatar+nama+
+ * keterangan, thumbnail/placeholder+chevron) — SATU fungsi dipakai
+ * BERSAMA oleh Aktivitas dan Riwayat.
+ */
+function buildPekerjaanListCard_(p) {
+  var jenisInfo = JENIS_PEKERJAAN_BADGE[p.jenis] || { label: p.jenis, cls: 'badge-neutral', icon: 'description' };
+  var statusCls = STATUS_PEKERJAAN_BADGE_CLASS[p.status] || 'badge-neutral';
+
+  var officer = p.handledByName || p.createdByName;
+  var photos = pilihFotoKartu_(p);
+
+  var card = document.createElement('div');
+  card.className = 'list-card list-card-row';
+
+  var main = document.createElement('div');
+  main.className = 'list-card-row-main';
+
+  var badgeRow = document.createElement('div');
+  badgeRow.className = 'op-card-top';
+      badgeRow.innerHTML =
+    '<span class="badge-pill ' + jenisInfo.cls + '"><span class="dot"></span>' + jenisInfo.label + '</span>' +
+    '<span class="badge ' + statusCls + '">' + p.statusLabel + '</span>' +
+    (p.commentCount > 0 ? '<span class="badge badge-neutral">\uD83D\uDCAC ' + p.commentCount + '</span>' : '');
+
+
+
+  main.appendChild(badgeRow);
+
+
+// PATCH — untuk arah Mandiri, utamakan performedAt (tujuan field ini:
+  // mencerminkan kapan pekerjaan BENAR-BENAR dilakukan).
+  var displayDate = (p.arah === 'mandiri' && p.performedAt) ? p.performedAt : (p.completedAt || p.startedAt || p.createdAt);
+
+  var dateRow = document.createElement('div');
+  dateRow.style.cssText = 'display:flex; align-items:center; gap:6px; flex-wrap:wrap;';
+  dateRow.innerHTML =
+    '<span class="list-card-date"><span class="icon-slot">' + mdIcon('calendar', 16) + '</span><span>' + formatAktivitasDateShort_(displayDate) + '</span></span>' +
+
+    '<span style="color:var(--color-text-faint);">|</span>' +
+    '<span style="font-size:13px; color:var(--color-text-muted);">' + (p.zoneCode ? (p.floorName + ' \u00b7 ' + p.zoneCode) : p.floorName) + '</span>';
+  main.appendChild(dateRow);
+
+  var personRow = document.createElement('div');
+  personRow.className = 'list-card-person-row';
+  var avatar = document.createElement('span');
+  avatar.className = 'avatar-circle';
+  avatar.style.background = 'var(--status-info-bg)';
+  avatar.style.color = 'var(--status-info-fg)';
+  avatar.innerHTML = mdIcon('account', 18);
+  personRow.appendChild(avatar);
+  var personText = document.createElement('div');
+  personText.className = 'list-card-person-text';
+  personText.innerHTML = '<div class="name">' + officer + '</div><div class="subtext">' + truncateText_(p.completionNotes || p.description, 12) + '</div>';
+  personRow.appendChild(personText);
+  main.appendChild(personRow);
+
+  card.appendChild(main);
+
+  var side = document.createElement('div');
+  side.className = 'list-card-row-side';
+
+  if (photos.length > 0) {
+    var thumbSide = document.createElement('div');
+    thumbSide.className = 'op-card-thumb-side';
+    var img = document.createElement('img');
+    img.src = photos[0].thumbUrl || photos[0].url;
+    img.alt = 'Foto dokumentasi';
+    thumbSide.appendChild(img);
+    if (photos.length > 1) {
+      var overlay = document.createElement('span');
+      overlay.className = 'thumb-count-overlay';
+      overlay.textContent = '+' + (photos.length - 1);
+      thumbSide.appendChild(overlay);
+    }
+    thumbSide.addEventListener('click', function (e) {
+      e.stopPropagation();
+      openPhotoViewer(photos.map(function (photo) { return photo.url; }), 0);
+    });
+    side.appendChild(thumbSide);
+  } else {
+    var placeholder = document.createElement('div');
+    placeholder.className = 'no-photo-placeholder';
+    placeholder.innerHTML = mdIcon('photo', 18) + '<span>Tidak ada foto</span>';
+    side.appendChild(placeholder);
+  }
+
+  var chevron = document.createElement('span');
+  chevron.className = 'list-card-chevron';
+  chevron.innerHTML = mdIcon('chevronRight', 18);
+  side.appendChild(chevron);
+
+  card.appendChild(side);
+
+  card.addEventListener('click', function () { openPekerjaanDetail(p); });
+  return card;
+}
+
+</script>

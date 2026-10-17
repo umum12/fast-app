@@ -1,1 +1,470 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<base target="_top">
+<meta charset="UTF-8">
+<title>Facility Support</title>
+<style>
+<?!= include('styles'); ?>
+</style>
+</head>
+<body>
 
+      <!-- ===================== LOGIN SCREEN ===================== -->
+  
+  <div id="screen-login">
+    <?!= include('login-card'); ?>
+  </div>
+  <!-- ===================== APP SHELL ===================== -->
+  <div id="screen-app">
+    <div class="app-layout">
+
+      <aside class="sidebar">
+        <div class="sidebar-title">Facility Support</div>
+        <div id="sidebar-nav-container"></div>
+      </aside>
+
+      <div class="app-main">
+        <header class="app-header">
+                    <div class="app-logo">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1229 646" role="img" aria-label="FS Facility Support"><path fill="#1F4E9C" fill-rule="evenodd" d="M9 602L324 60Q349 17 392 17L772 17L474 530Q433 602 392 602ZM178 474L253 474L332 340L522 340L561 272L372 272L404 215Q420 199 440 199L620 199L657 132L408 132Q372 132 350 175Z"/><path fill="#9CC247" fill-rule="evenodd" d="M480 625L721 198Q760 131 808 131L1170 131L914 581Q889 625 850 625ZM597 537L845 537Q880 537 902 498L964 388Q972 345 936 345L797 345Q782 345 788 329L806 299Q818 287 842 287L1018 287L1055 220L806 220Q775 220 755 255L690 376Q686 411 714 411L861 411Q872 412 870 424L851 457Q845 470 827 471L632 471Z"/><path fill="#D6312B" d="M803 17L1222 17L1177 97L759 97Z"/><text x="986" y="71" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="40" fill="#fff" text-anchor="middle" textLength="373" lengthAdjust="spacingAndGlyphs">FACILITY SUPPORT</text></svg>
+                      <div class="app-title"> Facility Support</div>
+          </div>
+          <div class="header-right">
+            <span class="header-status">
+              <span class="status-dot"></span>
+              <span id="header-username">—</span>
+            </span>
+            <button class="profile-icon-btn" id="btn-open-akun" aria-label="Akun & Profil">
+              <span id="header-avatar-initial">?</span>
+            </button>
+          </div>
+        </header>
+        <div id="linear-progress"></div>
+
+        <main class="app-content">
+
+          <section class="page-section" data-page="beranda">
+            <div id="content-banner-container"></div>
+
+            <div class="card" id="jadwal-piket-card">
+              <div class="card-header-row">
+                <div class="card-header-icon" id="jadwal-piket-header-icon"></div>
+                <div class="card-header-text">
+                  <p class="card-header-title" style="text-transform:uppercase; letter-spacing:0.02em;">Jadwal Kolaborasi</p>
+                  <p class="card-header-subtitle">Silakan buat jadwal Anda sendiri</p>
+                </div>
+                <div class="card-header-row-actions">
+                  <button class="btn-icon" id="btn-jadwal-piket-audit" type="button" aria-label="Riwayat Perubahan" style="display:none;"></button>
+                  <button class="btn-icon btn-icon-accent" id="btn-toggle-jadwal-form" type="button" aria-label="Tambah Jadwal" style="display:none;"></button>
+                </div>
+              </div>
+
+              <div class="jadwal-summary-box" id="jadwal-piket-summary">
+                <div class="inline-loading"><span class="spinner-sm"></span>Memuat jadwal...</div>
+              </div>
+
+              <div id="jadwal-piket-table" style="margin-top:10px;"></div>
+
+              <div id="jadwal-form-panel" style="display:none; margin-top:14px;">
+                <p class="md-title-sm" id="jadwal-form-heading" style="margin:0 0 10px;">Tambah Jadwal</p>
+                <div class="form-group">
+                  <label class="form-label">Tanggal</label>
+                  <input id="jadwal-form-date" class="form-input" type="date">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Jenis</label>
+                  <select id="jadwal-form-jenis" class="form-input"></select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Petugas</label>
+                  <select id="jadwal-form-user" class="form-input">
+                    <option value="">Pilih petugas</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Catatan (opsional)</label>
+                  <input id="jadwal-form-notes" class="form-input" type="text" maxlength="200">
+                </div>
+                <div class="form-actions-row">
+                  <button class="btn-outlined" id="btn-cancel-jadwal-form" type="button">Batal</button>
+                  <button class="btn-primary" id="btn-submit-jadwal">Simpan Jadwal</button>
+                </div>
+                <div class="form-error" id="jadwal-form-error"></div>
+              </div>
+            </div>
+
+            <div class="card" id="admin-content-card" style="display:none;">
+              <div class="card-header-row">
+                <div class="card-header-icon" id="content-management-header-icon"></div>
+                <div class="card-header-text">
+                  <p class="card-header-title">Content Management</p>
+                  <p class="card-header-subtitle">Pengumuman &amp; informasi Beranda (maks. 10 aktif)</p>
+                </div>
+                <div class="card-header-row-actions">
+                  <button class="btn-icon" id="btn-toggle-content-form" type="button" aria-label="Tambah Konten"></button>
+                </div>
+              </div>
+
+              <div id="content-management-list"><div class="inline-loading"><span class="spinner-sm"></span>Memuat konten...</div></div>
+
+              <div id="content-form-panel" style="display:none; margin-top:14px;">
+                <p class="md-title-sm" id="content-form-heading" style="margin:0 0 10px;">Tambah Konten</p>
+
+                <div class="form-group">
+                  <label class="form-label">Jenis Konten</label>
+                  <select id="content-form-type" class="form-input"></select>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Judul</label>
+                  <input id="content-form-title" class="form-input" type="text" maxlength="150">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Isi Konten</label>
+                  <div class="richtext-toolbar" id="content-form-toolbar">
+                    <button type="button" class="richtext-toolbar-btn" data-wrap="b" title="Tebal"><b>B</b></button>
+                    <button type="button" class="richtext-toolbar-btn" data-wrap="i" title="Miring"><i>I</i></button>
+                    <button type="button" class="richtext-toolbar-btn" data-wrap="u" title="Garis bawah"><u>U</u></button>
+                    <button type="button" class="richtext-toolbar-btn" id="btn-content-link" title="Sisipkan tautan">🔗</button>
+                  </div>
+                  <div id="content-link-input-row" style="display:none; gap:8px; margin-bottom:8px;">
+                    <input id="content-link-url" class="form-input" type="url" placeholder="https://..." style="flex:1;">
+                    <button type="button" class="btn-outlined" id="btn-insert-content-link" style="width:auto; padding:0 16px;">Sisipkan</button>
+                  </div>
+                  <textarea id="content-form-body" class="form-input" rows="5" maxlength="2000" placeholder="Tulis isi pengumuman... gunakan toolbar untuk format teks."></textarea>
+                  <div class="richtext-emoji-row" id="content-form-emoji-row"></div>
+                  <p class="form-label" style="margin:10px 0 4px;">Pratinjau</p>
+                  <div class="richtext-preview" id="content-form-preview"></div>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Tampil</label>
+                  <select id="content-form-schedule-mode" class="form-input">
+                    <option value="">Sekali / Rentang Tanggal</option>
+                    <option value="scheduled">Terjadwal Berulang</option>
+                  </select>
+                </div>
+                <div class="form-group" id="content-form-rule-group" style="display:none;">
+                  <label class="form-label">Pola Jadwal</label>
+                  <select id="content-form-rule-type" class="form-input">
+                    <option value="DAILY">Setiap Hari</option>
+                    <option value="WEEKLY">Setiap Hari Tertentu</option>
+                    <option value="DATE">Tanggal Tertentu</option>
+                  </select>
+                  <select id="content-form-rule-day" class="form-input" style="display:none; margin-top:8px;">
+                    <option value="MON">Senin</option>
+                    <option value="TUE">Selasa</option>
+                    <option value="WED">Rabu</option>
+                    <option value="THU">Kamis</option>
+                    <option value="FRI">Jumat</option>
+                    <option value="SAT">Sabtu</option>
+                    <option value="SUN">Minggu</option>
+                  </select>
+                  <input id="content-form-rule-date" class="form-input" type="date" style="display:none; margin-top:8px;">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Mulai Tampil</label>
+                  <input id="content-form-start" class="form-input" type="date">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Berakhir</label>
+                  <input id="content-form-end" class="form-input" type="date">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Gambar (opsional)</label>
+                  <div class="photo-slots" id="content-image-slot-container"></div>
+                  <input type="file" id="content-image-file-input" accept="image/*" style="display:none">
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">PDF (opsional)</label>
+                  <div id="content-pdf-slot-container"></div>
+                  <input type="file" id="content-pdf-file-input" accept="application/pdf" style="display:none">
+                </div>
+
+                <div class="form-actions-row">
+                  <button class="btn-outlined" id="btn-cancel-content-form" type="button">Batal</button>
+                  <button class="btn-primary" id="btn-submit-content">Simpan Konten</button>
+                </div>
+                <div class="form-error" id="content-form-error"></div>
+              </div>
+            </div>
+
+          </section>
+
+          <section class="page-section" data-page="pekerjaan">
+            <div class="card">
+              <div class="card-header-row">
+                <div class="card-header-icon" id="pekerjaan-header-icon"></div>
+                  <div class="card-header-text">
+                  <p class="card-header-title" id="pekerjaan-header-title">Menu Pekerjaan</p>
+                  <p class="card-header-subtitle" id="pekerjaan-header-subtitle">Inbox pekerjaan untuk Anda</p>
+                </div>
+                <div class="card-header-row-actions" style="position:relative;">
+                  <button class="btn-outlined" id="btn-pekerjaan-filter" type="button" style="width:auto; min-height:40px; padding:0 14px; gap:6px; font-size:13px;"></button>
+                  <div id="pekerjaan-filter-menu" class="activity-filter-menu" style="display:none;"></div>
+                </div>
+              </div>
+
+              <div id="pekerjaan-list"><div class="inline-loading"><span class="spinner-sm"></span>Memuat pekerjaan...</div></div>
+            </div>
+          </section>
+
+          <section class="page-section" data-page="buat">
+
+              <div class="card" id="buat-form-card">
+              <div class="card-header-row">
+                <div class="card-header-icon" id="buat-header-icon"></div>
+                <div class="card-header-text">
+                  <p class="card-header-title" id="buat-header-title" style="text-transform:uppercase; letter-spacing:0.02em;">Buat Pekerjaan</p>
+                </div>
+                <div class="card-header-row-actions">
+                  <button class="btn-icon" id="btn-cancel-report-form" type="button" aria-label="Reset"></button>
+                </div>
+              </div>
+
+              <div class="form-progress-box" id="buat-context-banner" style="display:none; background:var(--md-primary-container); color:var(--md-on-primary-container); text-align:left;">
+                Melengkapi laporan untuk Pekerjaan <b id="buat-context-pekerjaan-id"></b>
+              </div>
+
+              <div class="form-group form-jenis-lantai-row">
+                <div class="form-jenis-lantai-col">
+                  <label class="form-label">Jenis</label>
+                  <div class="select-field-wrap">
+                    <span class="select-field-icon" id="form-jenis-icon"></span>
+                    <select id="form-jenis"></select>
+                  </div>
+                </div>
+                <div class="form-jenis-lantai-col">
+                  <label class="form-label">Lantai</label>
+                  <div class="select-field-wrap">
+                    <span class="select-field-icon" id="form-floor-icon"></span>
+                    <select id="form-floor">
+                      <option value="">Pilih lantai</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+
+              <div class="form-group" id="form-performed-at-group" style="display:none;">
+                <div class="performed-at-label-row">
+                  <span class="icon-slot" id="performed-at-label-icon"></span>
+                  <label class="form-label" style="margin:0;">Waktu Laporan</label>
+                </div>
+
+                <div id="performed-at-collapsed" class="performed-at-collapsed">
+                  <span>Sekarang (otomatis)</span>
+                  <button type="button" class="performed-at-link" id="btn-performed-at-edit">Ubah</button>
+                </div>
+
+                <div id="performed-at-expanded" class="performed-at-expanded" style="display:none;">
+                  <div class="performed-at-preview" id="performed-at-preview"></div>
+                  <input id="form-performed-at" class="form-input" type="datetime-local">
+                  <p class="md-body-sm" style="margin:8px 0 0;">Laporan susulan maksimal 7 hari ke belakang.</p>
+                  <button type="button" class="performed-at-link" id="btn-performed-at-reset" style="margin-top:4px; padding-left:0;">Gunakan waktu sekarang</button>
+                </div>
+              </div>
+
+              <div class="form-group" id="form-assignment-mode-group" style="display:none;">
+                <label class="form-label">Mode Penugasan</label>
+                <select id="form-assignment-mode" class="form-input">
+                  <option value="broadcast">Area Broadcast</option>
+                  <option value="direct">Direct Assignment</option>
+                </select>
+              </div>
+              <div class="form-group" id="form-target-user-group" style="display:none;">
+                <label class="form-label">Petugas Penerima</label>
+                <select id="form-target-user" class="form-input">
+                  <option value="">Pilih petugas</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" id="form-subject-label">Subjek (opsional)</label>
+                <input id="form-subject" class="form-input" type="text" maxlength="100" placeholder="Contoh: Zona A">
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" id="form-description-label" style="text-transform:uppercase; letter-spacing:0.04em; font-weight:600;">Keterangan</label>
+                <textarea id="form-description" class="form-input" rows="4" maxlength="500" placeholder="Jelaskan secara singkat tentang pekerjaan ini..."></textarea>
+                <div class="char-counter" id="form-description-counter">0/500</div>
+              </div>
+
+              <div class="form-group">
+                <label class="form-label" id="form-photo-label">Foto Kondisi Awal (opsional, maks. 3)</label>
+                <div class="photo-slots-v2" id="photo-slots"></div>
+                <input type="file" id="photo-file-input" accept="image/*" style="display:none">
+              </div>
+
+              <div class="form-progress-box" id="form-progress-box">
+                <span id="form-progress-text">Progres pengisian: 0% | Foto siap upload: 0</span>
+              </div>
+
+              <div class="form-actions-row">
+                <button class="btn-primary" id="btn-submit-report" type="button"></button>
+              </div>
+
+              <div class="form-error" id="form-report-error"></div>
+            </div>
+
+            <div class="card" id="buat-success-card" style="display:none; text-align:center;">
+              <div class="empty-state-icon" style="background:var(--status-completed-bg); color:var(--status-completed-fg); margin:0 auto 12px;">
+                <span id="buat-success-icon"></span>
+              </div>
+              <p class="md-title" id="buat-success-message" style="margin-bottom:6px;">Pekerjaan berhasil dibuat.</p>
+              <p class="md-body-sm" id="buat-success-subtext" style="margin-bottom:18px;"></p>
+              <div class="form-actions-row">
+                <button class="btn-outlined" id="btn-buat-laporan-lagi" type="button">Buat Pekerjaan Lain</button>
+                <button class="btn-primary" id="btn-lihat-riwayat-setelah-submit" type="button">Lihat Riwayat</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="page-section" data-page="jadwal">
+            <div class="card">
+              <div class="card-header-row">
+                <div class="card-header-icon" id="reports-header-icon"></div>
+                <div class="card-header-text">
+                  <p class="card-header-title" id="reports-card-title">Riwayat Pekerjaan Saya</p>
+                  <p class="card-header-subtitle">Pekerjaan yang Anda buat atau tangani</p>
+                </div>
+              </div>
+              <div class="search-input-wrap" style="margin-bottom:10px;">
+                <span id="reports-search-icon"></span>
+                <input id="reports-search" class="form-input" type="text" placeholder="Cari subjek atau keterangan...">
+              </div>
+              <div id="my-reports-list"><div class="inline-loading"><span class="spinner-sm"></span>Memuat riwayat...</div></div>
+            </div>
+          </section>
+
+          <section class="page-section" data-page="akun">
+            <button id="btn-back-from-akun" type="button" style="background:none;border:none;color:var(--color-primary);font-size:14px;font-weight:600;padding:8px 0;margin-bottom:4px;cursor:pointer;">&larr; Kembali</button>
+            <div class="card">
+              <h2>Akun</h2>
+              <div class="profile-row"><span class="label">Nama</span><span id="akun-nama">—</span></div>
+              <div class="profile-row"><span class="label">Kode Akses</span><span id="akun-kode">—</span></div>
+              <div class="profile-row"><span class="label">Role</span><span id="akun-role">—</span></div>
+              <button class="btn-logout" id="btn-logout">Keluar</button>
+            </div>
+
+
+            <div class="card">
+              <h2>Data</h2>
+              <p class="md-body-sm" style="margin-bottom:12px;">Muat ulang seluruh data aplikasi dari server bila tampilan terasa tidak sesuai (mis. setelah perubahan oleh Admin).</p>
+              <button class="btn-outlined" id="btn-reload-app-data" type="button" style="display:flex; align-items:center; justify-content:center; gap:8px;"></button>
+            </div>
+
+            <div class="card">
+              <h2>Tentang Aplikasi</h2>
+              <div class="profile-row"><span class="label">Nama Aplikasi</span><span>Facility Support</span></div>
+              <div class="profile-row"><span class="label">Versi Arsitektur</span><span>Patch 10.x</span></div>
+            </div>
+          </section>
+
+
+
+
+                    <section class="page-section" data-page="aktivitas">
+            <div class="card" id="ringkasan-card">
+              <div class="card-header-row" style="margin-bottom:0;">
+                <h2 style="margin:0; flex:1;">Ringkasan</h2>
+                <button class="btn-icon" id="btn-toggle-ringkasan" type="button" aria-label="Buka/tutup Ringkasan"></button>
+              </div>
+              <div id="ringkasan-body" style="margin-top:10px;">
+                <div class="stats-grid" id="dashboard-stats"><div class="inline-loading"><span class="spinner-sm"></span>Memuat statistik...</div></div>
+                <div style="display:flex; justify-content:flex-end; margin-top:12px;">
+                  <button class="btn-outlined primary" id="btn-open-pdf-render" type="button" style="width:auto; min-height:40px; padding:0 16px; display:none; gap:6px;"></button>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header-row">
+                <div class="card-header-icon" id="activity-header-icon"></div>
+                <div class="card-header-text">
+                  <p class="card-header-title">Aktivitas</p>
+                  <p class="card-header-subtitle">Timeline operasional seluruh tim</p>
+                </div>
+                <div class="card-header-row-actions" style="position:relative;">
+                  <button class="btn-outlined" id="btn-activity-filter" type="button" style="width:auto; min-height:40px; padding:0 14px; gap:6px; font-size:13px;"></button>
+                  <div id="activity-filter-menu" class="activity-filter-menu" style="display:none;"></div>
+                </div>
+              </div>
+              <div class="search-input-wrap" style="margin-bottom:10px;">
+                <span id="activity-search-icon"></span>
+                <input id="activity-search" class="form-input" type="text" placeholder="Cari subjek atau keterangan...">
+              </div>
+
+              <div id="activity-feed-list"><div class="inline-loading"><span class="spinner-sm"></span>Memuat aktivitas...</div></div>
+            </div>
+          </section>
+
+
+        </main>
+      </div>
+    </div>
+
+    <nav class="bottom-nav" id="bottom-nav-container"></nav>
+  </div>
+
+  <div id="photo-viewer">
+    <button class="viewer-close" id="viewer-close">&times;</button>
+    <img id="viewer-img" src="" alt="Foto">
+    <div class="viewer-counter" id="viewer-counter"></div>
+  </div>
+
+  <div id="pull-indicator"><span class="spinner-sm"></span><span id="pull-indicator-text">Tarik untuk refresh</span></div>
+
+  <div id="confirm-modal-overlay">
+    <div class="confirm-modal-card">
+      <div class="confirm-modal-icon" id="confirm-modal-icon"></div>
+      <p id="confirm-modal-message"></p>
+      <div class="confirm-modal-actions">
+        <button class="btn-cancel" id="confirm-modal-cancel">Batal</button>
+        <button class="btn-confirm" id="confirm-modal-confirm">Ya, Lanjutkan</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="activity-detail-overlay">
+    <div class="activity-detail-card">
+            <div class="activity-detail-header-row">
+        <span class="activity-detail-title" id="activity-detail-title">DETAIL LAPORAN</span>
+        <button id="btn-close-activity-detail-x" class="btn-icon btn-icon-surface" type="button" aria-label="Tutup"></button>
+      </div>
+      <div id="activity-detail-body"></div>
+    </div>
+  </div>
+
+  <div id="bottom-sheet-overlay">
+    <div class="bottom-sheet-card">
+      <div class="bottom-sheet-handle"></div>
+      <div id="bottom-sheet-body"></div>
+    </div>
+  </div>
+
+  <div id="global-spinner"><div class="spinner"></div></div>
+
+    <div id="reload-overlay">
+    <div class="reload-card">
+      <p class="reload-title">Memuat ulang data</p>
+      <div class="reload-bar"><div class="reload-bar-fill" id="reload-bar-fill"></div></div>
+      <p class="reload-step" id="reload-step-text"></p>
+      <div class="reload-actions" id="reload-actions" style="display:none;">
+        <button class="btn-outlined" id="btn-reload-close" type="button">Tutup</button>
+        <button class="btn-primary" id="btn-reload-retry" type="button">Coba Lagi</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="snackbar"></div>
+  <?!= include('script-core'); ?>
+  <?!= include('script-pekerjaan'); ?>
+  <?!= include('script-jadwal'); ?>
+  <?!= include('script-aktivitas'); ?>
+</body>
+</html>

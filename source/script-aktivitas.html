@@ -1,0 +1,482 @@
+<script>
+// ============================================================
+// AKTIVITAS — Timeline Operasional Seluruh Tim (Tahap 4 Cutover)
+// ============================================================
+
+var currentActivityFilter = 'all';
+var ACTIVITY_TABS = [
+  { key: 'all', label: 'Semua' },
+  { key: 'mandiri', label: 'Mandiri' },
+  { key: 'admin_ke_fs', label: 'Penugasan' },
+  { key: 'fs_ke_admin', label: 'Lapor/Permintaan' }
+];
+
+
+
+/**
+ * PATCH: tab filter diganti dropdown "Filter: <label> v". Logika
+ * filter (currentActivityFilter, renderAktivitasFiltered) TIDAK
+ * berubah, hanya tampilan pemilihnya.
+ */
+function renderActivityTabs() {
+  var btn = document.getElementById('btn-activity-filter');
+  var menu = document.getElementById('activity-filter-menu');
+  if (!btn || !menu) return;
+
+  var current = ACTIVITY_TABS.filter(function (t) { return t.key === currentActivityFilter; })[0] || ACTIVITY_TABS[0];
+  var isOpen = menu.style.display === 'block';
+  btn.innerHTML = '<span>Filter: ' + current.label + '</span>' + mdIcon(isOpen ? 'chevronUp' : 'chevronDown', 16);
+
+  menu.innerHTML = '';
+  ACTIVITY_TABS.forEach(function (tab) {
+    var opt = document.createElement('button');
+    opt.type = 'button';
+    opt.className = 'activity-filter-option' + (tab.key === currentActivityFilter ? ' active' : '');
+    opt.innerHTML = '<span class="opt-dot"></span><span>' + tab.label + '</span>';
+    opt.addEventListener('click', function (e) {
+      e.stopPropagation();
+      currentActivityFilter = tab.key;
+      menu.style.display = 'none';
+      renderActivityTabs();
+      renderAktivitasFiltered();
+    });
+    menu.appendChild(opt);
+  });
+
+  if (!btn.dataset.bound) {
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+      renderActivityTabs();
+    });
+    document.addEventListener('click', function () {
+      if (menu.style.display === 'block') {
+        menu.style.display = 'none';
+        renderActivityTabs();
+      }
+    });
+  }
+}
+
+
+function loadPekerjaanAktivitas(force) {
+  var session = loadSession();
+  if (!session) return;
+
+  var cached = pageDataCache.pekerjaanAktivitas;
+  renderActivityTabs();
+
+  if (cached && !force) {
+    renderAktivitasFiltered();
+    return;
+  }
+
+  if (!cached) {
+
+  renderListSkeleton_('activity-feed-list', 3, 'Memuat aktivitas tim...');
+  }
+
+  google.script.run
+    .withSuccessHandler(function (response) {
+      if (!response.success) {
+        if (!cached) document.getElementById('activity-feed-list').innerHTML = '<p>' + response.error + '</p>';
+        return;
+      }
+      pageDataCache.pekerjaanAktivitas = response.data.pekerjaan;
+      renderAktivitasFiltered();
+    })
+    .withFailureHandler(function () {
+      if (!cached) document.getElementById('activity-feed-list').innerHTML = '<p>Gagal memuat aktivitas.</p>';
+    })
+    .getPekerjaanList(session.accessCode, { view: 'aktivitas' });
+}
+
+function renderAktivitasFiltered() {
+  var all = pageDataCache.pekerjaanAktivitas || [];
+  var filtered = currentActivityFilter === 'all' ? all : all.filter(function (p) { return p.arah === currentActivityFilter; });
+
+  var q = (document.getElementById('activity-search').value || '').trim().toLowerCase();
+  if (q) {
+    filtered = filtered.filter(function (p) {
+      return (p.subject || '').toLowerCase().indexOf(q) !== -1 ||
+             (p.description || '').toLowerCase().indexOf(q) !== -1;
+    });
+  }
+
+  renderPekerjaanAktivitas(filtered);
+}
+
+document.getElementById('activity-search').addEventListener('input', debounce_(renderAktivitasFiltered, 200));
+
+function renderPekerjaanAktivitas(list) {
+  var container = document.getElementById('activity-feed-list');
+  container.innerHTML = '';
+
+  if (!list || list.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('inbox', 26) + '</div>Belum ada aktivitas.</div>';
+    return;
+  }
+
+  list.forEach(function (p) {
+    container.appendChild(buildPekerjaanListCard_(p));
+  });
+}
+
+// ------------------- FILTER & UNDUH PDF (dipindah dari Riwayat, 3.4) -------------------
+
+/**
+ * PATCH — Halaman PDF Terpisah. Menggantikan initPekerjaanFilterUI()
+ * lama (panel filter inline di Aktivitas). Tombol di sini HANYA
+ * membuka /exec?page=pdfrender di tab baru — seluruh filter & opsi
+ * unduh (ke perangkat / ke Drive) sekarang di halaman itu.
+ */
+
+/**
+ * PATCH — Tombol PDF kini tersedia untuk SEMUA role (sebelumnya
+ * Admin/Demo saja). Aman karena backend (getFilteredPekerjaanRiwayatRows_,
+ * pekerjaan.gs) sudah otomatis membatasi data FS hanya ke Pekerjaan
+ * miliknya sendiri (created_by/handled_by) — tidak ada perubahan Hak
+ * Akses, murni membuka akses UI ke endpoint yang sudah aman per-role.
+ */
+
+
+function initPdfRenderButton_() {
+  if (!appBootstrap) return;
+
+  var btn = document.getElementById('btn-open-pdf-render');
+  if (btn) {
+    btn.style.display = 'inline-flex';
+    btn.innerHTML = mdIcon('download', 16) + '<span>Download PDF</span>';
+    btn.addEventListener('click', function () {
+      window.open(appBootstrap.webAppUrl + '?page=pdfrender', '_blank');
+    });
+  }
+
+  // Ringkasan collapsible; status diingat di localStorage (per perangkat).
+  var toggle = document.getElementById('btn-toggle-ringkasan');
+  var body = document.getElementById('ringkasan-body');
+  if (!toggle || !body) return;
+
+  function applyState(open) {
+    body.style.display = open ? 'block' : 'none';
+    toggle.innerHTML = mdIcon(open ? 'chevronUp' : 'chevronDown', 18);
+    try { localStorage.setItem('fs_ringkasan_open', open ? '1' : '0'); } catch (e) {}
+  }
+
+  var saved = null;
+  try { saved = localStorage.getItem('fs_ringkasan_open'); } catch (e) {}
+  var isOpen = saved !== '0';
+  applyState(isOpen);
+
+  toggle.addEventListener('click', function () {
+    isOpen = !isOpen;
+    applyState(isOpen);
+  });
+}
+
+// ============================================================
+// PHOTO VIEWER (Section 18.4) — pinch zoom, double-tap zoom, swipe, close
+// ============================================================
+
+var viewerPhotos = [];
+var viewerIndex = 0;
+var viewerScale = 1;
+
+function openPhotoViewer(urls, startIndex) {
+  viewerPhotos = urls;
+  viewerIndex = startIndex || 0;
+  viewerScale = 1;
+  updateViewerImage();
+  document.getElementById('photo-viewer').classList.add('show');
+}
+
+function closePhotoViewer() {
+  document.getElementById('photo-viewer').classList.remove('show');
+}
+
+var PHOTO_VIEWER_PLACEHOLDER =
+  'data:image/svg+xml;utf8,' + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">' +
+    '<rect width="200" height="200" fill="#374151"/>' +
+    '<text x="50%" y="50%" fill="#9ca3af" font-size="14" text-anchor="middle" dy=".3em">Foto tidak dapat dimuat</text>' +
+    '</svg>'
+  );
+
+function updateViewerImage() {
+  var img = document.getElementById('viewer-img');
+  img.onerror = function () {
+    console.warn('Gagal memuat foto di Photo Viewer. URL:', viewerPhotos[viewerIndex]);
+    img.onerror = null;
+    img.src = PHOTO_VIEWER_PLACEHOLDER;
+  };
+  img.src = viewerPhotos[viewerIndex];
+  viewerScale = 1;
+  img.style.transform = 'scale(1)';
+  document.getElementById('viewer-counter').textContent =
+    (viewerIndex + 1) + ' / ' + viewerPhotos.length;
+}
+
+document.getElementById('viewer-close').addEventListener('click', closePhotoViewer);
+
+(function setupViewerGestures() {
+  var img = document.getElementById('viewer-img');
+  var touchStartX = 0, touchStartY = 0;
+  var lastTapTime = 0;
+  var pinchStartDist = null;
+  var pinchStartScale = 1;
+
+  function distance(t1, t2) {
+    var dx = t1.clientX - t2.clientX;
+    var dy = t1.clientY - t2.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  img.addEventListener('touchstart', function (e) {
+    if (e.touches.length === 2) {
+      pinchStartDist = distance(e.touches[0], e.touches[1]);
+      pinchStartScale = viewerScale;
+    } else if (e.touches.length === 1) {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }
+  });
+
+  img.addEventListener('touchmove', function (e) {
+    if (e.touches.length === 2 && pinchStartDist) {
+      var newDist = distance(e.touches[0], e.touches[1]);
+      var scale = pinchStartScale * (newDist / pinchStartDist);
+      viewerScale = Math.min(4, Math.max(1, scale));
+      img.style.transform = 'scale(' + viewerScale + ')';
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  img.addEventListener('touchend', function (e) {
+    if (e.changedTouches.length === 1 && viewerScale === 1) {
+      var dx = e.changedTouches[0].clientX - touchStartX;
+      var dy = e.changedTouches[0].clientY - touchStartY;
+
+      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) {
+        if (dx < 0 && viewerIndex < viewerPhotos.length - 1) {
+          viewerIndex++;
+          updateViewerImage();
+        } else if (dx > 0 && viewerIndex > 0) {
+          viewerIndex--;
+          updateViewerImage();
+        }
+        return;
+      }
+
+      var now = new Date().getTime();
+      if (now - lastTapTime < 300) {
+        // Double tap
+        viewerScale = viewerScale > 1 ? 1 : 2.5;
+        img.style.transform = 'scale(' + viewerScale + ')';
+      }
+      lastTapTime = now;
+    }
+    pinchStartDist = null;
+  });
+})();
+
+// ============================================================
+// PULL TO REFRESH (Sprint 6.02 #6) — hanya Beranda & Pekerjaan
+// ============================================================
+
+(function setupPullToRefresh() {
+  var PULL_THRESHOLD = 70;
+  var PULL_MAX_VISUAL = 100;
+  var pullStartY = null;
+  var pullDistance = 0;
+  var indicator = document.getElementById('pull-indicator');
+  var indicatorText = document.getElementById('pull-indicator-text');
+
+  function pullablePage() {
+    return currentPage === 'beranda' || currentPage === 'pekerjaan' || currentPage === 'jadwal' || currentPage === 'aktivitas';
+  }
+
+  document.addEventListener('touchstart', function (e) {
+    if (pullablePage() && window.scrollY === 0) {
+      pullStartY = e.touches[0].clientY;
+    } else {
+      pullStartY = null;
+    }
+    pullDistance = 0;
+  }, { passive: true });
+
+  document.addEventListener('touchmove', function (e) {
+    if (pullStartY === null) return;
+    pullDistance = e.touches[0].clientY - pullStartY;
+    if (pullDistance > 0 && window.scrollY === 0) {
+      var visual = Math.min(pullDistance, PULL_MAX_VISUAL);
+      indicator.style.transform = 'translate(-50%, ' + (visual - 60) + 'px)';
+      indicatorText.textContent = pullDistance > PULL_THRESHOLD ? 'Lepas untuk refresh' : 'Tarik untuk refresh';
+    }
+  }, { passive: true });
+
+  document.addEventListener('touchend', function () {
+    if (pullStartY !== null && pullDistance > PULL_THRESHOLD) {
+      if (currentPage === 'pekerjaan') {
+        loadPekerjaanInbox(true);
+      } else if (currentPage === 'beranda') {
+        loadHomeBootstrap(true);
+      } else if (currentPage === 'jadwal') {
+        loadRiwayatPekerjaan(true);
+      } else if (currentPage === 'aktivitas') {
+        loadAktivitasSummary(true);
+        loadPekerjaanAktivitas(true);
+      }
+      indicatorText.textContent = 'Memperbarui...';
+      setTimeout(function () {
+        indicator.style.transform = 'translate(-50%, -60px)';
+      }, 500);
+      pullStartY = null;
+      pullDistance = 0;
+      return;
+    }
+    indicator.style.transform = 'translate(-50%, -60px)';
+    pullStartY = null;
+    pullDistance = 0;
+  });
+})();
+
+// ============================================================
+// TERAPKAN IKON PADA TOMBOL STATIS (Patch 6.1.5)
+// ============================================================
+
+function applyStaticIcons() {
+    var activityHeaderIcon2 = document.getElementById('activity-header-icon');
+  if (activityHeaderIcon2) activityHeaderIcon2.innerHTML = mdIcon('calendarCheck', 22);
+var iconButtonMap = [
+    ['btn-submit-report', 'upload', 'Simpan & Kirim'],
+    ['btn-logout', 'logout', 'Keluar'],
+    ['btn-back-from-akun', 'arrowBack', 'Kembali'],
+    ['btn-toggle-reports-filter', 'tune', 'Filter & Unduh PDF'],
+    ['btn-download-pdf', 'download', 'Unduh PDF Rekap'],
+    ['btn-apply-reports-filter', 'search', 'Terapkan Filter'],
+    ['btn-buat-laporan-lagi', 'add', 'Buat Pekerjaan Lain'],
+    ['btn-lihat-riwayat-setelah-submit', 'history', 'Lihat Riwayat']
+  ];
+
+  iconButtonMap.forEach(function (row) {
+    var el = document.getElementById(row[0]);
+    if (el) el.innerHTML = mdIcon(row[1], 18) + '<span>' + row[2] + '</span>';
+  });
+
+  var buatHeaderIcon = document.getElementById('buat-header-icon');
+  if (buatHeaderIcon) buatHeaderIcon.innerHTML = mdIcon('description', 22);
+
+  var btnResetBuat = document.getElementById('btn-cancel-report-form');
+  if (btnResetBuat) btnResetBuat.innerHTML = mdIcon('close', 18);
+
+  var pekerjaanHeaderIcon = document.getElementById('pekerjaan-header-icon');
+  if (pekerjaanHeaderIcon) pekerjaanHeaderIcon.innerHTML = mdIcon('task', 22);
+
+  var buatSuccessIcon = document.getElementById('buat-success-icon');
+  if (buatSuccessIcon) buatSuccessIcon.innerHTML = mdIcon('checkCircle', 26);
+
+  var floorIcon = document.getElementById('form-floor-icon');
+  if (floorIcon) { floorIcon.innerHTML = mdIcon('building', 15); floorIcon.style.background = 'var(--status-available-bg)'; floorIcon.style.color = 'var(--status-available-fg)'; }
+
+  var reportsHeaderIcon = document.getElementById('reports-header-icon');
+  if (reportsHeaderIcon) reportsHeaderIcon.innerHTML = mdIcon('description', 22);
+  var activityHeaderIcon = document.getElementById('activity-header-icon');
+  if (activityHeaderIcon) activityHeaderIcon.innerHTML = mdIcon('calendarCheck', 22);
+
+  var reportsSearchIcon = document.getElementById('reports-search-icon');
+  if (reportsSearchIcon) reportsSearchIcon.innerHTML = mdIcon('search', 18);
+  var activitySearchIcon = document.getElementById('activity-search-icon');
+  if (activitySearchIcon) activitySearchIcon.innerHTML = mdIcon('search', 18);
+
+  var jadwalPiketHeaderIcon = document.getElementById('jadwal-piket-header-icon');
+  if (jadwalPiketHeaderIcon) jadwalPiketHeaderIcon.innerHTML = mdIcon('calendarCheck', 22);
+  var btnJadwalAudit = document.getElementById('btn-jadwal-piket-audit');
+  if (btnJadwalAudit) btnJadwalAudit.innerHTML = mdIcon('history', 18);
+  var btnToggleJadwalForm = document.getElementById('btn-toggle-jadwal-form');
+  if (btnToggleJadwalForm) btnToggleJadwalForm.innerHTML = mdIcon('add', 18);
+
+  var btnCloseDetailX = document.getElementById('btn-close-activity-detail-x');
+  if (btnCloseDetailX) btnCloseDetailX.innerHTML = mdIcon('close', 18);
+
+  var contentHeaderIcon = document.getElementById('content-management-header-icon');
+  if (contentHeaderIcon) contentHeaderIcon.innerHTML = mdIcon('notification', 22);
+  var btnToggleContentForm = document.getElementById('btn-toggle-content-form');
+  if (btnToggleContentForm) btnToggleContentForm.innerHTML = mdIcon('add', 18);
+}
+
+applyStaticIcons();
+
+// ============================================================
+// RIPPLE EFFECT (Patch 7.2)
+// ============================================================
+function attachRipple(el) {
+  if (!el || el.dataset.rippleAttached) return;
+  el.dataset.rippleAttached = '1';
+  el.classList.add('ripple-surface');
+  el.addEventListener('click', function (e) {
+    var rect = el.getBoundingClientRect();
+    var size = Math.max(rect.width, rect.height);
+    var ripple = document.createElement('span');
+    ripple.className = 'ripple-effect';
+    ripple.style.width = ripple.style.height = size + 'px';
+    ripple.style.left = ((e.clientX || (rect.left + rect.width / 2)) - rect.left - size / 2) + 'px';
+    ripple.style.top = ((e.clientY || (rect.top + rect.height / 2)) - rect.top - size / 2) + 'px';
+    el.appendChild(ripple);
+    setTimeout(function () { ripple.remove(); }, 500);
+  });
+}
+
+document.querySelectorAll('.fab, .btn-primary').forEach(attachRipple);
+
+// Counter karakter Keterangan (UI Card v2)
+var formDescEl = document.getElementById('form-description');
+var formDescCounter = document.getElementById('form-description-counter');
+if (formDescEl && formDescCounter) {
+  formDescEl.addEventListener('input', function () {
+    formDescCounter.textContent = formDescEl.value.length + '/500';
+    updateFormProgress();
+  });
+}
+
+// Tombol Batal pada form Buat Pekerjaan — reset field (UI Card v2)
+document.getElementById('btn-cancel-report-form').addEventListener('click', function () {
+  var hasUnsavedContent = document.getElementById('form-subject').value.trim() ||
+    document.getElementById('form-description').value.trim() ||
+    selectedPhotos.filter(Boolean).length > 0;
+
+  
+function resetPekerjaanForm() {
+      document.getElementById('form-subject').value = '';
+      document.getElementById('form-description').value = '';
+      if (formDescCounter) formDescCounter.textContent = '0/500';
+      if (typeof collapsePerformedAt_ === 'function') collapsePerformedAt_();
+      selectedPhotos = [];
+      document.getElementById('form-report-error').textContent = '';
+      resetBuatPrefillContext_();
+      initPekerjaanForm();
+    }
+
+
+  if (hasUnsavedContent) {
+    showConfirmModal('Batalkan pekerjaan ini? Isian yang sudah diketik akan hilang.', resetPekerjaanForm, 'warning');
+  } else {
+    resetPekerjaanForm();
+  }
+});
+
+// ============================================================
+// INIT
+// ============================================================
+
+(function init() {
+  var session = loadSession();
+  if (session && session.accessCode) {
+    document.getElementById('screen-login').style.display = 'none';
+    attemptBootstrap(session);
+  } else {
+    document.getElementById('screen-login').style.display = 'flex';
+  }
+})();
+
+</script>

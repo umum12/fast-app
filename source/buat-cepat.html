@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<base target="_top">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Buat Laporan</title>
+
+<!-- PATCH — Add to Home Screen. Manifest dinamis dari core.gs
+     (buildBuatManifestJson_), tidak memerlukan file statis terpisah. -->
+<link rel="manifest" href="<?!= WEBAPP_EXEC_URL ?>?page=manifest-buat">
+<meta name="theme-color" content="#2563eb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Buat Laporan">
+
+<style>
+
+<?!= include('styles'); ?>
+
+/* Tambahan kecil khusus shortcut ini — seluruh style lain reuse styles.html */
+.quick-header-link {
+  font-size: 12px;
+  color: var(--color-primary);
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.login-page-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #fef2f2; color: #dc2626; border: 1px solid #fecaca;
+    font-size: 11.5px; font-weight: 700; letter-spacing: 0.02em;
+    padding: 6px 14px; border-radius: 999px; margin: 14px 0 6px;
+  }
+  .login-icon { display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
+
+  
+</style>
+</head>
+<body>
+
+  <!-- ===================== LOGIN SCREEN ===================== -->
+
+  <div id="screen-login">
+    <?!= include('login-card'); ?>
+  </div>
+
+  <!-- ===================== APP SHELL (RINGAN) ===================== -->
+  <div id="screen-app">
+    <header class="app-header">
+      <div class="app-title">📝 Buat Laporan</div>
+      <div class="header-right">
+        <a class="quick-header-link" id="link-app-utama">← Aplikasi Utama</a>
+        <span class="header-status">
+          <span class="status-dot"></span>
+          <span id="header-username">—</span>
+        </span>
+        <button class="btn-icon" id="btn-logout" type="button" aria-label="Keluar"></button>
+      </div>
+    </header>
+    <div id="linear-progress"></div>
+
+    <main class="app-content">
+      <section class="page-section" data-page="buat">
+
+          <div class="card" id="buat-form-card">
+              <div class="card-header-row">
+                <div class="card-header-icon" id="buat-header-icon"></div>
+                <div class="card-header-text">
+                  <p class="card-header-title" id="buat-header-title" style="text-transform:uppercase; letter-spacing:0.02em;">Buat Pekerjaan</p>
+                </div>
+                <div class="card-header-row-actions">
+                  <button class="btn-icon" id="btn-cancel-report-form" type="button" aria-label="Reset"></button>
+                </div>
+              </div>
+
+          <div class="form-progress-box" id="buat-context-banner" style="display:none; background:var(--md-primary-container); color:var(--md-on-primary-container); text-align:left;">
+            Melengkapi laporan untuk Pekerjaan <b id="buat-context-pekerjaan-id"></b>
+          </div>
+
+          <div class="form-group form-jenis-lantai-row">
+            <div class="form-jenis-lantai-col">
+              <label class="form-label">Jenis</label>
+              <div class="select-field-wrap">
+                <span class="select-field-icon" id="form-jenis-icon"></span>
+                <select id="form-jenis"></select>
+              </div>
+            </div>
+            <div class="form-jenis-lantai-col">
+              <label class="form-label">Lantai</label>
+              <div class="select-field-wrap">
+                <span class="select-field-icon" id="form-floor-icon"></span>
+                <select id="form-floor">
+                  <option value="">Pilih lantai</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+
+              <div class="form-group" id="form-performed-at-group" style="display:none;">
+                <div class="performed-at-label-row">
+                  <span class="icon-slot" id="performed-at-label-icon"></span>
+                  <label class="form-label" style="margin:0;">Waktu Laporan</label>
+                </div>
+
+                <div id="performed-at-collapsed" class="performed-at-collapsed">
+                  <span>Sekarang (otomatis)</span>
+                  <button type="button" class="performed-at-link" id="btn-performed-at-edit">Ubah</button>
+                </div>
+
+                <div id="performed-at-expanded" class="performed-at-expanded" style="display:none;">
+                  <div class="performed-at-preview" id="performed-at-preview"></div>
+                  <input id="form-performed-at" class="form-input" type="datetime-local">
+                  <p class="md-body-sm" style="margin:8px 0 0;">Laporan susulan maksimal 7 hari ke belakang.</p>
+                  <button type="button" class="performed-at-link" id="btn-performed-at-reset" style="margin-top:4px; padding-left:0;">Gunakan waktu sekarang</button>
+                </div>
+              </div>
+
+
+          <div class="form-group" id="form-assignment-mode-group" style="display:none;">
+            <label class="form-label">Mode Penugasan</label>
+            <select id="form-assignment-mode" class="form-input">
+              <option value="broadcast">Area Broadcast</option>
+              <option value="direct">Direct Assignment</option>
+            </select>
+          </div>
+          <div class="form-group" id="form-target-user-group" style="display:none;">
+            <label class="form-label">Petugas Penerima</label>
+            <select id="form-target-user" class="form-input">
+              <option value="">Pilih petugas</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" id="form-subject-label">Subjek (opsional)</label>
+            <input id="form-subject" class="form-input" type="text" maxlength="100" placeholder="Contoh: Zona 5A">
+          </div>
+
+
+          <div class="form-group">
+                <label class="form-label" id="form-description-label" style="text-transform:uppercase; letter-spacing:0.04em; font-weight:600;">Keterangan</label>
+                <textarea id="form-description" class="form-input" rows="4" maxlength="500" placeholder="Jelaskan secara singkat tentang pekerjaan ini..."></textarea>
+                <div class="char-counter" id="form-description-counter">0/500</div>
+              </div>
+
+              
+          <div class="form-group">
+                <label class="form-label" id="form-photo-label">Foto Kondisi Awal (opsional, maks. 3)</label>
+                <div class="photo-slots-v2" id="photo-slots"></div>
+                <input type="file" id="photo-file-input" accept="image/*" style="display:none">
+              </div>
+
+          <div class="form-progress-box" id="form-progress-box">
+            <span id="form-progress-text">Progres pengisian: 0% | Foto siap upload: 0</span>
+          </div>
+
+<div class="form-actions-row">
+                <button class="btn-primary" id="btn-submit-report" type="button"></button>
+              </div>
+
+          <div class="form-error" id="form-report-error"></div>
+        </div>
+
+        <div class="card" id="buat-success-card" style="display:none; text-align:center;">
+          <div class="empty-state-icon" style="background:var(--status-completed-bg); color:var(--status-completed-fg); margin:0 auto 12px;">
+            <span id="buat-success-icon"></span>
+          </div>
+          <p class="md-title" id="buat-success-message" style="margin-bottom:6px;">Pekerjaan berhasil dibuat.</p>
+          <p class="md-body-sm" id="buat-success-subtext" style="margin-bottom:18px;"></p>
+          <div class="form-actions-row">
+            <button class="btn-outlined" id="btn-buat-laporan-lagi" type="button">Buat Pekerjaan Lain</button>
+            <button class="btn-primary" id="btn-lihat-riwayat-setelah-submit" type="button">Lihat Riwayat</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ===================== OVERLAY FUNGSIONAL (nyata, dipakai) ===================== -->
+
+  <div id="confirm-modal-overlay">
+    <div class="confirm-modal-card">
+      <div class="confirm-modal-icon" id="confirm-modal-icon"></div>
+      <p id="confirm-modal-message"></p>
+      <div class="confirm-modal-actions">
+        <button class="btn-cancel" id="confirm-modal-cancel">Batal</button>
+        <button class="btn-confirm" id="confirm-modal-confirm">Ya, Lanjutkan</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="bottom-sheet-overlay">
+    <div class="bottom-sheet-card">
+      <div class="bottom-sheet-handle"></div>
+      <div id="bottom-sheet-body"></div>
+    </div>
+  </div>
+
+  <div id="global-spinner"><div class="spinner"></div></div>
+  <div id="snackbar"></div>
+
+  <!-- ===================== STUB TERSEMBUNYI ===================== -->
+  <!-- Elemen di bawah ini TIDAK dipakai di halaman shortcut ini, tapi
+       WAJIB ada di DOM karena script-core.html (reuse apa adanya dari
+       app utama) memasang event listener ke ID-ID ini tanpa pengecekan
+       null — tanpa elemen ini, script akan error saat load dan
+       menghentikan seluruh inisialisasi (termasuk proses login). -->
+  <div style="display:none;">
+    <span id="header-avatar-initial"></span>
+    <span id="akun-nama"></span>
+    <span id="akun-kode"></span>
+    <span id="akun-role"></span>
+    <div id="bottom-nav-container"></div>
+    <div id="sidebar-nav-container"></div>
+    <button id="btn-open-akun" type="button"></button>
+    <button id="btn-back-from-akun" type="button"></button>
+    <button id="btn-close-activity-detail-x" type="button"></button>
+    <div id="activity-detail-overlay"></div>
+  </div>
+
+<?!= include('script-core'); ?>
+<?!= include('script-pekerjaan'); ?>
+
+
+<script>
+  // ============================================================
+  // GLUE KHUSUS HALAMAN SHORTCUT — sengaja TIDAK meng-include
+  // script-jadwal.html/script-aktivitas.html (modul berat: Jadwal,
+  // Content Management, Riwayat, Aktivitas, PDF, gesture Photo Viewer)
+  // supaya halaman ini tetap ringan. Beberapa baris di bawah adalah
+  // duplikasi MINIMAL dari script-aktivitas.html — murni glue UI
+  // (counter karakter, tombol Reset, ikon statis, entry point init),
+  // BUKAN business logic (semua logic Buat Pekerjaan tetap 100% reuse
+  // dari script-pekerjaan.html, tidak diduplikasi).
+  // ============================================================
+
+  // Paksa landing page SELALU ke 'buat', apa pun role & defaultPage-nya
+  // (lihat patch renderApp di script-core.html).
+  var FORCE_LANDING_PAGE = 'buat';
+
+  // Subset applyStaticIcons() (script-aktivitas.html) — hanya ikon yang
+  // relevan untuk halaman ini.
+
+    function applyQuickIcons_() {
+    var map = [
+      ['btn-submit-report', 'upload', 'Simpan & Kirim'],
+      ['btn-buat-laporan-lagi', 'add', 'Buat Pekerjaan Lain'],
+      ['btn-lihat-riwayat-setelah-submit', 'history', 'Lihat Riwayat']
+    ];
+    map.forEach(function (row) {
+      var el = document.getElementById(row[0]);
+      if (el) el.innerHTML = mdIcon(row[1], 18) + '<span>' + row[2] + '</span>';
+    });
+
+    var btnResetBuat = document.getElementById('btn-cancel-report-form');
+    if (btnResetBuat) btnResetBuat.innerHTML = mdIcon('close', 18);
+
+    var buatHeaderIcon = document.getElementById('buat-header-icon');
+    if (buatHeaderIcon) buatHeaderIcon.innerHTML = mdIcon('description', 22);
+
+    var buatSuccessIcon = document.getElementById('buat-success-icon');
+    if (buatSuccessIcon) buatSuccessIcon.innerHTML = mdIcon('checkCircle', 26);
+
+    var floorIcon = document.getElementById('form-floor-icon');
+    if (floorIcon) {
+      floorIcon.innerHTML = mdIcon('building', 15);
+      floorIcon.style.background = 'var(--status-available-bg)';
+      floorIcon.style.color = 'var(--status-available-fg)';
+    }
+
+    var logoutBtn = document.getElementById('btn-logout');
+    if (logoutBtn) logoutBtn.innerHTML = mdIcon('logout', 20);
+  }
+  applyQuickIcons_();
+
+  // Counter karakter Keterangan — identik script-aktivitas.html.
+  var formDescEl = document.getElementById('form-description');
+  var formDescCounter = document.getElementById('form-description-counter');
+  if (formDescEl && formDescCounter) {
+    formDescEl.addEventListener('input', function () {
+      formDescCounter.textContent = formDescEl.value.length + '/500';
+      updateFormProgress();
+    });
+  }
+
+  // Tombol Batal/Reset form — identik script-aktivitas.html.
+  document.getElementById('btn-cancel-report-form').addEventListener('click', function () {
+    var hasUnsavedContent = document.getElementById('form-subject').value.trim() ||
+      document.getElementById('form-description').value.trim() ||
+      selectedPhotos.filter(Boolean).length > 0;
+
+
+    function resetPekerjaanForm() {
+      document.getElementById('form-subject').value = '';
+      document.getElementById('form-description').value = '';
+      if (formDescCounter) formDescCounter.textContent = '0/500';
+      if (typeof collapsePerformedAt_ === 'function') collapsePerformedAt_();
+      selectedPhotos = [];
+      document.getElementById('form-report-error').textContent = '';
+      resetBuatPrefillContext_();
+      initPekerjaanForm();
+    }
+
+    if (hasUnsavedContent) {
+      showConfirmModal('Batalkan pekerjaan ini? Isian yang sudah diketik akan hilang.', resetPekerjaanForm, 'warning');
+    } else {
+      resetPekerjaanForm();
+    }
+  });
+
+  // Link "← Aplikasi Utama" — aktif setelah login (appBootstrap terisi).
+  document.getElementById('link-app-utama').addEventListener('click', function () {
+    if (appBootstrap && appBootstrap.webAppUrl) {
+      window.location.href = appBootstrap.webAppUrl;
+    }
+  });
+
+
+  // ============================================================
+  // RIPPLE EFFECT — versi ringan, reuse CSS .ripple-surface/.ripple-effect
+  // dari styles.html (sudah ter-include). Logic identik dengan
+  // attachRipple() di script-aktivitas.html, didefinisikan ulang di sini
+  // karena file itu TIDAK di-include di halaman shortcut ini.
+  // ============================================================
+  function attachRipple_(el) {
+    if (!el || el.dataset.rippleAttached) return;
+    el.dataset.rippleAttached = '1';
+    el.classList.add('ripple-surface');
+    el.addEventListener('click', function (e) {
+      var rect = el.getBoundingClientRect();
+      var size = Math.max(rect.width, rect.height);
+      var ripple = document.createElement('span');
+      ripple.className = 'ripple-effect';
+      ripple.style.width = ripple.style.height = size + 'px';
+      ripple.style.left = ((e.clientX || (rect.left + rect.width / 2)) - rect.left - size / 2) + 'px';
+      ripple.style.top = ((e.clientY || (rect.top + rect.height / 2)) - rect.top - size / 2) + 'px';
+      el.appendChild(ripple);
+      setTimeout(function () { ripple.remove(); }, 500);
+    });
+  }
+  document.querySelectorAll('.btn-primary, .btn-outlined').forEach(attachRipple_);
+
+  // ============================================================
+  // INIT — identik pola script-aktivitas.html.
+  // ============================================================
+
+  (function init() {
+    var session = loadSession();
+    if (session && session.accessCode) {
+      document.getElementById('screen-login').style.display = 'none';
+      attemptBootstrap(session);
+    } else {
+      document.getElementById('screen-login').style.display = 'flex';
+    }
+  })();
+</script>
+</body>
+</html>

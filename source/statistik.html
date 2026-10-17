@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<base target="_top">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Statistik Laporan</title>
+<style>
+  :root {
+    --color-primary: #2563eb;
+    --color-primary-soft: #eff6ff;
+    --color-bg: #f6f7f9;
+    --color-surface: #ffffff;
+    --color-text: #111827;
+    --color-text-muted: #6b7280;
+    --color-text-faint: #9ca3af;
+    --color-border: #e5e7eb;
+
+    --status-available-bg: #eff6ff; --status-available-fg: #1d4ed8;
+    --status-claimed-bg: #fffbeb;   --status-claimed-fg: #b45309;
+    --status-completed-bg: #f0fdf4; --status-completed-fg: #15803d;
+    --status-neutral-bg: #f3f4f6;   --status-neutral-fg: #4b5563;
+
+    --md-surface-container: #f3f4f6;
+    --md-outline: #d1d5db;
+    --shape-sm: 10px;
+    --shape-md: 14px;
+    --shape-lg: 18px;
+    --shape-full: 999px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; background: var(--color-bg); color: var(--color-text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ===================== LOGIN ===================== */
+  #screen-login {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .login-card {
+    width: 100%; max-width: 340px; background: var(--color-surface); border-radius: 22px;
+    padding: 32px 24px; box-shadow: 0 12px 32px rgba(15,23,42,0.08); text-align: center;
+  }
+  .login-card h1 { font-size: 19px; margin: 0 0 6px; }
+  .login-card p { color: var(--color-text-muted); font-size: 13px; margin: 0 0 20px; }
+  #input-access-code {
+    width: 100%; min-height: 50px; text-align: center; letter-spacing: 2px; font-size: 15px;
+    border: 1.5px solid #bfdbfe; border-radius: 12px; padding: 0 12px; margin-bottom: 14px;
+  }
+  .btn-primary {
+    width: 100%; min-height: 48px; background: var(--color-primary); color: #fff; border: none;
+    border-radius: 999px; font-size: 14px; font-weight: 700; cursor: pointer;
+  }
+  .login-error { color: #dc2626; font-size: 13px; margin-top: 10px; min-height: 16px; }
+
+  .login-page-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #fef2f2; color: #dc2626; border: 1px solid #fecaca;
+    font-size: 11.5px; font-weight: 700; letter-spacing: 0.02em;
+    padding: 6px 14px; border-radius: 999px; margin: 14px 0 6px;
+  }
+<?!= include('login-styles'); ?>
+  /* ===================== DASHBOARD SHELL ===================== */
+  #screen-dashboard { display: none; max-width: 760px; margin: 0 auto; padding: 14px 14px 40px; }
+
+  header.dash-header {
+    display: flex; align-items: center; justify-content: space-between; padding: 6px 2px 4px;
+  }
+  header.dash-header h1 { font-size: 17px; margin: 0; }
+  header.dash-header .generated-at { font-size: 11px; color: var(--color-text-faint); }
+
+  .badge-readonly {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 700;
+    background: var(--md-surface-container); color: #4b5563; padding: 4px 10px; border-radius: 999px;
+    margin: 6px 0 14px;
+  }
+
+  /* ===================== PERIOD TABS ===================== */
+  .period-tabs {
+    display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto;
+  }
+  .period-tab-btn {
+    flex: 0 0 auto; min-height: 40px; padding: 0 16px; border: 1px solid var(--color-border);
+    border-radius: var(--shape-full); background: #fff; font-size: 13px; font-weight: 600;
+    color: var(--color-text-muted); cursor: pointer; white-space: nowrap; transition: all .12s ease;
+  }
+  .period-tab-btn.active {
+    background: var(--color-text); border-color: var(--color-text); color: #fff;
+  }
+
+  .card {
+    background: var(--color-surface); border-radius: var(--shape-lg); padding: 16px;
+    margin-bottom: 12px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+  .card h2 { font-size: 14px; margin: 0 0 12px; display: flex; align-items: center; gap: 8px; }
+  .card .card-subtitle { font-size: 11px; color: var(--color-text-faint); margin: -8px 0 12px; }
+
+  /* ===================== QUICK STATS ===================== */
+  .quick-stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  @media (min-width: 480px) { .quick-stats-grid { grid-template-columns: repeat(4, 1fr); } }
+  .quick-stat-box { background: #f9fafb; border-radius: 12px; padding: 12px 8px; text-align: center; }
+  .quick-stat-box .v { font-size: 20px; font-weight: 800; color: var(--color-primary); }
+  .quick-stat-box .l { font-size: 10.5px; color: var(--color-text-muted); margin-top: 2px; line-height: 1.3; }
+
+  /* ===================== LINE CHART (Tren) ===================== */
+  .linechart-wrap { width: 100%; overflow-x: auto; }
+  .linechart-svg { display: block; width: 100%; height: 190px; }
+  .linechart-grid-line { stroke: var(--color-border); stroke-width: 1; }
+  .linechart-axis-label { font-size: 8.5px; fill: var(--color-text-faint); }
+  .linechart-area { fill: url(#trendGradient); }
+  .linechart-line { fill: none; stroke: var(--color-primary); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+  .linechart-dot { fill: var(--color-primary); stroke: #fff; stroke-width: 1.5; cursor: pointer; }
+  .linechart-dot:hover, .linechart-dot:active { r: 5; }
+  .linechart-xlabel { font-size: 9px; fill: var(--color-text-faint); text-anchor: middle; }
+  .trend-empty { text-align: center; color: var(--color-text-muted); font-size: 13px; padding: 30px 0; }
+  .trend-peak-note { font-size: 11px; color: var(--color-text-muted); margin-top: 6px; text-align: right; }
+
+  /* ===================== DONUT (Status & Lantai) ===================== */
+  .donut-row { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  .donut {
+    width: 108px; height: 108px; border-radius: 50%; flex-shrink: 0;
+    background: var(--md-surface-container);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .donut-hole {
+    width: 62px; height: 62px; border-radius: 50%; background: var(--color-surface);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .donut-hole .total-v { font-size: 17px; font-weight: 800; }
+  .donut-hole .total-l { font-size: 9px; color: var(--color-text-faint); }
+
+  .legend-list { flex: 1; min-width: 140px; display: flex; flex-direction: column; gap: 8px; }
+  .legend-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .legend-label { flex: 1; color: var(--color-text-muted); }
+  .legend-value { font-weight: 700; }
+
+  /* ===================== PER JENIS BAR LIST ===================== */
+  .jenis-bar-row { margin-bottom: 12px; }
+  .jenis-bar-row:last-child { margin-bottom: 0; }
+  .jenis-bar-top { display: flex; justify-content: space-between; font-size: 12.5px; margin-bottom: 5px; }
+  .jenis-bar-top .label { font-weight: 600; }
+  .jenis-bar-top .value { color: var(--color-text-muted); }
+  .jenis-bar-track { height: 10px; background: var(--md-surface-container); border-radius: var(--shape-full); overflow: hidden; }
+  .jenis-bar-fill { height: 100%; background: var(--color-primary); border-radius: var(--shape-full); }
+
+  /* ===================== RANKING ===================== */
+  .rank-row {
+    display: flex; align-items: center; gap: 12px; padding: 10px 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .rank-row:last-child { border-bottom: none; }
+  .rank-medal {
+    width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center;
+    justify-content: center; font-size: 14px; font-weight: 800; flex-shrink: 0;
+    background: var(--md-surface-container); color: var(--color-text-muted);
+  }
+  .rank-medal.gold   { background: #fef3c7; color: #b45309; }
+  .rank-medal.silver { background: #f1f5f9; color: #475569; }
+  .rank-medal.bronze { background: #fee2e2; color: #b91c1c; }
+
+  .rank-main { flex: 1; min-width: 0; }
+  .rank-name { font-size: 13.5px; font-weight: 700; }
+  .rank-sub { font-size: 11px; color: var(--color-text-muted); margin-top: 1px; }
+  .rank-track { height: 6px; background: var(--md-surface-container); border-radius: var(--shape-full); margin-top: 6px; overflow: hidden; }
+  .rank-fill { height: 100%; background: var(--color-primary); border-radius: var(--shape-full); }
+
+  .rank-total { text-align: right; flex-shrink: 0; }
+  .rank-total .v { font-size: 16px; font-weight: 800; color: var(--color-primary); }
+  .rank-total .l { font-size: 9.5px; color: var(--color-text-faint); }
+
+  .empty-state-sm { text-align: center; color: var(--color-text-muted); font-size: 13px; padding: 20px 0; }
+
+  .inline-loading {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    color: var(--color-text-muted); font-size: 13px; padding: 30px 0;
+  }
+  .spinner-sm {
+    width: 16px; height: 16px; border: 2px solid var(--color-border);
+    border-top-color: var(--color-primary); border-radius: 50%; animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .footer-note { text-align: center; font-size: 11px; color: var(--color-text-faint); margin-top: 16px; }
+
+
+<?!= include('login-styles'); ?>
+</style>
+</head>
+<body>
+
+
+  <div id="screen-login">
+    <?!= include('login-card'); ?>
+  </div>
+
+  <div id="screen-dashboard">
+    <header class="dash-header">
+      <h1>📈 Statistik Laporan</h1>
+      <span class="generated-at" id="generated-at"></span>
+    </header>
+    <span class="badge-readonly">🔒 Read-only &middot; <span id="range-label-badge"></span></span>
+
+    <div class="period-tabs" id="period-tabs"></div>
+
+    <div class="card">
+      <div class="quick-stats-grid" id="quick-stats"></div>
+    </div>
+
+    <div class="card">
+      <h2>📊 Tren Pekerjaan</h2>
+      <p class="card-subtitle" id="trend-subtitle"></p>
+      <div id="trend-chart"></div>
+    </div>
+
+    <div class="card">
+      <h2>🧭 Status Pekerjaan Kolaboratif</h2>
+      <p class="card-subtitle">Penugasan &amp; Lapor Kerusakan/Permintaan (Mandiri tidak dihitung — selalu selesai seketika)</p>
+      <div class="donut-row">
+        <div class="donut" id="status-donut">
+          <div class="donut-hole">
+            <span class="total-v" id="donut-total">0</span>
+            <span class="total-l">Total</span>
+          </div>
+        </div>
+        <div class="legend-list" id="status-legend"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🗂️ Per Jenis Pekerjaan</h2>
+      <div id="jenis-list"></div>
+    </div>
+
+    <div class="card">
+      <h2>🏢 Jumlah Laporan per Lantai</h2>
+      <p class="card-subtitle">Distribusi seluruh jenis Pekerjaan berdasarkan lokasi, pada periode terpilih</p>
+      <div class="donut-row">
+        <div class="donut" id="lantai-donut">
+          <div class="donut-hole">
+            <span class="total-v" id="lantai-donut-total">0</span>
+            <span class="total-l">Total</span>
+          </div>
+        </div>
+        <div class="legend-list" id="lantai-legend"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>🏆 Ranking Performa Facility Support</h2>
+      <p class="card-subtitle">Laporan Mandiri + Penugasan Selesai, pada periode terpilih</p>
+      <div id="ranking-list"></div>
+    </div>
+
+    <div class="footer-note">Dashboard ini murni tampilan baca (read-only) — tidak dapat mengubah data apa pun.</div>
+  </div>
+
+<script>
+  // ============================================================
+  // SESSION — reuse fs_session yang sama dengan Web App utama, supaya
+  // pengguna yang sudah login di aplikasi utama TIDAK perlu login lagi
+  // di halaman ini (localStorage per-browser/device, bukan cookie).
+  // ============================================================
+
+  var SESSION_KEY = 'fs_session';
+
+  function loadSession() {
+    var raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch (e) { return null; }
+  }
+
+  function showLoginError(msg) {
+    document.getElementById('login-error').textContent = msg;
+  }
+
+  function handleLogin() {
+    var code = document.getElementById('input-access-code').value.trim().toUpperCase();
+    if (!code) { showLoginError('Kode akses wajib diisi.'); return; }
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ accessCode: code }));
+    currentAccessCode = code;
+    fetchPeriod(currentPeriod, true);
+  }
+
+  document.getElementById('btn-login').addEventListener('click', handleLogin);
+  document.getElementById('input-access-code').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') handleLogin();
+  });
+
+  // ============================================================
+  // STATE
+  // ============================================================
+
+  var currentAccessCode = null;
+  var currentPeriod = 'mingguan';
+  var dashboardCache = {};
+
+  var PERIOD_TABS = [
+    { key: 'mingguan', label: 'Mingguan' },
+    { key: 'bulanan', label: 'Bulanan' },
+    { key: 'tahunan', label: 'Tahunan' },
+    { key: 'all', label: 'Semua' }
+  ];
+
+  function renderPeriodTabs() {
+    var container = document.getElementById('period-tabs');
+    container.innerHTML = '';
+    PERIOD_TABS.forEach(function (tab) {
+      var btn = document.createElement('button');
+      btn.className = 'period-tab-btn' + (tab.key === currentPeriod ? ' active' : '');
+      btn.textContent = tab.label;
+      btn.addEventListener('click', function () {
+        if (currentPeriod === tab.key) return;
+        currentPeriod = tab.key;
+        renderPeriodTabs();
+        fetchPeriod(tab.key, false);
+      });
+      container.appendChild(btn);
+    });
+  }
+
+  // ============================================================
+  // FETCH (lazy per periode, cache client-side)
+  // ============================================================
+
+  function fetchPeriod(period, isManualLogin) {
+    if (dashboardCache[period]) {
+      renderDashboard(dashboardCache[period]);
+      return;
+    }
+
+    showLoadingState();
+
+    google.script.run
+      .withSuccessHandler(function (response) {
+        if (!response.success) {
+          if (isManualLogin) {
+            showLoginError(response.error);
+          } else {
+            document.getElementById('screen-dashboard').style.display = 'none';
+            document.getElementById('screen-login').style.display = 'flex';
+          }
+          return;
+        }
+        dashboardCache[period] = response.data;
+        renderDashboard(response.data);
+      })
+      .withFailureHandler(function () {
+        if (isManualLogin) {
+          showLoginError('Gagal terhubung ke server. Coba lagi.');
+        } else {
+          document.getElementById('trend-chart').innerHTML = '<div class="trend-empty">Gagal memuat data. Coba lagi.</div>';
+        }
+      })
+      .getStatistikDashboard(currentAccessCode, period);
+  }
+
+  function showLoadingState() {
+    document.getElementById('screen-login').style.display = 'none';
+    document.getElementById('screen-dashboard').style.display = 'block';
+    document.getElementById('trend-chart').innerHTML = '<div class="inline-loading"><span class="spinner-sm"></span>Memuat statistik...</div>';
+  }
+
+  // ============================================================
+  // RENDER
+  // ============================================================
+
+  var STATUS_COLORS = {
+    TERBUKA: '#1d4ed8',
+    DIKERJAKAN: '#b45309',
+    SELESAI: '#15803d'
+  };
+  var STATUS_LABELS = { TERBUKA: 'Terbuka', DIKERJAKAN: 'Dikerjakan', SELESAI: 'Selesai' };
+
+  // Palet warna generik untuk donut dengan kategori dinamis (Per Lantai) —
+  // jumlah lantai bisa berubah (MASTER_FLOORS_DATA), jadi warna di-cycle
+  // dari palet ini, bukan hardcode per floor_code.
+  var DONUT_PALETTE = ['#2563eb', '#7c3aed', '#059669', '#d97706', '#db2777', '#0891b2', '#65a30d', '#dc2626'];
+
+  function renderDashboard(data) {
+    document.getElementById('generated-at').textContent = 'Diperbarui: ' + data.generatedAt;
+    document.getElementById('range-label-badge').textContent = data.rangeLabel;
+
+    renderQuickStats(data);
+    renderTrendChart(data.trend, data.rangeLabel);
+    renderStatusDonut(data.statusBreakdown);
+    renderJenisList(data.perJenis);
+    renderLantaiDonut(data.perLantai);
+    renderRankingList(data.ranking);
+  }
+
+  function renderQuickStats(data) {
+    var items = [
+      { v: data.totalPekerjaanPeriode, l: 'Pekerjaan (' + data.rangeLabel + ')' },
+      { v: data.pekerjaanHariIni, l: 'Pekerjaan Hari Ini' },
+      { v: data.rataRataPerHari != null ? data.rataRataPerHari : '—', l: 'Rata-rata / Hari' },
+      { v: data.totalPekerjaanKeseluruhan, l: 'Total Sepanjang Waktu' }
+    ];
+    var grid = document.getElementById('quick-stats');
+    grid.innerHTML = '';
+    items.forEach(function (it) {
+      var box = document.createElement('div');
+      box.className = 'quick-stat-box';
+      box.innerHTML = '<div class="v">' + it.v + '</div><div class="l">' + it.l + '</div>';
+      grid.appendChild(box);
+    });
+  }
+
+  // ============================================================
+  // TREND — Line Chart (SVG murni, tanpa library eksternal)
+  // ============================================================
+
+  function renderTrendChart(buckets, rangeLabel) {
+    document.getElementById('trend-subtitle').textContent = rangeLabel;
+    var container = document.getElementById('trend-chart');
+    container.innerHTML = '';
+
+    if (!buckets || buckets.length === 0) {
+      container.innerHTML = '<div class="trend-empty">Belum ada data pada periode ini.</div>';
+      return;
+    }
+
+    var W = 600, H = 190;
+    var padTop = 16, padBottom = 26, padLeft = 8, padRight = 8;
+    var chartW = W - padLeft - padRight;
+    var chartH = H - padTop - padBottom;
+
+    var maxCount = Math.max.apply(null, buckets.map(function (b) { return b.count; }).concat([1]));
+    var n = buckets.length;
+    var labelEvery = n <= 10 ? 1 : Math.ceil(n / 7);
+
+    function xOf(i) { return n === 1 ? padLeft + chartW / 2 : padLeft + (i * (chartW / (n - 1))); }
+    function yOf(count) { return padTop + (1 - (count / maxCount)) * chartH; }
+
+    var points = buckets.map(function (b, i) { return { x: xOf(i), y: yOf(b.count), count: b.count, label: b.label }; });
+    var polylinePoints = points.map(function (pt) { return pt.x + ',' + pt.y; }).join(' ');
+    var areaPath = 'M ' + points[0].x + ',' + (padTop + chartH) +
+      ' L ' + points.map(function (pt) { return pt.x + ',' + pt.y; }).join(' L ') +
+      ' L ' + points[points.length - 1].x + ',' + (padTop + chartH) + ' Z';
+
+    var peakIdx = buckets.reduce(function (best, b, i, arr) { return b.count > arr[best].count ? i : best; }, 0);
+
+    var gridLinesSvg = [0, 0.5, 1].map(function (frac) {
+      var y = padTop + frac * chartH;
+      var val = Math.round(maxCount * (1 - frac));
+      return '<line class="linechart-grid-line" x1="' + padLeft + '" y1="' + y + '" x2="' + (W - padRight) + '" y2="' + y + '"></line>' +
+        '<text class="linechart-axis-label" x="' + (padLeft + 2) + '" y="' + (y - 3) + '">' + val + '</text>';
+    }).join('');
+
+    var dotsSvg = points.map(function (pt, i) {
+      return '<circle class="linechart-dot" cx="' + pt.x + '" cy="' + pt.y + '" r="3.5">' +
+        '<title>' + pt.label + ': ' + pt.count + ' pekerjaan</title>' +
+        '</circle>';
+    }).join('');
+
+    var xLabelsSvg = points.map(function (pt, i) {
+      var showLabel = (i % labelEvery === 0) || (i === n - 1);
+      if (!showLabel) return '';
+      return '<text class="linechart-xlabel" x="' + pt.x + '" y="' + (H - 6) + '">' + pt.label + '</text>';
+    }).join('');
+
+    var svg =
+      '<div class="linechart-wrap">' +
+      '<svg class="linechart-svg" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' +
+      '<defs><linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">' +
+      '<stop offset="0%" stop-color="#2563eb" stop-opacity="0.28"></stop>' +
+      '<stop offset="100%" stop-color="#2563eb" stop-opacity="0"></stop>' +
+      '</linearGradient></defs>' +
+      gridLinesSvg +
+      '<path class="linechart-area" d="' + areaPath + '"></path>' +
+      '<polyline class="linechart-line" points="' + polylinePoints + '"></polyline>' +
+      dotsSvg +
+      xLabelsSvg +
+      '</svg>' +
+      '</div>';
+
+    container.innerHTML = svg;
+
+    if (buckets[peakIdx].count > 0) {
+      var note = document.createElement('div');
+      note.className = 'trend-peak-note';
+      note.textContent = 'Puncak: ' + buckets[peakIdx].label + ' (' + buckets[peakIdx].count + ' pekerjaan)';
+      container.appendChild(note);
+    }
+  }
+
+  // ============================================================
+  // DONUT — Status (3 kategori tetap) & Per Lantai (dinamis)
+  // ============================================================
+
+  function renderStatusDonut(status) {
+    var total = status.TERBUKA + status.DIKERJAKAN + status.SELESAI;
+    var donut = document.getElementById('status-donut');
+    var legend = document.getElementById('status-legend');
+    document.getElementById('donut-total').textContent = total;
+
+    if (total === 0) {
+      donut.style.background = 'var(--md-surface-container)';
+      legend.innerHTML = '<div class="empty-state-sm">Tidak ada pekerjaan kolaboratif pada periode ini.</div>';
+      return;
+    }
+
+    var pTerbuka = (status.TERBUKA / total) * 100;
+    var pDikerjakan = (status.DIKERJAKAN / total) * 100;
+    var c1 = pTerbuka;
+    var c2 = c1 + pDikerjakan;
+
+    donut.style.background =
+      'conic-gradient(' +
+      STATUS_COLORS.TERBUKA + ' 0% ' + c1 + '%, ' +
+      STATUS_COLORS.DIKERJAKAN + ' ' + c1 + '% ' + c2 + '%, ' +
+      STATUS_COLORS.SELESAI + ' ' + c2 + '% 100%)';
+
+    legend.innerHTML =
+      legendRow(STATUS_COLORS.TERBUKA, STATUS_LABELS.TERBUKA, status.TERBUKA) +
+      legendRow(STATUS_COLORS.DIKERJAKAN, STATUS_LABELS.DIKERJAKAN, status.DIKERJAKAN) +
+      legendRow(STATUS_COLORS.SELESAI, STATUS_LABELS.SELESAI, status.SELESAI);
+  }
+
+  /**
+   * Donut generik untuk kategori dinamis (jumlah lantai bisa berbeda-beda
+   * tergantung MASTER_FLOORS_DATA) — warna diambil berputar dari
+   * DONUT_PALETTE, bukan hardcode per lantai.
+   */
+  function renderLantaiDonut(perLantai) {
+    var donut = document.getElementById('lantai-donut');
+    var legend = document.getElementById('lantai-legend');
+    var total = (perLantai || []).reduce(function (sum, f) { return sum + f.total; }, 0);
+    document.getElementById('lantai-donut-total').textContent = total;
+
+    if (!perLantai || perLantai.length === 0 || total === 0) {
+      donut.style.background = 'var(--md-surface-container)';
+      legend.innerHTML = '<div class="empty-state-sm">Belum ada data lokasi pada periode ini.</div>';
+      return;
+    }
+
+    var cumulative = 0;
+    var gradientParts = [];
+    var legendHtml = '';
+
+    perLantai.forEach(function (f, idx) {
+      var color = DONUT_PALETTE[idx % DONUT_PALETTE.length];
+      var pct = (f.total / total) * 100;
+      var start = cumulative;
+      var end = cumulative + pct;
+      gradientParts.push(color + ' ' + start + '% ' + end + '%');
+      cumulative = end;
+      legendHtml += legendRow(color, f.label, f.total);
+    });
+
+    donut.style.background = 'conic-gradient(' + gradientParts.join(', ') + ')';
+    legend.innerHTML = legendHtml;
+  }
+
+  function legendRow(color, label, value) {
+    return '<div class="legend-row"><span class="legend-dot" style="background:' + color + ';"></span>' +
+      '<span class="legend-label">' + label + '</span><span class="legend-value">' + value + '</span></div>';
+  }
+
+  function renderJenisList(perJenis) {
+    var container = document.getElementById('jenis-list');
+    container.innerHTML = '';
+
+    if (!perJenis || perJenis.length === 0) {
+      container.innerHTML = '<div class="empty-state-sm">Belum ada data pada periode ini.</div>';
+      return;
+    }
+
+    var maxTotal = Math.max.apply(null, perJenis.map(function (j) { return j.total; }));
+
+    perJenis.forEach(function (j) {
+      var pct = Math.round((j.total / maxTotal) * 100);
+      var row = document.createElement('div');
+      row.className = 'jenis-bar-row';
+      row.innerHTML =
+        '<div class="jenis-bar-top"><span class="label">' + j.label + '</span>' +
+        '<span class="value">' + j.total + ' total &middot; ' + j.selesai + ' selesai</span></div>' +
+        '<div class="jenis-bar-track"><div class="jenis-bar-fill" style="width:' + pct + '%;"></div></div>';
+      container.appendChild(row);
+    });
+  }
+
+  var MEDAL_CLASS = ['gold', 'silver', 'bronze'];
+  var MEDAL_EMOJI = ['🥇', '🥈', '🥉'];
+
+  function renderRankingList(ranking) {
+    var container = document.getElementById('ranking-list');
+    container.innerHTML = '';
+
+    if (!ranking || ranking.length === 0) {
+      container.innerHTML = '<div class="empty-state-sm">Belum ada data pada periode ini.</div>';
+      return;
+    }
+
+    var maxTotal = Math.max.apply(null, ranking.map(function (r) { return r.totalGabungan; }).concat([1]));
+
+    ranking.forEach(function (r, idx) {
+      var row = document.createElement('div');
+      row.className = 'rank-row';
+
+      var medalHtml;
+      if (idx < 3 && r.totalGabungan > 0) {
+        medalHtml = '<div class="rank-medal ' + MEDAL_CLASS[idx] + '">' + MEDAL_EMOJI[idx] + '</div>';
+      } else {
+        medalHtml = '<div class="rank-medal">' + (idx + 1) + '</div>';
+      }
+
+      var pct = maxTotal > 0 ? Math.round((r.totalGabungan / maxTotal) * 100) : 0;
+      var avgLabel = r.avgWaktuPenyelesaianMenit != null ? (r.avgWaktuPenyelesaianMenit + ' menit rata²') : 'Belum ada Penugasan selesai';
+
+      row.innerHTML = medalHtml +
+        '<div class="rank-main">' +
+        '<div class="rank-name">' + r.displayName + '</div>' +
+        '<div class="rank-sub">' + r.totalLaporanMandiri + ' Mandiri &middot; ' + r.totalPenugasanSelesai + ' Penugasan &middot; ' + avgLabel + '</div>' +
+        '<div class="rank-track"><div class="rank-fill" style="width:' + pct + '%;"></div></div>' +
+        '</div>' +
+        '<div class="rank-total"><div class="v">' + r.totalGabungan + '</div><div class="l">Total</div></div>';
+
+      container.appendChild(row);
+    });
+  }
+
+  // ============================================================
+  // INIT
+  // ============================================================
+
+  renderPeriodTabs();
+
+  (function init() {
+    var session = loadSession();
+    if (session && session.accessCode) {
+      currentAccessCode = session.accessCode;
+      fetchPeriod(currentPeriod, false);
+    } else {
+      document.getElementById('screen-login').style.display = 'flex';
+    }
+  })();
+</script>
+</body>
+</html>

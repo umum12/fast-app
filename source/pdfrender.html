@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<base target="_top">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Unduh PDF Rekap</title>
+<style>
+  :root {
+    --color-primary: #2563eb;
+    --color-primary-soft: #eff6ff;
+    --color-bg: #f6f7f9;
+    --color-surface: #ffffff;
+    --color-text: #111827;
+    --color-text-muted: #6b7280;
+    --color-text-faint: #9ca3af;
+    --color-border: #e5e7eb;
+    --color-danger: #dc2626;
+    --md-outline: #d1d5db;
+    --shape-sm: 10px;
+    --shape-md: 14px;
+    --shape-lg: 18px;
+    --shape-full: 999px;
+    --touch-min: 48px;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; background: var(--color-bg); color: var(--color-text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #screen-login {
+    min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
+  }
+  .login-card {
+    width: 100%; max-width: 340px; background: var(--color-surface); border-radius: 22px;
+    padding: 32px 24px; box-shadow: 0 12px 32px rgba(15,23,42,0.08); text-align: center;
+  }
+  .login-card h1 { font-size: 19px; margin: 0 0 6px; }
+  .login-card p { color: var(--color-text-muted); font-size: 13px; margin: 0 0 20px; }
+  #input-access-code {
+    width: 100%; min-height: 50px; text-align: center; letter-spacing: 2px; font-size: 15px;
+    border: 1.5px solid #bfdbfe; border-radius: 12px; padding: 0 12px; margin-bottom: 14px;
+  }
+  .login-error { color: var(--color-danger); font-size: 13px; margin-top: 10px; min-height: 16px; }
+
+  .login-page-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #fef2f2; color: #dc2626; border: 1px solid #fecaca;
+    font-size: 11.5px; font-weight: 700; letter-spacing: 0.02em;
+    padding: 6px 14px; border-radius: 999px; margin: 14px 0 6px;
+  }
+  .login-icon { display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
+
+  #screen-main { display: none; max-width: 540px; margin: 0 auto; padding: 16px 16px 40px; }
+
+  .page-header { display: flex; align-items: center; gap: 10px; padding: 6px 2px 16px; }
+  .page-header h1 { font-size: 18px; margin: 0; flex: 1; }
+  .back-link {
+    color: var(--color-primary); font-size: 13px; font-weight: 600; text-decoration: none;
+    cursor: pointer; white-space: nowrap;
+  }
+
+  .card {
+    background: var(--color-surface); border-radius: var(--shape-lg); padding: 18px;
+    margin-bottom: 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+  }
+  .card h2 { font-size: 14px; margin: 0 0 14px; }
+
+  .form-group { margin-bottom: 14px; }
+  .form-label { display: block; font-size: 13px; color: var(--color-text-muted); margin-bottom: 6px; }
+  .form-input {
+    width: 100%; min-height: var(--touch-min); border: 1.5px solid var(--md-outline);
+    border-radius: var(--shape-sm); padding: 0 14px; font-size: 14px; font-family: inherit;
+    background: #fff; color: var(--color-text);
+  }
+  select.form-input {
+    appearance: none; -webkit-appearance: none;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%236b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
+    background-repeat: no-repeat; background-position: right 12px center; background-size: 18px; padding-right: 38px;
+  }
+
+  .btn-action {
+    width: 100%; min-height: 54px; border-radius: var(--shape-full); border: none;
+    font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center;
+    justify-content: center; gap: 10px; margin-bottom: 10px; transition: opacity .15s ease, transform .15s ease;
+  }
+  .btn-action:active { transform: scale(0.98); }
+  .btn-action:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
+  .btn-action.device { background: var(--color-primary); color: #fff; }
+  .btn-action.drive { background: #16a34a; color: #fff; }
+
+  .action-hint { font-size: 11.5px; color: var(--color-text-faint); text-align: center; margin: -4px 0 14px; line-height: 1.4; }
+
+  .status-box {
+    border-radius: var(--shape-sm); padding: 12px 14px; font-size: 13px; margin-top: 4px; display: none;
+  }
+  .status-box.show { display: block; }
+  .status-box.info { background: var(--color-primary-soft); color: #1e40af; }
+  .status-box.success { background: #f0fdf4; color: #15803d; }
+  .status-box.error { background: #fef2f2; color: #b91c1c; }
+
+
+  .history-list { display: flex; flex-direction: column; gap: 2px; }
+  .history-row {
+    display: flex; align-items: center; gap: 12px; padding: 11px 4px;
+    border-bottom: 1px solid var(--color-border); cursor: pointer; text-decoration: none; color: inherit;
+  }
+  .history-row:last-child { border-bottom: none; }
+  .history-row:active { background: #f9fafb; }
+  .history-icon {
+    width: 36px; height: 36px; min-width: 36px; border-radius: 10px;
+    background: #fef2f2; color: #b91c1c; display: flex; align-items: center; justify-content: center;
+  }
+  .history-text { flex: 1; min-width: 0; }
+  .history-filename {
+    font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .history-date { font-size: 11.5px; color: var(--color-text-faint); margin-top: 1px; }
+  .history-empty { text-align: center; color: var(--color-text-muted); font-size: 13px; padding: 16px 0; }
+  .history-loading { text-align: center; color: var(--color-text-muted); font-size: 13px; padding: 16px 0; }
+
+  .spinner-sm {
+    width: 15px; height: 15px; border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: #fff; border-radius: 50%; display: inline-block;
+    animation: spin .8s linear infinite; flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+  <div id="screen-login">
+    <div class="login-card">
+      <div class="login-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="84" height="84">
+          <defs>
+            <style>
+              .cube-edge { fill: none; stroke: #2563EB; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; }
+              .icon-style { fill: none; stroke: #2563EB; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
+              .icon-fill { fill: #2563EB; stroke: none; }
+            </style>
+          </defs>
+          <path class="cube-edge" d="M100 22 L168 60 L168 140 L100 178 L32 140 L32 60 Z"/>
+          <path class="cube-edge" d="M100 178 L100 100 M100 100 L32 60 M100 100 L168 60"/>
+          <g transform="translate(100, 52) scale(0.85)">
+            <path class="icon-style" d="M-6 -14 A 8 8 0 0 1 6 -14 L 3 -2 L 8 12 C 8 15 4 17 0 17 C -4 17 -8 15 -8 12 L -3 -2 Z"/>
+            <circle cx="0" cy="-14" r="3" class="icon-fill"/>
+          </g>
+          <g transform="translate(64, 122) scale(0.85)">
+            <path class="icon-style" d="M-8 -18 L2 -18 M-3 -18 L-3 -12"/>
+            <path class="icon-style" d="M-7 -12 L3 -12 L7 14 C7 17 4 19 -2 19 C-8 19 -11 17 -11 14 Z"/>
+          </g>
+          <g transform="translate(136, 122) scale(0.85)">
+            <path class="icon-style" d="M0 -16 L0 -13"/>
+            <path class="icon-style" d="M-14 3 C-14 -9 14 -9 14 3 Z"/>
+            <path class="icon-style" d="M-17 9 L17 9"/>
+          </g>
+        </svg>
+      </div>
+      <h1>Facility Support</h1>
+      <p>Aplikasi Kebersihan, Perbaikan &amp; Layanan Kantor</p>
+      <span class="login-page-badge">🔴 Anda masuk di halaman PDF</span>
+      <label class="form-label" style="margin:18px 0 8px;">KODE AKSES</label>
+      <input id="input-access-code" type="text" placeholder="Ketik kode..." maxlength="20" autocomplete="off">
+      <button class="btn-action device" id="btn-login" style="margin-bottom:0;">Masuk</button>
+      <div class="login-error" id="login-error"></div>
+    </div>
+  </div>
+
+  <div id="screen-main">
+    <div class="page-header">
+      <h1>📄 Unduh PDF Rekap</h1>
+      <a class="back-link" id="btn-back-to-app">← Kembali</a>
+    </div>
+
+    <div class="card">
+      <h2>Filter Data</h2>
+        <div class="form-group" id="filter-scope-group" style="display:none;">
+        <label class="form-label">Cakupan Data</label>
+        <select id="filter-scope" class="form-input">
+          <option value="">Penugasan yang saya buat</option>
+          <option value="all_team">Seluruh aktivitas tim</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Jenis Pekerjaan</label>
+        <select id="filter-jenis" class="form-input"><option value="">Semua</option></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Lantai</label>
+        <select id="filter-floor" class="form-input"><option value="">Semua Lantai</option></select>
+      </div>
+
+      <div class="form-group" id="filter-owner-group">
+        <label class="form-label">Petugas (Dibuat oleh)</label>
+        <select id="filter-owner" class="form-input"><option value="">Semua Petugas</option></select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Dari Tanggal</label>
+        <input id="filter-date-from" class="form-input" type="date">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Sampai Tanggal</label>
+        <input id="filter-date-to" class="form-input" type="date">
+      </div>
+    </div>
+
+
+  <div class="card">
+      <h2>Pilih Tujuan Unduhan</h2>
+
+      <button class="btn-action device" id="btn-download-device">
+        <span id="device-btn-content">⬇️ Unduh ke Perangkat</span>
+      </button>
+      <p class="action-hint">File PDF langsung tersimpan di perangkat Anda (Downloads). Tidak disimpan ke Google Drive.</p>
+
+      <button class="btn-action drive" id="btn-save-drive">
+        <span id="drive-btn-content">☁️ Simpan ke Google Drive</span>
+      </button>
+      <p class="action-hint">File tersimpan di folder Drive aplikasi &amp; dapat dibagikan via tautan.</p>
+
+      <div class="status-box" id="status-box"></div>
+    </div>
+
+    <div class="card">
+      <h2>📁 Riwayat PDF Tersimpan</h2>
+      <p style="font-size:12px; color:var(--color-text-faint); margin:-8px 0 12px;">10 file terakhir — termasuk hasil rekap mingguan otomatis</p>
+      <div class="history-list" id="pdf-history-list">
+        <div class="history-loading">Memuat riwayat...</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  var SESSION_KEY = 'fs_session';
+
+  function loadSession() {
+    var raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch (e) { return null; }
+  }
+
+  function showLoginError(msg) {
+    document.getElementById('login-error').textContent = msg;
+  }
+
+  var currentAccessCode = null;
+
+  function handleLogin() {
+    var code = document.getElementById('input-access-code').value.trim().toUpperCase();
+    if (!code) { showLoginError('Kode akses wajib diisi.'); return; }
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ accessCode: code }));
+    currentAccessCode = code;
+    bootstrapPage(true);
+  }
+
+  document.getElementById('btn-login').addEventListener('click', handleLogin);
+  document.getElementById('input-access-code').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') handleLogin();
+  });
+
+  document.getElementById('btn-back-to-app').addEventListener('click', function () {
+    var baseUrl = window.location.href.split('?')[0];
+    window.location.href = baseUrl;
+  });
+
+  // ============================================================
+  // BOOTSTRAP — reuse getBootstrapData (sudah ada) untuk mengisi
+  // dropdown Jenis/Lantai/Petugas, TANPA endpoint baru.
+  // ============================================================
+
+
+function bootstrapPage(isManualLogin) {
+    document.getElementById('screen-login').style.display = 'none';
+    document.getElementById('screen-main').style.display = 'block';
+
+    google.script.run
+      .withSuccessHandler(function (response) {
+        if (!response.success) {
+          if (isManualLogin) {
+            document.getElementById('screen-main').style.display = 'none';
+            document.getElementById('screen-login').style.display = 'flex';
+            showLoginError(response.error);
+          }
+          return;
+        }
+        populateFilterOptions(response.data);
+        loadPdfHistory();
+      })
+      .withFailureHandler(function () {
+        showStatus('error', 'Gagal terhubung ke server. Muat ulang halaman.');
+      })
+      .getBootstrapData(currentAccessCode);
+  }
+
+  // ============================================================
+  // RIWAYAT PDF TERSIMPAN — 10 file terakhir dari folder Exports
+  // ============================================================
+
+  function loadPdfHistory() {
+    google.script.run
+      .withSuccessHandler(function (response) {
+        var container = document.getElementById('pdf-history-list');
+        if (!response.success) {
+          container.innerHTML = '<div class="history-empty">Gagal memuat riwayat.</div>';
+          return;
+        }
+        renderPdfHistory(response.data.files);
+      })
+      .withFailureHandler(function () {
+        document.getElementById('pdf-history-list').innerHTML = '<div class="history-empty">Gagal memuat riwayat.</div>';
+      })
+      .getRecentPdfExports(currentAccessCode);
+  }
+
+  function renderPdfHistory(files) {
+    var container = document.getElementById('pdf-history-list');
+    container.innerHTML = '';
+
+    if (!files || files.length === 0) {
+      container.innerHTML = '<div class="history-empty">Belum ada PDF yang tersimpan.</div>';
+      return;
+    }
+
+    files.forEach(function (f) {
+      var row = document.createElement('a');
+      row.className = 'history-row';
+      row.href = f.url;
+      row.target = '_blank';
+      row.rel = 'noopener';
+      row.innerHTML =
+        '<span class="history-icon">📄</span>' +
+        '<div class="history-text">' +
+          '<div class="history-filename">' + f.fileName + '</div>' +
+          '<div class="history-date">' + f.createdAt + '</div>' +
+        '</div>';
+      container.appendChild(row);
+    });
+  }
+
+
+  function populateFilterOptions(bootstrap) {
+    var jenisSelect = document.getElementById('filter-jenis');
+    (bootstrap.jenisPekerjaanList || []).forEach(function (j) {
+      var opt = document.createElement('option');
+      opt.value = j.value; opt.textContent = j.label;
+      jenisSelect.appendChild(opt);
+    });
+
+    var floorSelect = document.getElementById('filter-floor');
+    (bootstrap.master.floors || []).forEach(function (f) {
+      var opt = document.createElement('option');
+      opt.value = f.floor_code; opt.textContent = f.floor_name;
+      floorSelect.appendChild(opt);
+    });
+
+    // Filter "Petugas (Dibuat oleh)" hanya relevan untuk Admin/Demo —
+    // mereka bisa menyaring PDF berdasarkan FS tertentu. Untuk role FS,
+    // data yang terlihat SUDAH otomatis hanya miliknya sendiri (backend,
+    // getFilteredPekerjaanRiwayatRows_), jadi filter ini disembunyikan
+    // supaya tidak membingungkan (bukan pembatasan baru, murni UX).
+    var isAdminOrDemo = (bootstrap.currentUser.role === 'admin' || bootstrap.currentUser.role === 'demo');
+    var ownerGroup = document.getElementById('filter-owner-group');
+    if (isAdminOrDemo) {
+
+
+          if (bootstrap.currentUser.role === 'admin') {
+      document.getElementById('filter-scope-group').style.display = 'block';
+    }
+      var ownerSelect = document.getElementById('filter-owner');
+      (bootstrap.master.fsUsers || []).forEach(function (u) {
+        var opt = document.createElement('option');
+        opt.value = u.userCode; opt.textContent = u.displayName + ' (' + u.userCode + ')';
+        ownerSelect.appendChild(opt);
+      });
+    } else if (ownerGroup) {
+      ownerGroup.style.display = 'none';
+    }
+
+    // Prefill dari filter terakhir yang disimpan halaman utama (bila ada)
+    // — murni kenyamanan, bukan keharusan.
+    var session = loadSession();
+    var saved = (session && session.uiState && session.uiState.pekerjaanFilters) || {};
+    if (saved.jenis) jenisSelect.value = saved.jenis;
+    if (saved.floorCode) floorSelect.value = saved.floorCode;
+    if (isAdminOrDemo && saved.ownerCode) document.getElementById('filter-owner').value = saved.ownerCode;
+    if (saved.dateFrom) document.getElementById('filter-date-from').value = saved.dateFrom;
+    if (saved.dateTo) document.getElementById('filter-date-to').value = saved.dateTo;
+  }
+
+
+
+  function getFilters() {
+    return {
+      scope: document.getElementById('filter-scope').value,
+      jenis: document.getElementById('filter-jenis').value,
+      floorCode: document.getElementById('filter-floor').value,
+      ownerCode: document.getElementById('filter-owner').value,
+      dateFrom: document.getElementById('filter-date-from').value,
+      dateTo: document.getElementById('filter-date-to').value
+    };
+  }
+
+  function showStatus(type, message) {
+    var box = document.getElementById('status-box');
+    box.className = 'status-box show ' + type;
+    box.textContent = message;
+  }
+
+  function setButtonBusy(btnId, contentId, busyLabel, busy) {
+    var btn = document.getElementById(btnId);
+    var content = document.getElementById(contentId);
+    btn.disabled = busy;
+    if (busy) {
+      content.dataset.original = content.innerHTML;
+      content.innerHTML = '<span class="spinner-sm"></span><span>' + busyLabel + '</span>';
+    } else if (content.dataset.original) {
+      content.innerHTML = content.dataset.original;
+    }
+  }
+
+  // ============================================================
+  // OPSI 1 — UNDUH KE PERANGKAT (TIDAK menyentuh Google Drive)
+  // ============================================================
+
+  document.getElementById('btn-download-device').addEventListener('click', function () {
+    showStatus('info', 'Membuat PDF, mohon tunggu...');
+    setButtonBusy('btn-download-device', 'device-btn-content', 'Membuat PDF...', true);
+
+    google.script.run
+      .withSuccessHandler(function (response) {
+        setButtonBusy('btn-download-device', 'device-btn-content', '', false);
+        if (!response.success) {
+          showStatus('error', response.error);
+          return;
+        }
+        try {
+          var byteChars = atob(response.data.base64);
+          var byteNumbers = new Array(byteChars.length);
+          for (var i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+          var byteArray = new Uint8Array(byteNumbers);
+          var blob = new Blob([byteArray], { type: 'application/pdf' });
+          var url = URL.createObjectURL(blob);
+
+          var a = document.createElement('a');
+          a.href = url;
+          a.download = response.data.fileName;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+
+          showStatus('success', 'PDF berhasil diunduh (' + response.data.totalRows + ' pekerjaan). Cek folder Downloads perangkat Anda.');
+        } catch (err) {
+          showStatus('error', 'Gagal memproses file PDF di perangkat ini.');
+        }
+      })
+      .withFailureHandler(function () {
+        setButtonBusy('btn-download-device', 'device-btn-content', '', false);
+        showStatus('error', 'Gagal terhubung ke server. Coba lagi.');
+      })
+      .generatePekerjaanPdfBase64(currentAccessCode, getFilters());
+  });
+
+  // ============================================================
+  // OPSI 2 — SIMPAN KE GOOGLE DRIVE (perilaku lama, dipertahankan)
+  // ============================================================
+
+  document.getElementById('btn-save-drive').addEventListener('click', function () {
+    showStatus('info', 'Membuat PDF & menyimpan ke Drive...');
+    setButtonBusy('btn-save-drive', 'drive-btn-content', 'Menyimpan...', true);
+
+    google.script.run
+      .withSuccessHandler(function (response) {
+        setButtonBusy('btn-save-drive', 'drive-btn-content', '', false);
+        if (!response.success) {
+          showStatus('error', response.error);
+          return;
+        }
+        showStatus('success', 'PDF berhasil disimpan ke Drive (' + response.data.totalRows + ' pekerjaan). Membuka tautan...');
+        window.open(response.data.pdfUrl, '_blank');
+      })
+      .withFailureHandler(function () {
+        setButtonBusy('btn-save-drive', 'drive-btn-content', '', false);
+        showStatus('error', 'Gagal terhubung ke server. Coba lagi.');
+      })
+      .generatePekerjaanPdf(currentAccessCode, getFilters());
+  });
+
+  // ============================================================
+  // INIT
+  // ============================================================
+
+  (function init() {
+    var session = loadSession();
+    if (session && session.accessCode) {
+      currentAccessCode = session.accessCode;
+      bootstrapPage(false);
+    } else {
+      document.getElementById('screen-login').style.display = 'flex';
+    }
+  })();
+</script>
+</body>
+</html>

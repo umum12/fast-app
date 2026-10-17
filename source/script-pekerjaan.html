@@ -1,0 +1,1995 @@
+<script>
+// ============================================================
+// PEKERJAAN — FORM "BUAT" (Tahap 4 Cutover — form dinamis pengganti
+// form Laporan & form Penugasan terpisah lama)
+// ============================================================
+
+var MAX_PHOTOS = 3;
+var selectedPhotos = []; // { base64, mimeType, previewUrl } — foto kondisi awal (atau foto penuntasan pada mode "Buat Laporan")
+var activePhotoSlotIndex = null;
+
+// 3.1 — Dropdown Jenis difilter PER ROLE di frontend. Validasi "siapa
+// boleh membuat" TETAP ditegakkan backend (createPekerjaan) — filter
+// ini murni UX, bukan satu-satunya lapisan keamanan.
+// PATCH — Admin job desk murni dispatcher: hanya Penugasan. Validasi
+// SERVER-SIDE (createPekerjaan, pekerjaan.gs) juga WAJIB diterapkan di
+// samping filter dropdown ini — filter ini murni UX.
+var JENIS_ROLE_FILTER = {
+  admin: ['penugasan'],
+  fs: ['lapor_kerusakan', 'permintaan', 'kebersihan', 'perbaikan', 'lainnya'],
+  demo: []
+};
+
+
+/**
+ * Patch Bug Navigasi & Workflow (Bagian 3) — konteks prefill saat form
+ * "Buat" dibuka lewat tombol "Buat Laporan" dari sebuah Pekerjaan yang
+ * sedang DIKERJAKAN (lihat openBuatLaporanForPekerjaan()). null berarti
+ * form beroperasi dalam mode normal (createPekerjaan). Saat terisi,
+ * submit form memanggil selesaikanPekerjaan() TERHADAP pekerjaanId yang
+ * sama (bukan membuat Pekerjaan baru) — TIDAK ADA business logic baru,
+ * murni memakai ulang endpoint selesaikanPekerjaan yang sudah ada
+ * (sebelumnya hanya bisa diakses lewat modal "Selesaikan").
+ */
+var buatPrefillContext = null;
+
+function updateJenisIcon() {
+  var jenisSelect = document.getElementById('form-jenis');
+  var info = JENIS_PEKERJAAN_BADGE[jenisSelect.value] || { icon: 'description', cls: 'badge-neutral' };
+  var color = STATUS_BUBBLE_COLOR[info.cls] || STATUS_BUBBLE_COLOR['badge-neutral'];
+  var iconEl = document.getElementById('form-jenis-icon');
+  if (!iconEl) return;
+  iconEl.innerHTML = mdIcon(info.icon, 15);
+  iconEl.style.background = color.bg;
+  iconEl.style.color = color.fg;
+}
+
+function updateAssignmentFieldsVisibility() {
+  var jenisSelect = document.getElementById('form-jenis');
+  // Mode "Buat Laporan" (prefill) selalu menyembunyikan field Mode
+  // Penugasan/Petugas Penerima — konteksnya sudah pekerjaan yang ada,
+  // bukan pembuatan Penugasan baru (Bagian 3).
+  var isPenugasan = !buatPrefillContext && jenisSelect.value === 'penugasan';
+  var modeGroup = document.getElementById('form-assignment-mode-group');
+  if (modeGroup) modeGroup.style.display = isPenugasan ? 'block' : 'none';
+  var modeSelect = document.getElementById('form-assignment-mode');
+  var isDirect = isPenugasan && modeSelect && modeSelect.value === 'direct';
+  var targetGroup = document.getElementById('form-target-user-group');
+  if (targetGroup) targetGroup.style.display = isDirect ? 'block' : 'none';
+}
+
+var formBuatListenersAttached = false;
+
+function attachFormBuatListenersOnce_() {
+  if (formBuatListenersAttached) return;
+  formBuatListenersAttached = true;
+
+  var jenisSelect = document.getElementById('form-jenis');
+  jenisSelect.addEventListener('change', updateJenisIcon);
+  jenisSelect.addEventListener('change', updateAssignmentFieldsVisibility);
+  jenisSelect.addEventListener('change', updateFormProgress);
+  jenisSelect.addEventListener('change', updatePerformedAtFieldVisibility);
+
+  var modeSelectEl = document.getElementById('form-assignment-mode');
+  if (modeSelectEl) modeSelectEl.addEventListener('change', updateAssignmentFieldsVisibility);
+
+  var floorSelect = document.getElementById('form-floor');
+  floorSelect.addEventListener('change', updateFormProgress);
+}
+
+
+/**
+ * PATCH — "Waktu Laporan" (hanya arah Mandiri). Default state tertutup
+ * ("Sekarang (otomatis)"), tap "Ubah" membuka picker datetime-local +
+ * preview teks format Indonesia lengkap. Reuse JENIS_MANDIRI_SET_ yang
+ * sudah ada (dipakai showPekerjaanSuccessCard) dan INDO_DAY_NAMES_
+ * (script-jadwal.html, SATU sumber kebenaran nama hari — sudah
+ * ter-include lebih dulu baik di index.html maupun buat-cepat.html).
+ */
+var INDO_MONTH_FULL_ = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+
+function formatDatetimeLocalInput_(d) {
+  function pad(n) { return n < 10 ? '0' + n : n; }
+  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+/** "2026-10-04T20:25" (value datetime-local) -> "Minggu, 04 Oktober 2026 · 20:25". */
+function formatPerformedAtPreview_(datetimeLocalValue) {
+  var d = new Date(datetimeLocalValue);
+  if (isNaN(d.getTime())) return '';
+  function pad(n) { return n < 10 ? '0' + n : n; }
+  var dayName = INDO_DAY_NAMES_[d.getDay()];
+  return dayName + ', ' + pad(d.getDate()) + ' ' + INDO_MONTH_FULL_[d.getMonth()] + ' ' + d.getFullYear() + ' \u00b7 ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+}
+
+function setPerformedAtBounds_() {
+  var input = document.getElementById('form-performed-at');
+  if (!input) return;
+  var now = new Date();
+  var maxStr = formatDatetimeLocalInput_(now);
+  var minStr = formatDatetimeLocalInput_(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000));
+  input.max = maxStr;
+  input.min = minStr;
+}
+
+/** Kembali ke state tertutup ("Sekarang (otomatis)") — input dikosongkan
+ * supaya submit handler mengirim performedAt='' (backend default ke
+ * `now`, perilaku identik sebelum fitur ini ada). */
+function collapsePerformedAt_() {
+  var input = document.getElementById('form-performed-at');
+  if (input) input.value = '';
+  var collapsed = document.getElementById('performed-at-collapsed');
+  var expanded = document.getElementById('performed-at-expanded');
+  if (collapsed) collapsed.style.display = 'flex';
+  if (expanded) expanded.style.display = 'none';
+}
+
+function expandPerformedAt_() {
+  setPerformedAtBounds_();
+  var input = document.getElementById('form-performed-at');
+  if (input && !input.value) input.value = formatDatetimeLocalInput_(new Date());
+  var collapsed = document.getElementById('performed-at-collapsed');
+  var expanded = document.getElementById('performed-at-expanded');
+  if (collapsed) collapsed.style.display = 'none';
+  if (expanded) expanded.style.display = 'block';
+  updatePerformedAtPreview_();
+}
+
+function updatePerformedAtPreview_() {
+  var input = document.getElementById('form-performed-at');
+  var preview = document.getElementById('performed-at-preview');
+  if (!input || !preview) return;
+  preview.textContent = formatPerformedAtPreview_(input.value);
+}
+
+var performedAtListenersAttached_ = false;
+function attachPerformedAtListenersOnce_() {
+  if (performedAtListenersAttached_) return;
+  performedAtListenersAttached_ = true;
+
+  var editBtn = document.getElementById('btn-performed-at-edit');
+  if (editBtn) editBtn.addEventListener('click', expandPerformedAt_);
+
+  var resetBtn = document.getElementById('btn-performed-at-reset');
+  if (resetBtn) resetBtn.addEventListener('click', collapsePerformedAt_);
+
+  var input = document.getElementById('form-performed-at');
+  if (input) input.addEventListener('change', updatePerformedAtPreview_);
+
+  var labelIcon = document.getElementById('performed-at-label-icon');
+  if (labelIcon) labelIcon.innerHTML = mdIcon('reminder', 16);
+}
+
+function updatePerformedAtFieldVisibility() {
+  var jenisSelect = document.getElementById('form-jenis');
+  var group = document.getElementById('form-performed-at-group');
+  if (!group) return;
+  var isMandiri = !buatPrefillContext && JENIS_MANDIRI_SET_.indexOf(jenisSelect.value) !== -1;
+  group.style.display = isMandiri ? 'block' : 'none';
+  if (isMandiri) {
+    attachPerformedAtListenersOnce_();
+    setPerformedAtBounds_();
+  } else {
+    collapsePerformedAt_();
+  }
+}
+
+
+/**
+ * Menyalakan/mematikan tampilan mode "Buat Laporan" (prefill) pada form
+ * Buat — Jenis & Lantai dikunci (locked-field) karena nilainya sudah
+ * ditentukan oleh Pekerjaan asal, bukan pilihan bebas (Bagian 3).
+ */
+function applyBuatModeUI_() {
+  var isComplete = !!buatPrefillContext;
+
+  var banner = document.getElementById('buat-context-banner');
+  var idEl = document.getElementById('buat-context-pekerjaan-id');
+  if (banner) banner.style.display = isComplete ? 'block' : 'none';
+  if (idEl && isComplete) idEl.textContent = buatPrefillContext.pekerjaanId;
+
+  var headerTitle = document.getElementById('buat-header-title');
+  if (headerTitle) headerTitle.textContent = isComplete ? 'Buat Laporan Pekerjaan' : 'Buat Pekerjaan';
+
+  var jenisSelect = document.getElementById('form-jenis');
+  var floorSelect = document.getElementById('form-floor');
+
+
+
+    var contextBanner = document.getElementById('buat-context-banner');
+  if (contextBanner) {
+    contextBanner.style.background = isComplete ? 'var(--status-completed-bg)' : '';
+    contextBanner.style.color = isComplete ? 'var(--status-completed-fg)' : '';
+  }
+  [jenisSelect, floorSelect].forEach(function (el) {
+    if (!el) return;
+    el.classList.toggle('locked-field-green', isComplete);
+  });
+
+
+
+  
+  [jenisSelect, floorSelect].forEach(function (el) {
+    if (!el) return;
+    el.disabled = isComplete;
+    el.classList.toggle('locked-field', isComplete);
+  });
+
+  var descLabel = document.getElementById('form-description-label');
+  var photoLabel = document.getElementById('form-photo-label');
+  if (descLabel) descLabel.textContent = isComplete ? 'Keterangan Penuntasan' : 'Keterangan';
+  if (photoLabel) photoLabel.textContent = isComplete ? 'Foto Penuntasan (opsional, maks. 3)' : 'Foto Kondisi Awal (opsional, maks. 3)';
+
+  var submitBtn = document.getElementById('btn-submit-report');
+  if (submitBtn) submitBtn.innerHTML = mdIcon(isComplete ? 'checkCircle' : 'upload', 18) + '<span>' + (isComplete ? 'Kirim Laporan' : 'Simpan & Kirim') + '</span>';
+}
+
+/**
+ * Dipanggil dari tombol "Buat Laporan" pada kartu Pekerjaan yang sedang
+ * DIKERJAKAN (Menu Pekerjaan) — Bagian 2 & 3 Patch Bug Navigasi &
+ * Workflow. Prefill Lantai, Subjek, Keterangan, dan Job ID dari data
+ * Pekerjaan yang dipilih, lalu arahkan ke halaman Buat.
+ */
+
+function openBuatLaporanForPekerjaan(p) {
+  buatPrefillContext = {
+    pekerjaanId: p.pekerjaanId,
+    jenis: 'penugasan',
+    floorCode: p.floorCode,
+    subject: p.subject || '',
+    description: '' // keterangan penuntasan harus kosong, bukan salinan keterangan penugasan
+  };
+  goToPage('buat');
+}
+
+
+function initPekerjaanForm() {
+  if (!appBootstrap) return;
+  var role = appBootstrap.currentUser.role;
+
+  var allowedJenis = JENIS_ROLE_FILTER[role] || [];
+  var jenisSelect = document.getElementById('form-jenis');
+  jenisSelect.innerHTML = '';
+
+  var jenisSource = buatPrefillContext
+    ? (appBootstrap.jenisPekerjaanList || []).filter(function (j) { return j.value === buatPrefillContext.jenis; })
+    : (appBootstrap.jenisPekerjaanList || []).filter(function (j) { return allowedJenis.indexOf(j.value) !== -1; });
+  jenisSource.forEach(function (j) {
+    var opt = document.createElement('option');
+    opt.value = j.value;
+    opt.textContent = j.label;
+    jenisSelect.appendChild(opt);
+  });
+
+  // Lantai
+  var floorSelect = document.getElementById('form-floor');
+  floorSelect.innerHTML = '<option value="">Pilih lantai</option>';
+  (appBootstrap.master.floors || []).forEach(function (f) {
+    var opt = document.createElement('option');
+    opt.value = f.floor_code;
+    opt.textContent = f.floor_name;
+    floorSelect.appendChild(opt);
+  });
+
+  // Petugas Penerima (Direct Assignment)
+  var targetSelect = document.getElementById('form-target-user');
+  if (targetSelect) {
+    targetSelect.innerHTML = '<option value="">Pilih petugas</option>';
+    (appBootstrap.master.fsUsers || []).forEach(function (u) {
+      var opt = document.createElement('option');
+      opt.value = u.userCode;
+      opt.textContent = u.displayName + ' (' + u.userCode + ')';
+      targetSelect.appendChild(opt);
+    });
+  }
+
+  attachFormBuatListenersOnce_();
+
+  if (buatPrefillContext) {
+    jenisSelect.value = buatPrefillContext.jenis;
+    floorSelect.value = buatPrefillContext.floorCode;
+    document.getElementById('form-subject').value = buatPrefillContext.subject;
+    document.getElementById('form-description').value = buatPrefillContext.description;
+    var descCounterEl = document.getElementById('form-description-counter');
+    if (descCounterEl) descCounterEl.textContent = buatPrefillContext.description.length + '/500';
+  }
+
+applyBuatModeUI_();
+  updateJenisIcon();
+  updateAssignmentFieldsVisibility();
+  updatePerformedAtFieldVisibility();
+  renderPhotoSlots();
+  updateFormProgress();
+}
+
+
+function resetBuatPrefillContext_() {
+  buatPrefillContext = null;
+}
+
+/**
+ * Progres pengisian form — Jenis, Lantai, Keterangan, dan foto
+ * masing-masing berkontribusi 25%. Subjek tidak dihitung karena
+ * eksplisit opsional.
+ */
+function updateFormProgress() {
+  var progressEl = document.getElementById('form-progress-text');
+  if (!progressEl) return;
+
+  var jenis = document.getElementById('form-jenis').value;
+  var floor = document.getElementById('form-floor').value;
+  var desc = document.getElementById('form-description').value.trim();
+  var photoCount = selectedPhotos.filter(Boolean).length;
+
+  var doneCount = 0;
+  if (jenis) doneCount++;
+  if (floor) doneCount++;
+  if (desc) doneCount++;
+  if (photoCount > 0) doneCount++;
+
+  var percent = Math.round((doneCount / 4) * 100);
+  progressEl.textContent = 'Progres: ' + percent + '% | ' + photoCount + ' Foto Terpilih';
+}
+
+// ------------------- PHOTO SLOTS (foto kondisi awal) -------------------
+
+
+/**
+ * PATCH — redesain slot foto berlabel. Kelas 'photo-slot-v2' SENGAJA
+ * BARU (bukan 'photo-slot' lama) — 'photo-slot'/'photo-slots' masih
+ * dipakai slot gambar Content Management (renderContentImageSlot_,
+ * script-jadwal.html), jadi dipisah supaya perubahan ini TIDAK ikut
+ * mengubah tampilan form Content Management. Caption per slot MURNI
+ * visual/saran urutan pengambilan foto — ketiganya tetap tersimpan
+ * generik sebagai array (initial_photos_json/completion_photos_json),
+ * tidak ada perbedaan perlakuan data per index.
+ */
+var PHOTO_SLOT_CAPTIONS_ = ['Foto Kondisi Awal', 'Foto Hasil / Sesudah', 'Foto Detail Tambahan'];
+
+function renderPhotoSlots() {
+  var container = document.getElementById('photo-slots');
+  container.innerHTML = '';
+
+  for (var i = 0; i < MAX_PHOTOS; i++) {
+    var slot = document.createElement('div');
+    slot.className = 'photo-slot-v2';
+
+    if (selectedPhotos[i]) {
+      var inner = document.createElement('div');
+      inner.className = 'photo-thumb-inner';
+      var img = document.createElement('img');
+      img.src = selectedPhotos[i].previewUrl;
+      inner.appendChild(img);
+      slot.appendChild(inner);
+
+      inner.addEventListener('click', function (idx) {
+        return function () {
+          activePhotoSlotIndex = idx;
+          openPhotoSourceSheet();
+        };
+      }(i));
+
+      var removeBtn = document.createElement('button');
+      removeBtn.className = 'remove-btn';
+      removeBtn.textContent = '\u00d7';
+      removeBtn.setAttribute('aria-label', 'Hapus foto');
+      removeBtn.addEventListener('click', function (idx) {
+        return function (e) {
+          e.stopPropagation();
+          selectedPhotos.splice(idx, 1);
+          renderPhotoSlots();
+        };
+      }(i));
+      slot.appendChild(removeBtn);
+    } else {
+      slot.innerHTML = '<span class="plus-icon">+</span><span class="slot-caption">' + (PHOTO_SLOT_CAPTIONS_[i] || '') + '</span>';
+      slot.addEventListener('click', function (idx) {
+        return function () {
+          activePhotoSlotIndex = idx;
+          openPhotoSourceSheet();
+        };
+      }(i));
+    }
+
+    container.appendChild(slot);
+  }
+
+  updateFormProgress();
+}
+/**
+ * Patch 10.x Bagian 3 — Perbaikan Upload Foto. Kontrol pemilihan sumber
+ * dipindah ke level aplikasi lewat Bottom Sheet — "Ambil Foto" memakai
+ * atribut capture="environment" (memaksa kamera), "Pilih dari Galeri"
+ * tanpa capture (Photo Picker/galeri seperti biasa).
+ *
+ * Generik lewat parameter targetInputId (default 'photo-file-input') —
+ * dipakai bersama oleh form Buat DAN oleh slot gambar Content Management
+ * (#content-image-file-input, script-jadwal.html) — satu implementasi,
+ * tidak diduplikasi.
+ */
+function openPhotoSourceSheet(targetInputId) {
+  var inputId = targetInputId || 'photo-file-input';
+  openBottomSheet([
+    { icon: 'photoCamera', label: 'Ambil Foto', onClick: function () { triggerPhotoFileInput_(true, inputId); } },
+    { icon: 'photo', label: 'Pilih dari Galeri', onClick: function () { triggerPhotoFileInput_(false, inputId); } }
+  ]);
+}
+
+function triggerPhotoFileInput_(useCamera, targetInputId) {
+  var input = document.getElementById(targetInputId || 'photo-file-input');
+  if (useCamera) {
+    input.setAttribute('capture', 'environment');
+  } else {
+    input.removeAttribute('capture');
+  }
+  input.click();
+}
+
+document.getElementById('photo-file-input').addEventListener('change', function (e) {
+  var file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+
+  beginAction(null);
+  compressImage(file).then(function (result) {
+    endAction(null);
+    selectedPhotos[activePhotoSlotIndex] = result;
+    renderPhotoSlots();
+  }).catch(function (err) {
+    endAction(null);
+    showSnackbar('Gagal memproses foto. Coba foto lain.', 'error');
+  });
+});
+
+/**
+ * Kompresi foto di client (Section 18.2):
+ * resize sisi terpanjang maks 1280px, JPEG, kompresi adaptif target ±100KB.
+ * Generik — dipakai baik oleh foto kondisi awal maupun foto penuntasan,
+ * juga oleh gambar Content Management.
+ */
+function compressImage(file) {
+  return new Promise(function (resolve, reject) {
+    var reader = new FileReader();
+    reader.onerror = function () { reject(new Error('Gagal membaca file')); };
+    reader.onload = function () {
+      var img = new Image();
+      img.onerror = function () { reject(new Error('Gagal memuat gambar')); };
+      img.onload = function () {
+        var maxSide = 1280;
+        var w = img.width;
+        var h = img.height;
+        if (w > h && w > maxSide) { h = Math.round(h * (maxSide / w)); w = maxSide; }
+        else if (h >= w && h > maxSide) { w = Math.round(w * (maxSide / h)); h = maxSide; }
+
+        var canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+
+        var targetBytes = 100 * 1024;
+        var quality = 0.8;
+        var dataUrl = canvas.toDataURL('image/jpeg', quality);
+
+        function sizeOf(dUrl) {
+          return Math.round((dUrl.length - 'data:image/jpeg;base64,'.length) * 3 / 4);
+        }
+
+        var attempts = 0;
+        while (sizeOf(dataUrl) > targetBytes && quality > 0.3 && attempts < 8) {
+          quality -= 0.1;
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+          attempts++;
+        }
+
+        var base64 = dataUrl.split(',')[1];
+        resolve({ base64: base64, mimeType: 'image/jpeg', previewUrl: dataUrl });
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// ------------------- SUBMIT PEKERJAAN -------------------
+
+document.getElementById('btn-submit-report').addEventListener('click', function () {
+  var errorEl = document.getElementById('form-report-error');
+  errorEl.textContent = '';
+
+  // Mode "Buat Laporan" (Bagian 3) — menyelesaikan Pekerjaan yang SUDAH
+  // ADA lewat selesaikanPekerjaan(), bukan membuat Pekerjaan baru.
+  if (buatPrefillContext) {
+    submitBuatLaporanCompletion_();
+    return;
+  }
+
+  var jenisEl = document.getElementById('form-jenis');
+  var floorEl = document.getElementById('form-floor');
+  var descEl = document.getElementById('form-description');
+  var targetEl = document.getElementById('form-target-user');
+  clearFieldErrors([floorEl, descEl, targetEl]);
+
+  var jenis = jenisEl.value;
+  var isPenugasan = jenis === 'penugasan';
+  var assignmentModeEl = document.getElementById('form-assignment-mode');
+  var assignmentMode = isPenugasan && assignmentModeEl ? assignmentModeEl.value : '';
+
+  
+var performedAtEl = document.getElementById('form-performed-at');
+  var data = {
+    jenis: jenis,
+    floorCode: floorEl.value,
+    subject: document.getElementById('form-subject').value,
+    description: descEl.value,
+    photos: selectedPhotos.filter(Boolean).map(function (p) {
+      return { base64: p.base64, mimeType: p.mimeType };
+    }),
+    assignmentMode: assignmentMode,
+    targetUserCode: (isPenugasan && assignmentMode === 'direct' && targetEl) ? targetEl.value : '',
+    performedAt: (performedAtEl && performedAtEl.offsetParent !== null && performedAtEl.value) ? performedAtEl.value : ''
+  };
+
+
+  if (!jenis) { errorEl.textContent = 'Jenis pekerjaan wajib dipilih.'; return; }
+  if (!data.floorCode) { showFieldError(floorEl, errorEl, 'Lantai wajib dipilih.'); return; }
+  if (!data.description.trim()) { showFieldError(descEl, errorEl, 'Keterangan wajib diisi.'); return; }
+  if (isPenugasan && assignmentMode === 'direct' && !data.targetUserCode) {
+    showFieldError(targetEl, errorEl, 'Pilih petugas penerima.'); return;
+  }
+
+  var session = loadSession();
+  var submitBtn = document.getElementById('btn-submit-report');
+  beginAction(submitBtn, 'Menyimpan...');
+  google.script.run
+    .withSuccessHandler(function (response) {
+      endAction(submitBtn);
+      if (!response.success) {
+        errorEl.textContent = response.error;
+        showSnackbar(response.error, 'error');
+        return;
+      }
+      selectedPhotos = [];
+      renderPhotoSlots();
+      document.getElementById('form-subject').value = '';
+      document.getElementById('form-description').value = '';
+      var descCounterEl = document.getElementById('form-description-counter');
+      if (descCounterEl) descCounterEl.textContent = '0/500';
+      updateFormProgress();
+
+      invalidateAllPekerjaanCaches_();
+
+      showPekerjaanSuccessCard(jenis);
+    })
+    .withFailureHandler(function () {
+      endAction(submitBtn);
+      errorEl.textContent = 'Gagal terhubung ke server. Coba lagi.';
+      showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error');
+    })
+    .createPekerjaan(session.accessCode, data);
+});
+
+/**
+ * Submit form Buat dalam mode "Buat Laporan" (Bagian 3) — memanggil
+ * selesaikanPekerjaan() dengan pekerjaanId dari konteks prefill.
+ */
+function submitBuatLaporanCompletion_() {
+  var errorEl = document.getElementById('form-report-error');
+  var descEl = document.getElementById('form-description');
+  var pekerjaanId = buatPrefillContext.pekerjaanId;
+
+  var data = {
+    notes: descEl.value,
+    photos: selectedPhotos.filter(Boolean).map(function (p) {
+      return { base64: p.base64, mimeType: p.mimeType };
+    })
+  };
+
+  var session = loadSession();
+  var submitBtn = document.getElementById('btn-submit-report');
+  beginAction(submitBtn, 'Mengirim...');
+  google.script.run
+    .withSuccessHandler(function (response) {
+      endAction(submitBtn);
+      if (!response.success) {
+        errorEl.textContent = response.error;
+        showSnackbar(response.error, 'error');
+        return;
+      }
+      resetBuatPrefillContext_();
+      selectedPhotos = [];
+      renderPhotoSlots();
+      document.getElementById('form-subject').value = '';
+      document.getElementById('form-description').value = '';
+      var descCounterEl = document.getElementById('form-description-counter');
+      if (descCounterEl) descCounterEl.textContent = '0/500';
+      updateFormProgress();
+
+      invalidateAllPekerjaanCaches_();
+
+      showLaporanSuccessCard_(pekerjaanId);
+    })
+    .withFailureHandler(function () {
+      endAction(submitBtn);
+      errorEl.textContent = 'Gagal terhubung ke server. Coba lagi.';
+      showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error');
+    })
+    .selesaikanPekerjaan(session.accessCode, pekerjaanId, data);
+}
+
+// ------------------- SUCCESS CARD -------------------
+
+var JENIS_MANDIRI_SET_ = ['kebersihan', 'perbaikan', 'lainnya'];
+
+function showPekerjaanSuccessCard(jenis) {
+  document.getElementById('buat-form-card').style.display = 'none';
+  var isMandiri = JENIS_MANDIRI_SET_.indexOf(jenis) !== -1;
+  document.getElementById('buat-success-message').textContent = 'Pekerjaan berhasil dibuat.';
+  var subtextEl = document.getElementById('buat-success-subtext');
+  if (subtextEl) {
+    subtextEl.textContent = isMandiri
+      ? 'Pekerjaan ini bersifat mandiri dan otomatis ditandai selesai.'
+      : (jenis === 'penugasan'
+        ? 'Menunggu diambil oleh Facility Support terkait.'
+        : 'Menunggu ditindaklanjuti oleh Administrator.');
+  }
+  document.getElementById('buat-success-card').style.display = 'block';
+}
+
+function showLaporanSuccessCard_(pekerjaanId) {
+  document.getElementById('buat-form-card').style.display = 'none';
+  document.getElementById('buat-success-message').textContent = 'Laporan berhasil dikirim.';
+  var subtextEl = document.getElementById('buat-success-subtext');
+  if (subtextEl) subtextEl.textContent = 'Pekerjaan ' + pekerjaanId + ' telah ditandai selesai.';
+  document.getElementById('buat-success-card').style.display = 'block';
+}
+
+function hidePekerjaanSuccessCard() {
+  document.getElementById('buat-success-card').style.display = 'none';
+  document.getElementById('buat-form-card').style.display = 'block';
+}
+
+document.getElementById('btn-buat-laporan-lagi').addEventListener('click', function () {
+  hidePekerjaanSuccessCard();
+  initPekerjaanForm();
+});
+
+
+document.getElementById('btn-lihat-riwayat-setelah-submit').addEventListener('click', function () {
+  hidePekerjaanSuccessCard();
+  // PATCH — di app utama, loadRiwayatPekerjaan() selalu ada (script-jadwal.html
+  // ter-include), jadi goToPage('jadwal') berjalan normal. Di halaman
+  // shortcut (buat-cepat.html), modul itu TIDAK dimuat — arahkan ke app
+  // utama; sesi sudah tersimpan di localStorage jadi otomatis resume.
+  if (typeof loadRiwayatPekerjaan === 'function') {
+    goToPage('jadwal');
+  } else {
+    window.location.href = (appBootstrap && appBootstrap.webAppUrl) || window.location.href;
+  }
+});
+
+// ============================================================
+// BROWSER STATE CACHE — Patch 6.05 (Performance & Navigation Optimization)
+// ============================================================
+
+var pageDataCache = {
+  dashboard: null,               // { stats } (Patch 10.x — reminders dihapus)
+  pekerjaanInbox: null,          // [...] daftar inbox (Menu Pekerjaan)
+  pekerjaanRiwayatByKey: {},     // { '<filters JSON>': [...] }
+  content: null,                 // [...] Content Management aktif (Patch 10.x)
+  pekerjaanAktivitas: null,      // [...] timeline seluruh tim
+  jadwalAktif: null              // [...] Jadwal Piket & Libur Pengganti (Patch 10.x)
+};
+
+/** Seluruh cache Pekerjaan basi setelah mutasi apa pun (Create/Ambil/
+ * Lepas/Selesaikan/Hapus) — pola event-driven cache Patch 8.0. */
+function invalidateAllPekerjaanCaches_() {
+  pageDataCache.pekerjaanInbox = null;
+  pageDataCache.pekerjaanRiwayatByKey = {};
+  pageDataCache.pekerjaanAktivitas = null;
+  pageDataCache.dashboard = null;
+}
+
+/**
+ * PATCH — Reset TOTAL seluruh pageDataCache, dipanggil SATU-SATUNYA
+ * saat logout (handleLogout, script-core.html). Lebih luas dari
+ * invalidateAllPekerjaanCaches_() di atas (yang hanya cache Pekerjaan,
+ * dipakai event-driven setelah mutasi) — ini mengosongkan SEMUA field
+ * termasuk content & jadwalAktif, supaya user berikutnya yang login di
+ * tab/browser yang sama tidak pernah melihat data user sebelumnya.
+ */
+function resetAllPageDataCache_() {
+  pageDataCache.dashboard = null;
+  pageDataCache.pekerjaanInbox = null;
+  pageDataCache.pekerjaanRiwayatByKey = {};
+  pageDataCache.content = null;
+  pageDataCache.pekerjaanAktivitas = null;
+  pageDataCache.jadwalAktif = null;
+}
+
+function renderSkeleton(containerId, lineCount) {
+  var el = document.getElementById(containerId);
+  if (!el) return;
+  var widths = ['90%', '70%', '85%', '60%'];
+  var html = '';
+  for (var i = 0; i < (lineCount || 3); i++) {
+    html += '<div class="skeleton-line" style="width:' + (widths[i % widths.length]) + ';"></div>';
+  }
+  el.innerHTML = html;
+}
+
+/**
+ * PATCH: skeleton berbentuk kartu daftar Pekerjaan + pesan & spinner.
+ * Dipakai Menu Pekerjaan, Riwayat, dan Aktivitas supaya satu bahasa
+ * visual. renderSkeleton() lama tetap dipakai untuk kotak Ringkasan.
+ */
+function renderListSkeleton_(containerId, cardCount, message) {
+  var el = document.getElementById(containerId);
+  if (!el) return;
+
+  var cardHtml =
+    '<div class="skeleton-card">' +
+      '<div class="skeleton-card-main">' +
+        '<div class="skeleton-block skeleton-pill"></div>' +
+        '<div class="skeleton-block skeleton-date"></div>' +
+        '<div class="skeleton-person-row">' +
+          '<div class="skeleton-block skeleton-avatar"></div>' +
+          '<div class="skeleton-person-lines">' +
+            '<div class="skeleton-block skeleton-line-name"></div>' +
+            '<div class="skeleton-block skeleton-line-sub"></div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="skeleton-block skeleton-thumb"></div>' +
+    '</div>';
+
+  var html = '';
+  for (var i = 0; i < (cardCount || 3); i++) html += cardHtml;
+  html += '<div class="skeleton-caption"><span class="spinner-sm"></span><span>' + (message || 'Memuat data...') + '</span></div>';
+  el.innerHTML = html;
+}
+
+/**
+ * Perf — debounce ringan untuk input pencarian.
+ */
+function debounce_(fn, delayMs) {
+  var timer = null;
+  return function () {
+    var args = arguments;
+    var ctx = this;
+    clearTimeout(timer);
+    timer = setTimeout(function () { fn.apply(ctx, args); }, delayMs);
+  };
+}
+
+// ============================================================
+// KOMPONEN BERSAMA — Badge Jenis/Status Pekerjaan, Kartu, Bottom Sheet,
+// Detail, Modal Selesaikan (dipakai bersama Pekerjaan/Riwayat/Aktivitas)
+// ============================================================
+
+var JENIS_PEKERJAAN_BADGE = {
+  kebersihan: { label: 'Kebersihan', cls: 'badge-available', icon: 'broom' },
+  perbaikan: { label: 'Perbaikan', cls: 'badge-completed', icon: 'wrench' },
+  lainnya: { label: 'Lainnya', cls: 'badge-neutral', icon: 'description' },
+  penugasan: { label: 'Penugasan', cls: 'badge-info', icon: 'task' },
+  lapor_kerusakan: { label: 'Lapor Kerusakan', cls: 'badge-alert', icon: 'warning' },
+  permintaan: { label: 'Permintaan', cls: 'badge-claimed', icon: 'calendarCheck' }
+};
+
+var STATUS_PEKERJAAN_BADGE_CLASS = { TERBUKA: 'badge-available', DIKERJAKAN: 'badge-claimed', SELESAI: 'badge-completed' };
+
+var STATUS_BUBBLE_COLOR = {
+  'badge-available': { bg: 'var(--status-available-bg)', fg: 'var(--status-available-fg)' },
+  'badge-claimed':   { bg: 'var(--status-claimed-bg)',   fg: 'var(--status-claimed-fg)' },
+  'badge-completed': { bg: 'var(--status-completed-bg)', fg: 'var(--status-completed-fg)' },
+  'badge-neutral':   { bg: 'var(--status-neutral-bg)',   fg: 'var(--status-neutral-fg)' },
+  'badge-alert':     { bg: 'var(--status-alert-bg)',     fg: 'var(--status-alert-fg)' },
+  'badge-info':      { bg: 'var(--status-info-bg)',      fg: 'var(--status-info-fg)' }
+};
+
+/**
+ * Membangun satu kartu operasional gaya "v2": ikon kategori di kiri, badge
+ * + meta ber-ikon + judul/keterangan di tengah, thumbnail representatif +
+ * overlay jumlah foto di kanan. Dipakai bersama oleh render Pekerjaan
+ * (inbox/riwayat/aktivitas) agar satu bahasa visual konsisten.
+ */
+function createOpCardV2(cfg) {
+  var card = document.createElement('div');
+  card.className = 'op-card op-card-v2';
+  if (cfg.onCardClick) card.style.cursor = 'pointer';
+
+  var color = STATUS_BUBBLE_COLOR[cfg.badgeCls] || STATUS_BUBBLE_COLOR['badge-neutral'];
+  var iconBubble = document.createElement('div');
+  iconBubble.className = 'op-card-icon-bubble';
+  iconBubble.style.background = color.bg;
+  iconBubble.style.color = color.fg;
+  iconBubble.innerHTML = mdIcon(cfg.iconName, 20);
+  card.appendChild(iconBubble);
+
+  var main = document.createElement('div');
+  main.className = 'op-card-main';
+
+  var top = document.createElement('div');
+  top.className = 'op-card-top';
+  (cfg.badges || []).forEach(function (b) {
+    var badge = document.createElement('span');
+    badge.className = 'badge ' + b.cls;
+    badge.textContent = b.label;
+    top.appendChild(badge);
+  });
+  main.appendChild(top);
+
+  var metaRow = document.createElement('div');
+  metaRow.className = 'op-card-meta-row';
+  (cfg.metaItems || []).forEach(function (m) {
+    var item = document.createElement('span');
+    item.className = 'op-card-meta-item';
+    item.innerHTML = mdIcon(m.icon, 13) + '<span>' + m.text + '</span>';
+    metaRow.appendChild(item);
+  });
+  main.appendChild(metaRow);
+
+  var title = document.createElement('div');
+  title.className = 'op-card-title';
+  if (cfg.subject) {
+    var subjectSpan = document.createElement('span');
+    subjectSpan.className = 'op-card-subject';
+    subjectSpan.textContent = cfg.subject + ' — ';
+    title.appendChild(subjectSpan);
+  }
+  title.appendChild(document.createTextNode(cfg.description || ''));
+  main.appendChild(title);
+
+  var hasBottomRow = (cfg.photos && cfg.photos.length > 0) || (cfg.actions && cfg.actions.length > 0);
+  if (hasBottomRow) {
+    var bottomRow = document.createElement('div');
+    bottomRow.className = 'op-card-bottom-row';
+
+    if (cfg.photos && cfg.photos.length > 0) {
+      var chip = document.createElement('span');
+      chip.className = 'photo-count-chip';
+      chip.innerHTML = mdIcon('photo', 14) + '<span>' + cfg.photos.length + ' Foto</span>';
+      bottomRow.appendChild(chip);
+    }
+
+    (cfg.actions || []).forEach(function (a) {
+      var btn = document.createElement('button');
+      btn.className = 'btn-card-action ' + a.cls;
+      btn.innerHTML = mdIcon(a.icon, 15) + (a.label ? '<span>' + a.label + '</span>' : '');
+      btn.addEventListener('click', function (e) { e.stopPropagation(); a.onClick(); });
+      bottomRow.appendChild(btn);
+    });
+
+    main.appendChild(bottomRow);
+  }
+
+  card.appendChild(main);
+
+  if (cfg.photos && cfg.photos.length > 0) {
+    var thumbSide = document.createElement('div');
+    thumbSide.className = 'op-card-thumb-side';
+    var img = document.createElement('img');
+    img.src = cfg.photos[0].thumbUrl || cfg.photos[0].url;
+    img.alt = 'Foto dokumentasi';
+    img.onerror = function () {
+      console.warn('Gagal memuat thumbnail. file_id:', cfg.photos[0].file_id);
+      thumbSide.style.display = 'flex';
+      thumbSide.style.alignItems = 'center';
+      thumbSide.style.justifyContent = 'center';
+      thumbSide.style.background = 'var(--md-surface-container)';
+      thumbSide.style.color = 'var(--color-text-faint)';
+      thumbSide.innerHTML = mdIcon('photo', 22);
+    };
+    thumbSide.appendChild(img);
+    if (cfg.photos.length > 1) {
+      var overlay = document.createElement('span');
+      overlay.className = 'thumb-count-overlay';
+      overlay.textContent = '+' + (cfg.photos.length - 1);
+      thumbSide.appendChild(overlay);
+    }
+    thumbSide.addEventListener('click', function (e) {
+      e.stopPropagation();
+      cfg.onPhotoClick(0);
+    });
+    card.appendChild(thumbSide);
+  } else if (cfg.showNoPhotoPlaceholder) {
+    var placeholder = document.createElement('div');
+    placeholder.className = 'no-photo-placeholder';
+    placeholder.innerHTML = mdIcon('photo', 18) + '<span>Tanpa foto</span>';
+    card.appendChild(placeholder);
+  }
+
+  if (cfg.onCardClick) {
+    card.addEventListener('click', cfg.onCardClick);
+  }
+
+  return card;
+}
+
+
+/**
+ * Kartu Menu Pekerjaan (inbox) — gaya visual DISELARASKAN dengan
+ * buildPekerjaanListCard_ (Riwayat/Aktivitas, script-jadwal.html) agar
+ * satu bahasa visual konsisten di seluruh daftar Pekerjaan. Bedanya
+ * HANYA baris aksi (Ambil/Lepas/Buat Laporan) yang muncul kontekstual
+ * di bawah info petugas — tombol titik-tiga (moreVert) DIHAPUS, seluruh
+ * kartu bisa diklik untuk membuka Detail (chevron), sama seperti
+ * Riwayat/Aktivitas. Opsi Ubah/Hapus tetap tersedia lewat Detail
+ * (openPekerjaanDetail sudah punya tombol canUbah/canHapus) — tidak ada
+ * fungsi yang hilang, murni dipindah ke satu pintu yang konsisten.
+ */
+function buildPekerjaanInboxCard_(p) {
+  var jenisInfo = JENIS_PEKERJAAN_BADGE[p.jenis] || { label: p.jenis, cls: 'badge-neutral', icon: 'description' };
+  var statusCls = STATUS_PEKERJAAN_BADGE_CLASS[p.status] || 'badge-neutral';
+
+  var officer = p.handledByName || p.createdByName;
+
+  var photos = p.initialPhotos;
+
+  var card = document.createElement('div');
+  card.className = 'list-card list-card-row';
+
+  var main = document.createElement('div');
+  main.className = 'list-card-row-main';
+
+  var badgeRow = document.createElement('div');
+  badgeRow.className = 'op-card-top';
+  var badgeHtml =
+    '<span class="badge-pill ' + jenisInfo.cls + '"><span class="dot"></span>' + jenisInfo.label + '</span>' +
+    '<span class="badge ' + statusCls + '">' + p.statusLabel + '</span>';
+  if (p.assignmentMode === 'direct') {
+    badgeHtml += '<span class="badge badge-info">Direct \u2192 ' + p.targetUserCode + '</span>';
+  }
+
+    if (p.commentCount > 0) {
+    badgeHtml += '<span class="badge badge-neutral">\uD83D\uDCAC ' + p.commentCount + '</span>';
+  }
+
+  
+  badgeRow.innerHTML = badgeHtml;
+  main.appendChild(badgeRow);
+
+  var dateRow = document.createElement('div');
+  dateRow.style.cssText = 'display:flex; align-items:center; gap:6px; flex-wrap:wrap;';
+  dateRow.innerHTML =
+    '<span class="list-card-date"><span class="icon-slot">' + mdIcon('calendar', 16) + '</span><span>' + formatAktivitasDateShort_(p.createdAt) + '</span></span>' +
+    '<span style="color:var(--color-text-faint);">|</span>' +
+    '<span style="font-size:13px; color:var(--color-text-muted);">' + (p.zoneCode ? (p.floorName + ' \u00b7 ' + p.zoneCode) : p.floorName) + '</span>';
+  main.appendChild(dateRow);
+
+  var personRow = document.createElement('div');
+  personRow.className = 'list-card-person-row';
+  var avatar = document.createElement('span');
+  avatar.className = 'avatar-circle';
+  avatar.style.background = 'var(--status-info-bg)';
+  avatar.style.color = 'var(--status-info-fg)';
+  avatar.innerHTML = mdIcon('account', 18);
+  personRow.appendChild(avatar);
+  var personText = document.createElement('div');
+  personText.className = 'list-card-person-text';
+  personText.innerHTML = '<div class="name">' + officer + '</div><div class="subtext">' + truncateText_(p.completionNotes || p.description, 12) + '</div>';
+  personRow.appendChild(personText);
+  main.appendChild(personRow);
+
+
+  // PATCH — Lepas dipindah ke Detail (lihat openPekerjaanDetail).
+  // Kartu inbox sekarang hanya punya 1 tombol aksi:
+  // - canAmbil -> "Ambil Pekerjaan", transform in-place jadi
+  //   "Buat Laporan" setelah sukses (lihat doAmbilPekerjaanInline_).
+  // - canLepas (sudah diambil, milik user ini) -> langsung "Buat
+  //   Laporan" di kartu (shortcut tercepat untuk kasus paling umum:
+  //   FS sedang kerjakan lalu lapor), Lepas tetap tersedia via Detail.
+  if (p.canAmbil || p.canLepas) {
+    var actionsRow = document.createElement('div');
+    actionsRow.className = 'list-card-actions-row';
+
+    if (p.canAmbil) {
+      var ambilBtn = document.createElement('button');
+      ambilBtn.className = 'btn-card-action action-primary';
+      ambilBtn.dataset.pekerjaanId = p.pekerjaanId;
+      ambilBtn.innerHTML = mdIcon('add', 15) + '<span>Ambil Pekerjaan</span>';
+      ambilBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        doAmbilPekerjaanInline_(ambilBtn, p);
+      });
+      actionsRow.appendChild(ambilBtn);
+    } else if (p.canLepas) {
+      var laporBtn = document.createElement('button');
+      laporBtn.className = 'btn-card-action action-positive';
+      laporBtn.innerHTML = mdIcon('description', 15) + '<span>Buat Laporan</span>';
+      laporBtn.addEventListener('click', function (e) { e.stopPropagation(); openBuatLaporanForPekerjaan(p); });
+      actionsRow.appendChild(laporBtn);
+    }
+
+    main.appendChild(actionsRow);
+  }
+
+  card.appendChild(main);
+
+  var side = document.createElement('div');
+  side.className = 'list-card-row-side';
+
+  if (photos && photos.length > 0) {
+    var thumbSide = document.createElement('div');
+    thumbSide.className = 'op-card-thumb-side';
+    var img = document.createElement('img');
+    img.src = photos[0].thumbUrl || photos[0].url;
+    img.alt = 'Foto dokumentasi';
+    thumbSide.appendChild(img);
+    if (photos.length > 1) {
+      var overlay = document.createElement('span');
+      overlay.className = 'thumb-count-overlay';
+      overlay.textContent = '+' + (photos.length - 1);
+      thumbSide.appendChild(overlay);
+    }
+    thumbSide.addEventListener('click', function (e) {
+      e.stopPropagation();
+      openPhotoViewer(photos.map(function (photo) { return photo.url; }), 0);
+    });
+    side.appendChild(thumbSide);
+  } else {
+    var placeholder = document.createElement('div');
+    placeholder.className = 'no-photo-placeholder';
+    placeholder.innerHTML = mdIcon('photo', 18) + '<span>Tidak ada foto</span>';
+    side.appendChild(placeholder);
+  }
+
+  var chevron = document.createElement('span');
+  chevron.className = 'list-card-chevron';
+  chevron.innerHTML = mdIcon('chevronRight', 18);
+  side.appendChild(chevron);
+
+  card.appendChild(side);
+
+  card.addEventListener('click', function () { openPekerjaanDetail(p); });
+  return card;
+}
+
+
+
+/**
+ * Foto representatif satu kartu — completion jika ada, fallback ke
+ * initial (pola sama dgn PDF Bagian 4.1 backend, simetris).
+ */
+function pilihFotoKartu_(p) {
+  return (p.completionPhotos && p.completionPhotos.length > 0) ? p.completionPhotos : p.initialPhotos;
+}
+
+
+/**
+ * PATCH — Jendela waktu hapus dihapus total (keputusan Product Owner).
+ * Popup peringatan diperjelas supaya user sadar ini aksi PERMANEN TANPA
+ * BATAS WAKTU — bisa menghapus Pekerjaan lama sekalipun, termasuk
+ * dampaknya ke statistik periode lalu & Card Telegram yang mungkin jadi
+ * tidak ter-update lagi.
+ */
+
+
+function confirmHapusPekerjaan(pekerjaanId, onMutated) {
+  showConfirmModal(
+    'Hapus pekerjaan ini secara PERMANEN? Foto terkait akan ikut terhapus dari Drive, dan data ini akan hilang dari statistik & rekap. Tindakan ini TIDAK DAPAT DIBATALKAN.',
+    function () { doHapusPekerjaan(pekerjaanId, onMutated); },
+    'delete',
+    true,
+    'Menghapus...'
+  );
+}
+
+function doHapusPekerjaan(pekerjaanId, onMutated) {
+  var session = loadSession();
+  beginAction(null, 'Menghapus...');
+  google.script.run
+    .withSuccessHandler(function (response) {
+      endAction(null);
+      if (!response.success) {
+        showSnackbar(response.error, 'error');
+        return;
+      }
+      showSnackbar('Pekerjaan berhasil dihapus.', 'success');
+      invalidateAllPekerjaanCaches_();
+      if (onMutated) onMutated();
+    })
+    .withFailureHandler(function () {
+      endAction(null);
+      showSnackbar('Gagal menghapus pekerjaan. Coba lagi.', 'error');
+    })
+    .hapusPekerjaan(session.accessCode, pekerjaanId);
+}
+
+/** "11/10/2026 21:24" -> "Minggu, 11/10/26 • 21:24". */
+function formatDetailDateTime_(ddmmyyyyHHmm) {
+  if (!ddmmyyyyHHmm) return '';
+  var parts = String(ddmmyyyyHHmm).split(' ');
+  var dp = (parts[0] || '').split('/');
+  if (dp.length !== 3) return ddmmyyyyHHmm;
+  var d = new Date(parseInt(dp[2], 10), parseInt(dp[1], 10) - 1, parseInt(dp[0], 10));
+  if (isNaN(d.getTime())) return ddmmyyyyHHmm;
+  return INDO_DAY_NAMES_[d.getDay()] + ', ' + dp[0] + '/' + dp[1] + '/' + String(dp[2]).slice(-2) + ' \u2022 ' + (parts[1] || '');
+}
+
+
+function openPekerjaanDetail(p) {
+  var jenisInfo = JENIS_PEKERJAAN_BADGE[p.jenis] || { label: p.jenis, cls: 'badge-neutral' };
+  var statusCls = STATUS_PEKERJAAN_BADGE_CLASS[p.status] || 'badge-neutral';
+  var body = document.getElementById('activity-detail-body');
+
+    var detailTitleEl = document.getElementById('activity-detail-title');
+  if (detailTitleEl) detailTitleEl.textContent = 'DETAIL LAPORAN';
+
+  var initialPhotosHtml = '';
+  if (p.initialPhotos && p.initialPhotos.length > 0) {
+    initialPhotosHtml = '<p class="form-label" style="margin-top:12px;">Foto Kondisi Awal</p>' +
+      '<div class="op-card-thumbs" id="detail-initial-photos">' +
+      p.initialPhotos.map(function (photo) { return '<img src="' + (photo.thumbUrl || photo.url) + '">'; }).join('') +
+      '</div>';
+  }
+  var completionPhotosHtml = '';
+  if (p.completionPhotos && p.completionPhotos.length > 0) {
+    completionPhotosHtml = '<p class="form-label" style="margin-top:12px;">Foto Penuntasan</p>' +
+      '<div class="op-card-thumbs" id="detail-completion-photos">' +
+      p.completionPhotos.map(function (photo) { return '<img src="' + (photo.thumbUrl || photo.url) + '">'; }).join('') +
+      '</div>';
+  }
+
+  var completionNotesHtml = p.completionNotes
+    ? detailRowWithIcon_('description', 'Catatan Penuntasan', p.completionNotes)
+    : '';
+
+  var performedAtHtml = (p.arah === 'mandiri' && p.performedAt)
+
+        ? detailRowWithIcon_('calendar', 'Waktu Dikerjakan', formatDetailDateTime_(p.performedAt))
+    : '';
+
+  body.innerHTML =
+    '<div class="op-card-top" style="margin-bottom:10px;">' +
+      '<span class="badge-pill ' + jenisInfo.cls + '"><span class="dot"></span>' + jenisInfo.label + '</span>' +
+      '<span class="badge ' + statusCls + '">' + p.statusLabel + '</span>' +
+    '</div>' +
+    (p.subject ? '<div style="font-weight:700;font-size:15px;margin-bottom:6px;">' + p.subject + '</div>' : '') +
+    '<div class="activity-detail-desc">' + p.description + '</div>' +
+    detailRowWithIcon_('account', 'Dibuat oleh', p.createdByName) +
+        detailRowWithIcon_('calendar', 'Waktu Dibuat', formatDetailDateTime_(p.createdAt)) +
+    performedAtHtml +
+    detailRowWithIcon_('location', 'Lokasi', p.zoneCode ? (p.floorName + ' \u00b7 ' + p.zoneCode) : p.floorName) +
+    (p.handledBy ? detailRowWithIcon_('account', 'Ditangani oleh', p.handledByName) : '') +
+    completionNotesHtml +
+    initialPhotosHtml +
+    completionPhotosHtml;
+
+  ['detail-initial-photos', 'detail-completion-photos'].forEach(function (containerId) {
+    var container = document.getElementById(containerId);
+    if (!container) return;
+    var photoSet = containerId === 'detail-initial-photos' ? p.initialPhotos : p.completionPhotos;
+    container.querySelectorAll('img').forEach(function (imgEl, idx) {
+      imgEl.style.cursor = 'pointer';
+      imgEl.addEventListener('click', function () {
+        openPhotoViewer(photoSet.map(function (photo) { return photo.url; }), idx);
+      });
+    });
+  });
+
+    
+          if (p.canLepas || p.canUbah || p.canHapus || p.canUbahPenuntasan || p.canBatalkanPenuntasan) {
+    var actionsWrap = document.createElement('div');
+    actionsWrap.style.marginTop = '20px';
+    actionsWrap.style.display = 'flex';
+    actionsWrap.style.flexDirection = 'column';
+    actionsWrap.style.gap = '10px';
+
+    // PATCH — Lepas Pekerjaan dipindah ke sini dari kartu inbox.
+    if (p.canLepas) {
+      var lepasBtn = document.createElement('button');
+      lepasBtn.className = 'btn-outlined danger';
+      lepasBtn.style.display = 'inline-flex';
+      lepasBtn.style.alignItems = 'center';
+      lepasBtn.style.justifyContent = 'center';
+      lepasBtn.style.gap = '8px';
+      lepasBtn.innerHTML = mdIcon('close', 16) + '<span>Lepas Pekerjaan</span>';
+      lepasBtn.addEventListener('click', function () {
+        closeActivityDetail();
+        doLepasPekerjaan(p.pekerjaanId);
+      });
+      actionsWrap.appendChild(lepasBtn);
+    }
+
+        // PATCH — Edit/Batalkan Laporan Penuntasan (HANYA Penugasan SELESAI).
+    if (p.canUbahPenuntasan || p.canBatalkanPenuntasan) {
+      var penuntasanHeading = document.createElement('p');
+      penuntasanHeading.className = 'form-label';
+      penuntasanHeading.style.margin = '4px 0 0';
+      penuntasanHeading.textContent = 'Laporan Penuntasan';
+      actionsWrap.appendChild(penuntasanHeading);
+
+      if (p.canUbahPenuntasan) {
+        var editPenuntasanBtn = document.createElement('button');
+        editPenuntasanBtn.className = 'btn-outlined primary';
+        editPenuntasanBtn.style.display = 'inline-flex';
+        editPenuntasanBtn.style.alignItems = 'center';
+        editPenuntasanBtn.style.justifyContent = 'center';
+        editPenuntasanBtn.style.gap = '8px';
+        editPenuntasanBtn.innerHTML = mdIcon('edit', 16) + '<span>Ubah Catatan Penuntasan</span>';
+        editPenuntasanBtn.addEventListener('click', function () { openPenuntasanEditForm_(p); });
+        actionsWrap.appendChild(editPenuntasanBtn);
+      }
+
+      if (p.canBatalkanPenuntasan) {
+        var batalkanBtn = document.createElement('button');
+        batalkanBtn.className = 'btn-outlined danger';
+        batalkanBtn.style.display = 'inline-flex';
+        batalkanBtn.style.alignItems = 'center';
+        batalkanBtn.style.justifyContent = 'center';
+        batalkanBtn.style.gap = '8px';
+        batalkanBtn.innerHTML = mdIcon('close', 16) + '<span>Batalkan Penuntasan</span>';
+        batalkanBtn.addEventListener('click', function () {
+          showConfirmModal(
+            'Batalkan laporan penuntasan ini? Pekerjaan akan kembali berstatus Dikerjakan dan muncul lagi di Menu Pekerjaan. Foto penuntasan akan terhapus permanen.',
+            function () { doBatalkanPenuntasan_(p.pekerjaanId); },
+            'warning', true, 'Membatalkan...'
+          );
+        });
+        actionsWrap.appendChild(batalkanBtn);
+      }
+
+      var penuntasanDivider = document.createElement('div');
+      penuntasanDivider.style.cssText = 'border-top:1px solid var(--color-border); margin:4px 0;';
+      actionsWrap.appendChild(penuntasanDivider);
+    }
+
+
+    if (p.canHapus) {
+      var hint = document.createElement('p');
+      hint.className = 'md-body-sm';
+      hint.style.margin = '0';
+      hint.style.color = 'var(--color-danger)';
+      hint.textContent = '⚠️ Menghapus Pekerjaan bersifat permanen, tanpa batas waktu.';
+      actionsWrap.appendChild(hint);
+    }
+
+        var pairWrap = document.createElement('div');
+    pairWrap.className = 'detail-actions-pair';
+
+    if (p.canUbah) {
+      var editBtn = document.createElement('button');
+      editBtn.className = 'btn-outlined primary';
+      editBtn.style.display = 'inline-flex';
+      editBtn.style.alignItems = 'center';
+      editBtn.style.justifyContent = 'center';
+      editBtn.style.gap = '8px';
+      editBtn.innerHTML = mdIcon('edit', 16) + '<span>Ubah Pekerjaan</span>';
+      editBtn.addEventListener('click', function () { openPekerjaanEditForm_(p); });
+      pairWrap.appendChild(editBtn);
+    }
+
+    if (p.canHapus) {
+      var deleteBtn = document.createElement('button');
+      deleteBtn.className = 'btn-outlined danger';
+      deleteBtn.style.display = 'inline-flex';
+      deleteBtn.style.alignItems = 'center';
+      deleteBtn.style.justifyContent = 'center';
+      deleteBtn.style.gap = '8px';
+      deleteBtn.innerHTML = mdIcon('delete', 16) + '<span>Hapus Pekerjaan</span>';
+      deleteBtn.addEventListener('click', function () {
+        confirmHapusPekerjaan(p.pekerjaanId, function () {
+          closeActivityDetail();
+          refreshCurrentPekerjaanPage_();
+        });
+      });
+      pairWrap.appendChild(deleteBtn);
+    }
+        if (pairWrap.children.length > 0) actionsWrap.appendChild(pairWrap);
+
+    body.appendChild(actionsWrap);
+  }
+  renderKomentarSection_(p, body);
+  document.getElementById('activity-detail-overlay').classList.add('show');
+}
+
+
+
+/** Refresh daftar Pekerjaan pada halaman yang sedang aktif — dipakai
+ * setelah Ubah/Hapus dari Detail (yang bisa dibuka dari Inbox, Riwayat,
+ * maupun Aktivitas, jadi tidak tahu di muka harus me-refresh yang mana). */
+function refreshCurrentPekerjaanPage_() {
+  if (currentPage === 'pekerjaan') loadPekerjaanInbox(true);
+  else if (currentPage === 'jadwal') loadRiwayatPekerjaan(true);
+  else if (currentPage === 'aktivitas') loadPekerjaanAktivitas(true);
+}
+
+/**
+ * Form Ubah Pekerjaan (Subjek/Keterangan saja) — menggantikan konten
+ * overlay Detail sementara, reuse class form yang sudah ada.
+ */
+
+function openPekerjaanEditForm_(p) {
+  var isMandiri = p.arah === 'mandiri';
+  var body = document.getElementById('activity-detail-body');
+  body.innerHTML =
+    '<p class="card-header-title" style="margin:0 0 14px;">Ubah Pekerjaan</p>' +
+    '<div class="form-group">' +
+      '<label class="form-label">Subjek (opsional)</label>' +
+      '<input id="pekerjaan-edit-subject" class="form-input" type="text" maxlength="100">' +
+    '</div>' +
+    '<div class="form-group">' +
+      '<label class="form-label">Keterangan</label>' +
+      '<textarea id="pekerjaan-edit-description" class="form-input" rows="4" maxlength="500"></textarea>' +
+    '</div>' +
+    (isMandiri ?
+      '<div class="form-group">' +
+        '<label class="form-label">Tanggal &amp; Jam Dikerjakan</label>' +
+        '<input id="pekerjaan-edit-performed-at" class="form-input" type="datetime-local">' +
+      '</div>'
+    : '') +
+    '<div class="form-actions-row">' +
+      '<button class="btn-outlined" id="btn-cancel-pekerjaan-edit" type="button">Batal</button>' +
+      '<button class="btn-primary" id="btn-submit-pekerjaan-edit" type="button">Simpan</button>' +
+    '</div>' +
+    '<div class="form-error" id="pekerjaan-edit-error"></div>';
+
+  document.getElementById('pekerjaan-edit-subject').value = p.subject || '';
+  document.getElementById('pekerjaan-edit-description').value = p.description || '';
+
+  if (isMandiri) {
+    var performedAtEditEl = document.getElementById('pekerjaan-edit-performed-at');
+    var nowStr = formatDatetimeLocalInput_(new Date());
+    var minStr = formatDatetimeLocalInput_(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+    performedAtEditEl.max = nowStr;
+    performedAtEditEl.min = minStr;
+    performedAtEditEl.value = p.performedAtInput || nowStr;
+  }
+
+  document.getElementById('btn-cancel-pekerjaan-edit').addEventListener('click', function () {
+    openPekerjaanDetail(p);
+  });
+
+  document.getElementById('btn-submit-pekerjaan-edit').addEventListener('click', function () {
+    var errorEl = document.getElementById('pekerjaan-edit-error');
+    var subjectEl = document.getElementById('pekerjaan-edit-subject');
+    var descEl = document.getElementById('pekerjaan-edit-description');
+    errorEl.textContent = '';
+
+    if (!descEl.value.trim()) { errorEl.textContent = 'Keterangan wajib diisi.'; return; }
+
+    var editData = { subject: subjectEl.value, description: descEl.value };
+    if (isMandiri) {
+      var performedAtEditEl2 = document.getElementById('pekerjaan-edit-performed-at');
+      if (performedAtEditEl2 && performedAtEditEl2.value) editData.performedAt = performedAtEditEl2.value;
+    }
+
+    var session = loadSession();
+    var submitBtn = document.getElementById('btn-submit-pekerjaan-edit');
+    beginAction(submitBtn, 'Menyimpan...');
+    google.script.run
+      .withSuccessHandler(function (response) {
+        endAction(submitBtn);
+        if (!response.success) { errorEl.textContent = response.error; showSnackbar(response.error, 'error'); return; }
+        showSnackbar('Pekerjaan berhasil diubah.', 'success');
+        closeActivityDetail();
+        invalidateAllPekerjaanCaches_();
+        refreshCurrentPekerjaanPage_();
+      })
+      .withFailureHandler(function () {
+        endAction(submitBtn);
+        errorEl.textContent = 'Gagal terhubung ke server. Coba lagi.';
+        showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error');
+      })
+      .ubahPekerjaan(session.accessCode, p.pekerjaanId, editData);
+  });
+}
+
+
+/**
+ * PATCH — Eksekusi Batalkan Laporan Penuntasan. Pola sama persis
+ * doLepasPekerjaan/doHapusPekerjaan (busy-mode Confirm Modal).
+ */
+function doBatalkanPenuntasan_(pekerjaanId) {
+  var session = loadSession();
+  beginAction(null, 'Membatalkan...');
+  google.script.run
+    .withSuccessHandler(function (response) {
+      hideConfirmModal();
+      if (!response.success) {
+        var bar = document.getElementById('linear-progress');
+        if (bar) bar.classList.remove('show');
+        showSnackbar(response.error, 'error');
+        return;
+      }
+      showSnackbar('Laporan penuntasan dibatalkan. Pekerjaan kembali Dikerjakan.', 'success');
+      closeActivityDetail();
+      invalidateAllPekerjaanCaches_();
+      refreshCurrentPekerjaanPage_();
+    })
+    .withFailureHandler(function () {
+      hideConfirmModal();
+      endAction(null);
+      showSnackbar('Gagal membatalkan laporan penuntasan. Coba lagi.', 'error');
+    })
+    .batalkanPenuntasanPekerjaan(session.accessCode, pekerjaanId);
+}
+
+/**
+ * PATCH — Form Ubah Catatan Penuntasan. Pola sama openPekerjaanEditForm_,
+ * HANYA 1 field (completion_notes), foto TIDAK bisa diubah di sini.
+ */
+function openPenuntasanEditForm_(p) {
+  var body = document.getElementById('activity-detail-body');
+  body.innerHTML =
+    '<p class="card-header-title" style="margin:0 0 14px;">Ubah Catatan Penuntasan</p>' +
+    '<div class="form-group">' +
+      '<label class="form-label">Catatan Penuntasan</label>' +
+      '<textarea id="penuntasan-edit-notes" class="form-input" rows="4" maxlength="500"></textarea>' +
+    '</div>' +
+    '<div class="form-actions-row">' +
+      '<button class="btn-outlined" id="btn-cancel-penuntasan-edit" type="button">Batal</button>' +
+      '<button class="btn-primary" id="btn-submit-penuntasan-edit" type="button">Simpan</button>' +
+    '</div>' +
+    '<div class="form-error" id="penuntasan-edit-error"></div>';
+
+  document.getElementById('penuntasan-edit-notes').value = p.completionNotes || '';
+
+  document.getElementById('btn-cancel-penuntasan-edit').addEventListener('click', function () {
+    openPekerjaanDetail(p);
+  });
+
+  document.getElementById('btn-submit-penuntasan-edit').addEventListener('click', function () {
+    var errorEl = document.getElementById('penuntasan-edit-error');
+    var notesEl = document.getElementById('penuntasan-edit-notes');
+    errorEl.textContent = '';
+
+    if (!notesEl.value.trim()) { errorEl.textContent = 'Catatan penuntasan wajib diisi.'; return; }
+
+    var session = loadSession();
+    var submitBtn = document.getElementById('btn-submit-penuntasan-edit');
+    beginAction(submitBtn, 'Menyimpan...');
+    google.script.run
+      .withSuccessHandler(function (response) {
+        endAction(submitBtn);
+        if (!response.success) { errorEl.textContent = response.error; showSnackbar(response.error, 'error'); return; }
+        showSnackbar('Catatan penuntasan berhasil diubah.', 'success');
+        closeActivityDetail();
+        invalidateAllPekerjaanCaches_();
+        refreshCurrentPekerjaanPage_();
+      })
+      .withFailureHandler(function () {
+        endAction(submitBtn);
+        errorEl.textContent = 'Gagal terhubung ke server. Coba lagi.';
+        showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error');
+      })
+      .ubahPenuntasanPekerjaan(session.accessCode, p.pekerjaanId, { completionNotes: notesEl.value });
+  });
+}
+
+
+// ============================================================
+// KOMENTAR pada Detail Pekerjaan
+// ============================================================
+
+function renderKomentarSection_(p, body) {
+  var section = document.createElement('div');
+  section.className = 'komentar-section';
+  section.innerHTML =
+    '<div class="komentar-head"><span class="title">Komentar</span>' +
+    '<button class="btn-icon" type="button" id="btn-komentar-refresh" aria-label="Muat ulang komentar">' + mdIcon('refresh', 18) + '</button></div>' +
+    '<div id="komentar-list"><div class="inline-loading"><span class="spinner-sm"></span>Memuat komentar...</div></div>' +
+    '<div id="komentar-form-wrap"></div>';
+  body.appendChild(section);
+
+  document.getElementById('btn-komentar-refresh').addEventListener('click', function () { loadKomentar_(p); });
+  loadKomentar_(p);
+}
+
+function loadKomentar_(p) {
+  var session = loadSession();
+  var listEl = document.getElementById('komentar-list');
+  if (!listEl) return;
+  google.script.run
+    .withSuccessHandler(function (response) {
+      listEl = document.getElementById('komentar-list');
+      if (!listEl) return; // Detail sudah ditutup
+      if (!response.success) { listEl.innerHTML = '<div class="komentar-empty">' + response.error + '</div>'; return; }
+      p.commentCount = response.data.komentar.length;
+      renderKomentarList_(p, response.data.komentar);
+      renderKomentarForm_(p, response.data.canKirim);
+    })
+    .withFailureHandler(function () {
+      var el = document.getElementById('komentar-list');
+      if (el) el.innerHTML = '<div class="komentar-empty">Gagal memuat komentar.</div>';
+    })
+    .getKomentarList(session.accessCode, p.pekerjaanId);
+}
+
+function renderKomentarList_(p, list) {
+  var listEl = document.getElementById('komentar-list');
+  listEl.innerHTML = '';
+  if (!list.length) {
+    listEl.innerHTML = '<div class="komentar-empty">Belum ada komentar.</div>';
+    return;
+  }
+  list.forEach(function (k) {
+    var item = document.createElement('div');
+    item.className = 'komentar-item';
+
+    var meta = document.createElement('div');
+    meta.className = 'komentar-meta';
+    var name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = k.userName;
+    meta.appendChild(name);
+    var when = document.createElement('span');
+    when.textContent = k.createdAt + (k.edited ? ' \u00b7 diedit' : '');
+    meta.appendChild(when);
+    item.appendChild(meta);
+
+    var text = document.createElement('div');
+    text.className = 'komentar-text';
+    text.textContent = k.text; // textContent: aman dari HTML injection
+    item.appendChild(text);
+
+    if (k.canUbah || k.canHapus) {
+      var actions = document.createElement('div');
+      actions.className = 'komentar-actions';
+      if (k.canUbah) {
+        var editBtn = document.createElement('button');
+        editBtn.type = 'button';
+        editBtn.textContent = 'Edit';
+        editBtn.addEventListener('click', function () { startEditKomentar_(p, k, item, text, actions); });
+        actions.appendChild(editBtn);
+      }
+      if (k.canHapus) {
+        var delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'danger';
+        delBtn.textContent = 'Hapus';
+        delBtn.addEventListener('click', function () {
+          showConfirmModal('Hapus komentar ini?', function () { doHapusKomentar_(p, k.komentarId); }, 'delete', true, 'Menghapus...');
+        });
+        actions.appendChild(delBtn);
+      }
+      item.appendChild(actions);
+    }
+    listEl.appendChild(item);
+  });
+}
+
+function startEditKomentar_(p, k, item, textEl, actionsEl) {
+  var ta = document.createElement('textarea');
+  ta.className = 'form-input';
+  ta.rows = 3;
+  ta.maxLength = 500;
+  ta.value = k.text;
+  item.replaceChild(ta, textEl);
+  actionsEl.innerHTML = '';
+
+  var save = document.createElement('button');
+  save.type = 'button';
+  save.textContent = 'Simpan';
+  var cancel = document.createElement('button');
+  cancel.type = 'button';
+  cancel.textContent = 'Batal';
+  actionsEl.appendChild(save);
+  actionsEl.appendChild(cancel);
+
+  cancel.addEventListener('click', function () { loadKomentar_(p); });
+  save.addEventListener('click', function () {
+    if (!ta.value.trim()) { showSnackbar('Komentar tidak boleh kosong.', 'error'); return; }
+    var session = loadSession();
+    beginAction(save, 'Menyimpan...');
+    google.script.run
+      .withSuccessHandler(function (response) {
+        endAction(save);
+        if (!response.success) { showSnackbar(response.error, 'error'); return; }
+        invalidateAllPekerjaanCaches_();
+        loadKomentar_(p);
+      })
+      .withFailureHandler(function () {
+        endAction(save);
+        showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error');
+      })
+      .ubahKomentar(session.accessCode, k.komentarId, ta.value);
+  });
+}
+
+function doHapusKomentar_(p, komentarId) {
+  var session = loadSession();
+  beginAction(null, 'Menghapus...');
+  google.script.run
+    .withSuccessHandler(function (response) {
+      endAction(null); // juga menutup Confirm Modal (busy-mode)
+      if (!response.success) { showSnackbar(response.error, 'error'); return; }
+      showSnackbar('Komentar dihapus.', 'success');
+      invalidateAllPekerjaanCaches_();
+      loadKomentar_(p);
+    })
+    .withFailureHandler(function () {
+      endAction(null);
+      showSnackbar('Gagal menghapus komentar. Coba lagi.', 'error');
+    })
+    .hapusKomentar(session.accessCode, komentarId);
+}
+
+function renderKomentarForm_(p, canKirim) {
+  var wrap = document.getElementById('komentar-form-wrap');
+  if (!wrap || wrap.dataset.rendered) return; // render sekali agar teks yang sedang diketik tidak hilang
+  wrap.dataset.rendered = '1';
+  if (!canKirim) { wrap.innerHTML = '<div class="komentar-empty">Akun Demo hanya dapat melihat komentar.</div>'; return; }
+
+  wrap.innerHTML =
+    '<div class="komentar-form">' +
+      '<textarea id="komentar-input" class="form-input" rows="1" maxlength="500" placeholder="Tulis komentar..."></textarea>' +
+      '<button class="btn-primary" id="btn-komentar-kirim" type="button">Kirim</button>' +
+    '</div>';
+
+  document.getElementById('btn-komentar-kirim').addEventListener('click', function () {
+    var input = document.getElementById('komentar-input');
+    var btn = document.getElementById('btn-komentar-kirim');
+    if (!input.value.trim()) return;
+    var session = loadSession();
+    beginAction(btn, 'Kirim...');
+    google.script.run
+      .withSuccessHandler(function (response) {
+        endAction(btn);
+        if (!response.success) { showSnackbar(response.error, 'error'); return; }
+        input.value = '';
+        invalidateAllPekerjaanCaches_();
+        loadKomentar_(p);
+      })
+      .withFailureHandler(function () {
+        endAction(btn);
+        showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error');
+      })
+      .buatKomentar(session.accessCode, p.pekerjaanId, input.value);
+  });
+}
+
+
+/** Baris detail dengan ikon di depan label — reuse .icon-slot. */
+function detailRowWithIcon_(iconName, label, value) {
+  return '<div class="activity-detail-row">' +
+    '<span class="label" style="display:flex; align-items:center; gap:8px;"><span class="icon-slot">' + mdIcon(iconName, 16) + '</span>' + label + '</span>' +
+    '<span class="value">' + value + '</span>' +
+  '</div>';
+}
+
+// ============================================================
+// MENU PEKERJAAN — Halaman Inbox (Tahap 4 Cutover, pengganti Task lama)
+// ============================================================
+
+var PEKERJAAN_AUTO_REFRESH_MS = 60000;
+var pekerjaanAutoRefreshTimer = null;
+
+function stopPekerjaanAutoRefresh() {
+  if (pekerjaanAutoRefreshTimer) {
+    clearInterval(pekerjaanAutoRefreshTimer);
+    pekerjaanAutoRefreshTimer = null;
+  }
+}
+
+function startPekerjaanAutoRefresh() {
+  stopPekerjaanAutoRefresh();
+  pekerjaanAutoRefreshTimer = setInterval(function () {
+    if (currentPage === 'pekerjaan' && document.visibilityState === 'visible') {
+      loadPekerjaanInbox(true);
+    }
+  }, PEKERJAAN_AUTO_REFRESH_MS);
+}
+
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'visible' && currentPage === 'pekerjaan') {
+    loadPekerjaanInbox(true);
+  }
+});
+
+var currentPekerjaanFilter = 'all';
+var PEKERJAAN_FILTERS = [
+  { key: 'all', label: 'Semua' },
+  { key: 'TERBUKA', label: 'Menunggu Diambil' },
+  { key: 'DIKERJAKAN', label: 'Dikerjakan' }
+];
+
+function initPekerjaanInboxPage() {
+  if (!appBootstrap) return;
+  var role = appBootstrap.currentUser.role;
+  var isFs = role === 'fs';
+
+  var titleEl = document.getElementById('pekerjaan-header-title');
+  if (titleEl) titleEl.textContent = isFs ? 'TUGAS UNTUK ANDA' : 'Menu Pekerjaan';
+
+  var subtitleEl = document.getElementById('pekerjaan-header-subtitle');
+  if (subtitleEl) {
+    subtitleEl.textContent = (role === 'admin' || role === 'demo')
+      ? 'Lapor Kerusakan & Permintaan dari seluruh Facility Support'
+      : 'Penugasan yang menunggu atau sedang Anda kerjakan';
+  }
+
+  renderPekerjaanFilter_();
+  loadPekerjaanInbox();
+}
+
+/** Dropdown filter status. Pola & CSS sama dengan filter Aktivitas. */
+function renderPekerjaanFilter_() {
+  var btn = document.getElementById('btn-pekerjaan-filter');
+  var menu = document.getElementById('pekerjaan-filter-menu');
+  if (!btn || !menu) return;
+
+  var current = PEKERJAAN_FILTERS.filter(function (f) { return f.key === currentPekerjaanFilter; })[0] || PEKERJAAN_FILTERS[0];
+  var isOpen = menu.style.display === 'block';
+  btn.innerHTML = '<span>' + current.label + '</span>' + mdIcon(isOpen ? 'chevronUp' : 'chevronDown', 16);
+
+  menu.innerHTML = '';
+  PEKERJAAN_FILTERS.forEach(function (f) {
+    var opt = document.createElement('button');
+    opt.type = 'button';
+    opt.className = 'activity-filter-option' + (f.key === currentPekerjaanFilter ? ' active' : '');
+    opt.innerHTML = '<span class="opt-dot"></span><span>' + f.label + '</span>';
+    opt.addEventListener('click', function (e) {
+      e.stopPropagation();
+      currentPekerjaanFilter = f.key;
+      menu.style.display = 'none';
+      renderPekerjaanFilter_();
+      renderPekerjaanInboxList(pageDataCache.pekerjaanInbox || []);
+    });
+    menu.appendChild(opt);
+  });
+
+  if (!btn.dataset.bound) {
+    btn.dataset.bound = '1';
+    btn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+      renderPekerjaanFilter_();
+    });
+    document.addEventListener('click', function () {
+      if (menu.style.display === 'block') {
+        menu.style.display = 'none';
+        renderPekerjaanFilter_();
+      }
+    });
+  }
+}
+
+
+function loadPekerjaanInbox(force) {
+  var session = loadSession();
+  if (!session) return;
+
+  var cached = pageDataCache.pekerjaanInbox;
+
+  if (cached && !force) {
+    renderPekerjaanInboxList(cached);
+    return;
+  }
+
+  if (!cached) {
+  
+        renderListSkeleton_('pekerjaan-list', 3, 'Memuat data pekerjaan...');
+  }
+
+  google.script.run
+    .withSuccessHandler(function (response) {
+      var container = document.getElementById('pekerjaan-list');
+      if (!response.success) {
+        if (!cached) container.innerHTML = '<p>' + response.error + '</p>';
+        var bar1 = document.getElementById('linear-progress');
+        if (bar1) bar1.classList.remove('show');
+        return;
+      }
+      pageDataCache.pekerjaanInbox = response.data.pekerjaan;
+      renderPekerjaanInboxList(response.data.pekerjaan);
+      // PATCH — Jaring pengaman: SELALU matikan bar setelah render
+      // selesai, apa pun yang memicu loadPekerjaanInbox(true) (Ambil,
+      // Lepas, pull-to-refresh, auto-refresh 60 detik, dll). Mencegah
+      // bar "menggantung" akibat tumpang-tindih pemanggilan
+      // beginAction/endAction dari aksi-aksi yang terjadi berurutan
+      // cepat.
+      var bar2 = document.getElementById('linear-progress');
+      if (bar2) bar2.classList.remove('show');
+    })
+    .withFailureHandler(function () {
+      if (!cached) document.getElementById('pekerjaan-list').innerHTML = '<p>Gagal memuat daftar pekerjaan.</p>';
+      var bar3 = document.getElementById('linear-progress');
+      if (bar3) bar3.classList.remove('show');
+    })
+    .getPekerjaanList(session.accessCode, { view: 'inbox' });
+}
+
+function renderPekerjaanInboxList(list) {
+  var container = document.getElementById('pekerjaan-list');
+  container.innerHTML = '';
+
+  if (!list || list.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('task', 26) + '</div>Tidak ada pekerjaan di inbox Anda.</div>';
+    return;
+  }
+
+  if (currentPekerjaanFilter !== 'all') {
+    list = list.filter(function (p) { return p.status === currentPekerjaanFilter; });
+    if (list.length === 0) {
+      container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('task', 26) + '</div>Tidak ada pekerjaan dengan status ini.</div>';
+      return;
+    }
+  }
+
+  var STATUS_SORT_PRIORITY = { DIKERJAKAN: 0, TERBUKA: 1 };
+  list = list.slice().sort(function (a, b) {
+    var pa = STATUS_SORT_PRIORITY[a.status] != null ? STATUS_SORT_PRIORITY[a.status] : 2;
+    var pb = STATUS_SORT_PRIORITY[b.status] != null ? STATUS_SORT_PRIORITY[b.status] : 2;
+    return pa - pb;
+  });
+
+  list.forEach(function (p) {
+    container.appendChild(buildPekerjaanInboxCard_(p));
+  });
+}
+
+
+
+function doAmbilPekerjaan(pekerjaanId) {
+  var session = loadSession();
+  beginAction(null, 'Mengambil...');
+  google.script.run
+    .withSuccessHandler(function (response) {
+      endAction(null);
+      if (!response.success) { showSnackbar(response.error, 'error'); }
+      else { showSnackbar('Pekerjaan berhasil diambil.', 'success'); }
+      invalidateAllPekerjaanCaches_();
+      loadPekerjaanInbox(true);
+    })
+    .withFailureHandler(function () {
+      endAction(null);
+      showSnackbar('Gagal mengambil pekerjaan. Coba lagi.', 'error');
+    })
+    .ambilPekerjaan(session.accessCode, pekerjaanId);
+}
+
+
+/**
+ * PATCH — FIX bug "card tidak sinkron setelah Ambil" (status masih
+ * tampil 'Menunggu Diambil', tombol Lepas tidak muncul di Detail sampai
+ * refresh manual). Akar masalah SEBELUMNYA: hanya tombol & field
+ * p.status/p.handledBy yang ditambal manual — badge status di kartu,
+ * p.statusLabel, p.canLepas, p.canAmbil TIDAK ikut diperbarui, membuat
+ * objek `p` dalam state SEPARUH MATANG yang lalu dipakai Detail
+ * (openPekerjaanDetail) sehingga tombol Lepas gagal muncul.
+ *
+ * FIX: setelah ambilPekerjaan() sukses, panggil getPekerjaanList()
+ * ULANG (ringan — 1 row saja secara efektif karena filter di client)
+ * untuk mendapat OBJEK PEKERJAAN YANG BENAR-BENAR FRESH dari server
+ * (statusLabel/canLepas/canAmbil semua terhitung benar oleh backend,
+ * SATU sumber kebenaran — bukan ditambal manual di frontend lagi).
+ * Kartu LAMA di-replace total dengan kartu baru hasil
+ * buildPekerjaanInboxCard_(freshP) — bukan cuma ubah tombolnya saja.
+ */
+
+/** Bar progres kecil di dalam kartu. set(pct) menaikkan bar & teks. */
+function attachCardProgress_(cardEl) {
+  var main = cardEl && cardEl.querySelector('.list-card-row-main');
+  if (!main) return { set: function () {}, remove: function () {} };
+
+  var box = document.createElement('div');
+  box.className = 'card-progress';
+  box.innerHTML =
+    '<div class="card-progress-bar"><div class="card-progress-fill"></div></div>' +
+    '<div class="card-progress-text"></div>';
+  main.appendChild(box);
+
+  var fill = box.querySelector('.card-progress-fill');
+  var text = box.querySelector('.card-progress-text');
+  return {
+    set: function (pct) {
+      fill.style.width = pct + '%';
+      text.textContent = 'Mengecek data penugasan... (' + pct + '%)';
+    },
+    remove: function () { if (box.parentNode) box.parentNode.removeChild(box); }
+  };
+}
+
+/**
+ * Ambil Pekerjaan in-place. Progres kartu mengikuti tahap NYATA:
+ * 10% mulai -> 55% pengambilan berhasil di server -> 100% data kartu
+ * terbaru diterima. Kartu lalu diganti kartu segar dari server.
+ */
+function doAmbilPekerjaanInline_(buttonEl, p) {
+  var session = loadSession();
+  var cardEl = buttonEl.closest('.list-card');
+  var progress = attachCardProgress_(cardEl);
+  var toastDetail = 'Tugas "' + truncateText_(p.subject || p.description, 40) + '" kini ada di tangan Anda. Tekan Buat Laporan setelah selesai.';
+
+  function toastSuccess() { showSnackbar('Pekerjaan berhasil diambil', 'success', toastDetail); }
+
+  progress.set(10);
+  beginAction(buttonEl, 'Mengambil...');
+  google.script.run
+    .withSuccessHandler(function (response) {
+      var bar = document.getElementById('linear-progress');
+      if (bar) bar.classList.remove('show');
+
+      if (!response.success) {
+        progress.remove();
+        if (document.body.contains(buttonEl)) endAction(buttonEl);
+        showSnackbar(response.error, 'error');
+        return;
+      }
+      invalidateAllPekerjaanCaches_();
+      progress.set(55);
+
+      google.script.run
+        .withSuccessHandler(function (listResponse) {
+          if (!listResponse.success || !document.body.contains(cardEl)) {
+            toastSuccess();
+            loadPekerjaanInbox(true);
+            return;
+          }
+          progress.set(100);
+          var freshP = listResponse.data.pekerjaan.find(function (row) { return row.pekerjaanId === p.pekerjaanId; });
+          setTimeout(function () {
+            if (!document.body.contains(cardEl)) { toastSuccess(); loadPekerjaanInbox(true); return; }
+            if (!freshP) {
+              cardEl.remove();
+            } else {
+              cardEl.replaceWith(buildPekerjaanInboxCard_(freshP));
+            }
+            toastSuccess();
+          }, 300);
+        })
+        .withFailureHandler(function () {
+          toastSuccess();
+          loadPekerjaanInbox(true);
+        })
+        .getPekerjaanList(session.accessCode, { view: 'inbox' });
+    })
+    .withFailureHandler(function () {
+      var bar = document.getElementById('linear-progress');
+      if (bar) bar.classList.remove('show');
+      progress.remove();
+      if (document.body.contains(buttonEl)) endAction(buttonEl);
+      showSnackbar('Gagal mengambil pekerjaan. Coba lagi.', 'error');
+    })
+    .ambilPekerjaan(session.accessCode, p.pekerjaanId);
+}
+
+function doLepasPekerjaan(pekerjaanId) {
+  showConfirmModal('Lepas pekerjaan ini agar bisa diambil pihak lain?', function () {
+    executeLepasPekerjaan(pekerjaanId);
+  }, 'delete', true, 'Melepas...');
+}
+
+/**
+ * PATCH — FIX bug "popup Lepas tidak pernah tertutup, terlihat freeze".
+ * Akar masalah: endAction(null) sengaja TIDAK dipanggil di jalur sukses
+ * (patch sebelumnya, untuk cegah race bar loading dengan
+ * loadPekerjaanInbox). TAPI endAction() jugalah satu-satunya titik yang
+ * otomatis menutup Confirm Modal (hook di script-core.html) — sehingga
+ * modal tidak pernah tertutup di jalur ini. FIX: panggil
+ * hideConfirmModal() SECARA EKSPLISIT & SEGERA begitu response diterima
+ * (terpisah dari urusan bar, yang tetap ditangani loadPekerjaanInbox
+ * sendiri seperti sebelumnya — TIDAK diubah).
+ */
+function executeLepasPekerjaan(pekerjaanId) {
+  var session = loadSession();
+  beginAction(null, 'Melepas...');
+  google.script.run
+    .withSuccessHandler(function (response) {
+      hideConfirmModal();
+      if (!response.success) {
+        var bar = document.getElementById('linear-progress');
+        if (bar) bar.classList.remove('show');
+        showSnackbar(response.error, 'error');
+        return;
+      }
+      showSnackbar('Pekerjaan dilepas kembali.', 'success');
+      invalidateAllPekerjaanCaches_();
+      loadPekerjaanInbox(true);
+    })
+    .withFailureHandler(function () {
+      hideConfirmModal();
+      endAction(null);
+      showSnackbar('Gagal melepas pekerjaan. Coba lagi.', 'error');
+    })
+    .lepasPekerjaan(session.accessCode, pekerjaanId);
+}
+
+
+
+
+</script>
+
+
+
