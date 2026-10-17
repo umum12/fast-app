@@ -1,7 +1,7 @@
 <script>
-
-
-
+// ============================================================
+// AKTIVITAS — Timeline Operasional Seluruh Tim (Tahap 4 Cutover)
+// ============================================================
 
 var currentActivityFilter = 'all';
 var ACTIVITY_TABS = [
@@ -13,8 +13,11 @@ var ACTIVITY_TABS = [
 
 
 
-
-
+/**
+ * PATCH: tab filter diganti dropdown "Filter: <label> v". Logika
+ * filter (currentActivityFilter, renderAktivitasFiltered) TIDAK
+ * berubah, hanya tampilan pemilihnya.
+ */
 function renderActivityTabs() {
   var btn = document.getElementById('btn-activity-filter');
   var menu = document.getElementById('activity-filter-menu');
@@ -120,13 +123,22 @@ function renderPekerjaanAktivitas(list) {
   });
 }
 
+// ------------------- FILTER & UNDUH PDF (dipindah dari Riwayat, 3.4) -------------------
 
+/**
+ * PATCH — Halaman PDF Terpisah. Menggantikan initPekerjaanFilterUI()
+ * lama (panel filter inline di Aktivitas). Tombol di sini HANYA
+ * membuka /exec?page=pdfrender di tab baru — seluruh filter & opsi
+ * unduh (ke perangkat / ke Drive) sekarang di halaman itu.
+ */
 
-
-
-
-
-
+/**
+ * PATCH — Tombol PDF kini tersedia untuk SEMUA role (sebelumnya
+ * Admin/Demo saja). Aman karena backend (getFilteredPekerjaanRiwayatRows_,
+ * pekerjaan.gs) sudah otomatis membatasi data FS hanya ke Pekerjaan
+ * miliknya sendiri (created_by/handled_by) — tidak ada perubahan Hak
+ * Akses, murni membuka akses UI ke endpoint yang sudah aman per-role.
+ */
 
 
 function initPdfRenderButton_() {
@@ -141,7 +153,7 @@ function initPdfRenderButton_() {
     });
   }
 
-  
+  // Ringkasan collapsible; status diingat di localStorage (per perangkat).
   var toggle = document.getElementById('btn-toggle-ringkasan');
   var body = document.getElementById('ringkasan-body');
   if (!toggle || !body) return;
@@ -163,9 +175,9 @@ function initPdfRenderButton_() {
   });
 }
 
-
-
-
+// ============================================================
+// PHOTO VIEWER (Section 18.4) — pinch zoom, double-tap zoom, swipe, close
+// ============================================================
 
 var viewerPhotos = [];
 var viewerIndex = 0;
@@ -258,7 +270,7 @@ document.getElementById('viewer-close').addEventListener('click', closePhotoView
 
       var now = new Date().getTime();
       if (now - lastTapTime < 300) {
-        
+        // Double tap
         viewerScale = viewerScale > 1 ? 1 : 2.5;
         img.style.transform = 'scale(' + viewerScale + ')';
       }
@@ -268,9 +280,9 @@ document.getElementById('viewer-close').addEventListener('click', closePhotoView
   });
 })();
 
-
-
-
+// ============================================================
+// PULL TO REFRESH (Sprint 6.02 #6) — hanya Beranda & Pekerjaan
+// ============================================================
 
 (function setupPullToRefresh() {
   var PULL_THRESHOLD = 70;
@@ -329,9 +341,9 @@ document.getElementById('viewer-close').addEventListener('click', closePhotoView
   });
 })();
 
-
-
-
+// ============================================================
+// TERAPKAN IKON PADA TOMBOL STATIS (Patch 6.1.5)
+// ============================================================
 
 function applyStaticIcons() {
     var activityHeaderIcon2 = document.getElementById('activity-header-icon');
@@ -395,9 +407,9 @@ var iconButtonMap = [
 
 applyStaticIcons();
 
-
-
-
+// ============================================================
+// RIPPLE EFFECT (Patch 7.2)
+// ============================================================
 function attachRipple(el) {
   if (!el || el.dataset.rippleAttached) return;
   el.dataset.rippleAttached = '1';
@@ -417,7 +429,7 @@ function attachRipple(el) {
 
 document.querySelectorAll('.fab, .btn-primary').forEach(attachRipple);
 
-
+// Counter karakter Keterangan (UI Card v2)
 var formDescEl = document.getElementById('form-description');
 var formDescCounter = document.getElementById('form-description-counter');
 if (formDescEl && formDescCounter) {
@@ -427,7 +439,7 @@ if (formDescEl && formDescCounter) {
   });
 }
 
-
+// Tombol Batal pada form Buat Pekerjaan — reset field (UI Card v2)
 document.getElementById('btn-cancel-report-form').addEventListener('click', function () {
   var hasUnsavedContent = document.getElementById('form-subject').value.trim() ||
     document.getElementById('form-description').value.trim() ||
@@ -453,9 +465,9 @@ function resetPekerjaanForm() {
   }
 });
 
-
-
-
+// ============================================================
+// INIT
+// ============================================================
 
 (function init() {
   var session = loadSession();

@@ -1,7 +1,7 @@
 <script>
-
-
-
+// ============================================================
+// FIELD VALIDATION HIGHLIGHT (Sprint 6.02 #5)
+// ============================================================
 
 function clearFieldErrors(fieldEls) {
   fieldEls.forEach(function (el) { if (el) el.classList.remove('input-error'); });
@@ -15,17 +15,32 @@ function showFieldError(fieldEl, errorEl, message) {
   if (errorEl) errorEl.textContent = message;
 }
 
-
-
-
+// ============================================================
+// CONFIRM MODAL (Sprint 6.02 #4) — pengganti window.confirm() bawaan
+// ============================================================
 
 
 var pendingConfirmCallback = null;
 var confirmModalBusyLabel = 'Memproses...';
 var confirmModalIsBusyMode = false;
 
-
-
+/**
+ * PATCH — FIX bug "popup Reset/Logout freeze". Akar masalah sebelumnya:
+ * showConfirmModal() diubah supaya TIDAK auto-close, dengan asumsi
+ * SEMUA onConfirm pada akhirnya memanggil endAction() (pola async
+ * hapus/lepas). Tapi banyak pemanggil (Reset form, Logout) adalah
+ * fungsi SINKRON yang tidak pernah memanggil endAction/hideConfirmModal
+ * sama sekali -> modal menggantung selamanya.
+ *
+ * FIX: busy-mode (loading state di tombol + modal tetap terbuka sampai
+ * endAction dipanggil) SEKARANG OPT-IN lewat parameter ke-4 `busyMode`
+ * (boolean, default false/undefined). Tanpa parameter ini, perilaku
+ * KEMBALI seperti semula: modal langsung tertutup begitu tombol ditekan
+ * (aman untuk proses sinkron seperti Reset/Logout). HANYA pemanggil
+ * yang eksplisit mengirim busyMode=true (Hapus Pekerjaan/Jadwal/
+ * Content, Lepas Pekerjaan — proses async yang pakai beginAction/
+ * endAction(null)) yang mendapat loading state di tombol.
+ */
 function showConfirmModal(message, onConfirm, iconName, busyMode, busyLabel) {
   pendingConfirmCallback = onConfirm;
   confirmModalIsBusyMode = !!busyMode;
@@ -51,17 +66,17 @@ document.getElementById('confirm-modal-confirm').addEventListener('click', funct
   var cb = pendingConfirmCallback;
 
   if (!confirmModalIsBusyMode) {
-    
-    
-    
+    // Perilaku LAMA (default) — tutup modal dulu, baru jalankan
+    // callback. Aman untuk proses sinkron (Reset form, Logout) maupun
+    // async yang TIDAK memakai pola beginAction/endAction(null).
     hideConfirmModal();
     if (cb) cb();
     return;
   }
 
-  
-  
-  
+  // Busy mode — tombol jadi loading state, modal TETAP TERBUKA sampai
+  // endAction(null) dipanggil pemanggil (lihat hook di endAction di
+  // bawah).
   var confirmBtn = document.getElementById('confirm-modal-confirm');
   var cancelBtn = document.getElementById('confirm-modal-cancel');
   confirmBtn.disabled = true;
@@ -71,10 +86,10 @@ document.getElementById('confirm-modal-confirm').addEventListener('click', funct
   if (cb) cb();
 });
 
-
-
-
-
+// ============================================================
+// BOTTOM SHEET (Patch 7.2) — pengganti pop-up aksi kontekstual per item.
+// items: [{ icon, label, danger (opsional), onClick }]
+// ============================================================
 
 function openBottomSheet(items) {
   var body = document.getElementById('bottom-sheet-body');
@@ -97,12 +112,12 @@ function closeBottomSheet() {
 }
 
 document.getElementById('bottom-sheet-overlay').addEventListener('click', function (e) {
-  if (e.target === this) closeBottomSheet(); 
+  if (e.target === this) closeBottomSheet(); // tap backdrop untuk menutup
 });
 
-
-
-
+// ============================================================
+// Menu Akun (#btn-back-from-akun) & Detail overlay ✕
+// ============================================================
 
 function closeActivityDetail() {
   document.getElementById('activity-detail-overlay').classList.remove('show');
@@ -110,16 +125,16 @@ function closeActivityDetail() {
 
 document.getElementById('btn-close-activity-detail-x').addEventListener('click', closeActivityDetail);
 document.getElementById('activity-detail-overlay').addEventListener('click', function (e) {
-  if (e.target === this) closeActivityDetail(); 
+  if (e.target === this) closeActivityDetail(); // tap backdrop untuk menutup
 });
 
 document.getElementById('btn-back-from-akun').addEventListener('click', function () {
-  goToPage(lastMainPage); 
+  goToPage(lastMainPage); // kembali ke halaman utama sebelum membuka Akun
 });
 
-
-
-
+// ============================================================
+// SESSION (localStorage) — SDS Section 17
+// ============================================================
 
 var SESSION_KEY = 'fs_session';
 
@@ -141,9 +156,9 @@ function clearSession() {
   localStorage.removeItem(SESSION_KEY);
 }
 
-
-
-
+// ============================================================
+// UI HELPERS (Patch 7.2 — MD3 loading & feedback)
+// ============================================================
 
 function showSpinner() {
   document.getElementById('global-spinner').style.display = 'flex';
@@ -157,11 +172,20 @@ function hideSpinner() {
   if (bar) bar.classList.remove('show');
 }
 
+/**
+ * Progress feedback non-blocking untuk operasi lain (simpan laporan,
+ * upload foto, hapus laporan, ambil/lepas tugas, buat status, refresh,
+ * dsb.) — Linear Progress Indicator di App Bar + tombol pemicu berubah
+ * ke status "sedang berjalan" (disabled + label progres) agar aplikasi
+ * tidak pernah terasa freeze, tanpa menutup layar dengan overlay.
+ */
 
-
-
-
-
+/**
+ * PATCH — spinner lingkaran polos di dalam tombol diganti dot-pulse
+ * (3 titik berdenyut bergantian, lihat .btn-loading-dots di
+ * styles.html) — terasa lebih hidup dibanding spinner statis berputar,
+ * tanpa menambah dependency apa pun.
+ */
 function beginAction(buttonEl, progressLabel) {
   var bar = document.getElementById('linear-progress');
   if (bar) bar.classList.add('show');
@@ -176,8 +200,14 @@ function beginAction(buttonEl, progressLabel) {
 }
 
 
-
-
+/**
+ * PATCH — menutup Confirm Modal otomatis (bila sedang terbuka) setiap
+ * endAction() dipanggil. Ini hook TERPUSAT: seluruh fungsi hapus yang
+ * SUDAH ADA (doHapusPekerjaan, doHapusJadwal, doHapusContent_, dll)
+ * memanggil endAction(null) di withSuccessHandler/withFailureHandler
+ * mereka masing-masing — dengan baris ini, modal otomatis ikut tertutup
+ * di titik yang sama TANPA perlu mengubah fungsi-fungsi itu satu-satu.
+ */
 
 function endAction(buttonEl) {
   var bar = document.getElementById('linear-progress');
@@ -190,10 +220,10 @@ function endAction(buttonEl) {
       delete buttonEl.dataset.actionOriginalHtml;
     }
   }
-  
-  
-  
-  
+  // PATCH — hanya tutup modal bila memang sedang busy-mode (lihat
+  // showConfirmModal). Mencegah hook ini menutup modal yang sebenarnya
+  // sudah tidak terkait modal manapun (endAction dipanggil di banyak
+  // tempat di luar konteks Confirm Modal, mis. submit form Buat).
   if (confirmModalIsBusyMode) {
     var confirmOverlay = document.getElementById('confirm-modal-overlay');
     if (confirmOverlay && confirmOverlay.classList.contains('show')) {
@@ -205,11 +235,17 @@ function endAction(buttonEl) {
 var SNACKBAR_ICONS = { success: 'checkCircle', error: 'warning', warning: 'warning', info: 'notification' };
 var snackbarTimer = null;
 
+/**
+ * type: 'success' | 'error' | 'warning' | 'info' (default 'info').
+ * Style/animasi/durasi konsisten di semua tipe (Patch 7.2) — hanya
+ * warna aksen & ikon yang membedakan makna pesan.
+ */
 
-
-
-
-
+/**
+ * type: 'success' | 'error' | 'warning' | 'info'. Parameter `detail`
+ * (opsional) menampilkan baris kedua dan memperbesar toast + durasinya
+ * (untuk konfirmasi penting). Pesan lama tanpa detail tidak berubah.
+ */
 function showSnackbar(message, type, detail) {
   var el = document.getElementById('snackbar');
   var t = type || 'info';
@@ -229,7 +265,7 @@ function showSnackbar(message, type, detail) {
     title.textContent = message;
     var sub = document.createElement('span');
     sub.className = 'snackbar-detail';
-    sub.textContent = detail; 
+    sub.textContent = detail; // textContent: aman dari HTML injection
     wrap.appendChild(title);
     wrap.appendChild(sub);
     el.appendChild(wrap);
@@ -249,24 +285,24 @@ function showSnackbar(message, type, detail) {
 
 
 
-
-
-
+// ============================================================
+// NAVIGASI
+// ============================================================
 
 var currentPage = 'beranda';
-var lastMainPage = 'beranda'; 
-var pekerjaanFilterUIInitialized = false; 
+var lastMainPage = 'beranda'; // dipakai tombol "Kembali" di halaman Akun (Patch 6.1.0)
+var pekerjaanFilterUIInitialized = false; // Tahap 4 Cutover — init filter Aktivitas hanya sekali, saat halaman Aktivitas pertama kali dibuka
 
 document.getElementById('btn-open-akun').addEventListener('click', function () {
   goToPage('akun');
 });
 
-
-
-
-
-
-
+// ============================================================
+// MATERIAL SYMBOLS — inline SVG (Patch 6.1.5)
+// ============================================================
+// Dibuat manual meniru gaya "Material Symbols Outlined" — BUKAN memuat font
+// dari Google Fonts CDN, agar aplikasi tetap tidak punya dependency jaringan
+// eksternal (konsisten dengan keputusan ikon nav di Patch 6.06).
 var MD_ICONS = {
   save: '<path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7z"/><path d="M17 21v-8H7v8M7 3v5h8"/>',
   edit: '<path d="m17 3 4 4L7 21H3v-4z"/>',
@@ -353,21 +389,25 @@ function renderNav(navItems) {
   });
 }
 
-
-
+/**
+ * Perf/UX — fungsi start/stopPekerjaanAutoRefresh() didefinisikan di
+ * script-pekerjaan.html (bersama loadPekerjaanInbox()). Aman dipanggil
+ * dari sini karena seluruh file include() digabung menjadi SATU blok
+ * <script>, sehingga function declaration ter-hoist lintas file.
+ */
 
 function goToPage(pageKey) {
-  
+  // Auto-refresh Pekerjaan hanya relevan selama halaman Pekerjaan terbuka.
   if (typeof stopPekerjaanAutoRefresh === 'function') stopPekerjaanAutoRefresh();
 
-  
-  
-  
+  // Meninggalkan halaman Buat (mis. lewat nav) tanpa submit/batal
+  // eksplisit tetap membatalkan mode "Buat Laporan" (Bagian 3) — supaya
+  // kunjungan berikutnya ke Buat selalu mulai dari mode normal.
   if (pageKey !== 'buat' && buatPrefillContext) {
     resetBuatPrefillContext_();
   }
 
-  
+  // Simpan posisi scroll halaman yang sedang ditinggalkan sebelum berpindah.
   if (currentPage) {
     var session = loadSession();
     if (session) {
@@ -410,13 +450,13 @@ function goToPage(pageKey) {
     initPekerjaanForm();
   }
   if (pageKey === 'jadwal' && appBootstrap && typeof loadRiwayatPekerjaan === 'function') {
-    
-    
+    // "Riwayat" kini berisi Riwayat Pekerjaan (arsip pribadi). Filter &
+    // Unduh PDF dipindah ke Aktivitas (3.4).
     loadRiwayatPekerjaan();
   }
   if (pageKey === 'aktivitas' && appBootstrap && typeof loadAktivitasSummary === 'function') {
-    
-    
+    // Ringkasan (statistik) + timeline Pekerjaan. Filter & Unduh PDF
+    // sekarang di halaman terpisah (/exec?page=pdfrender).
     if (!pekerjaanFilterUIInitialized && typeof initPdfRenderButton_ === 'function') {
       initPdfRenderButton_();
       pekerjaanFilterUIInitialized = true;
@@ -426,7 +466,7 @@ function goToPage(pageKey) {
   }
 
 
-  
+  // Restore posisi scroll halaman yang baru ditampilkan (setelah konten dirender).
   setTimeout(function () {
     var s = loadSession();
     var savedScroll = (s && s.uiState && s.uiState.scrollPositions) ? s.uiState.scrollPositions[pageKey] : 0;
@@ -434,9 +474,9 @@ function goToPage(pageKey) {
   }, 50);
 }
 
-
-
-
+// ============================================================
+// RENDER APP (POST-LOGIN)
+// ============================================================
 
 var ROLE_LABELS = {
   admin: 'Administrator',
@@ -463,17 +503,17 @@ function renderApp(bootstrap, session) {
 
   renderNav(bootstrap.navItems);
 
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
+  // Patch 8.x (2.3) — halaman default kini ditentukan server
+  // (bootstrap.defaultPage), dikirim bersama respons login/bootstrap.
+  // Fallback ke perhitungan role tetap dijaga untuk kompatibilitas.
+  //
+  // PATCH — Shortcut ?page=buat (buat-cepat.html) mendeklarasikan
+  // FORCE_LANDING_PAGE = 'buat' supaya SELALU mendarat di form Buat apa
+  // pun defaultPage role-nya (termasuk Admin/Demo yang defaultPage
+  // normalnya 'beranda' — modul Beranda tidak dimuat di halaman
+  // shortcut ini). Di app utama, FORCE_LANDING_PAGE tidak pernah
+  // dideklarasikan (typeof === 'undefined'), jadi baris ini TIDAK
+  // berpengaruh sama sekali pada perilaku app utama.
   var lastPage;
   if (typeof FORCE_LANDING_PAGE !== 'undefined' && FORCE_LANDING_PAGE) {
     lastPage = FORCE_LANDING_PAGE;
@@ -490,17 +530,17 @@ function renderApp(bootstrap, session) {
     document.getElementById('btn-submit-report').style.display = 'none';
   }
 
-  
-  
+  // Auto-logout 30 menit tidak ada aktivitas — mulai/reset hitungan
+  // mundur begitu user berhasil masuk (login baru atau resume sesi).
   resetInactivityTimer();
 }
 
+// ============================================================
+// AUTH FLOW
+// ============================================================
 
-
-
-
-
-
+// Dipakai HANYA untuk resume sesi dari localStorage (tanpa form login) —
+// login baru langsung dapat payload bootstrap penuh, lihat handleLogin().
 function attemptBootstrap(session) {
   showSpinner();
   google.script.run
@@ -509,7 +549,7 @@ function attemptBootstrap(session) {
       if (response.success) {
         renderApp(response.data, session);
       } else {
-        
+        // Sesi tidak valid lagi (mis. user dinonaktifkan) — Final A3.
         clearSession();
         document.getElementById('screen-app').style.display = 'none';
         document.getElementById('screen-login').style.display = 'flex';
@@ -523,8 +563,13 @@ function attemptBootstrap(session) {
     .getBootstrapData(session.accessCode);
 }
 
-
-
+/**
+ * Patch 8.x (Bagian 2.3) — loginByAccessCode() sekarang mengembalikan
+ * seluruh payload bootstrap sekaligus (user, master data, navItems,
+ * jenisPekerjaanList, default page), jadi login TIDAK LAGI memanggil
+ * getBootstrapData() secara terpisah setelahnya. Startup = SATU
+ * request, bukan dua berurutan.
+ */
 function handleLogin() {
   var input = document.getElementById('input-access-code');
   var errorEl = document.getElementById('login-error');
@@ -564,8 +609,15 @@ function handleLogin() {
 }
 
 
-
-
+/**
+ * PATCH — FIX bug cache browser "nyangkut" antar akun: pageDataCache
+ * (script-pekerjaan.html) hidup di memori JS, TIDAK otomatis kosong
+ * saat logout. Tanpa reset ini, user B yang login di tab/browser yang
+ * sama persis setelah user A logout masih melihat data cache milik
+ * user A (Pekerjaan/Riwayat/Aktivitas/Jadwal/Content/Dashboard) sampai
+ * salah satu cache itu di-invalidate lewat aksi atau force-refresh.
+ * resetAllPageDataCache_() didefinisikan di script-pekerjaan.html.
+ */
 function handleLogout() {
   stopInactivityTimer();
   clearSession();
@@ -576,11 +628,11 @@ function handleLogout() {
   document.getElementById('input-access-code').value = '';
 }
 
+// ============================================================
+// AUTO-LOGOUT SETELAH 30 MENIT TIDAK ADA AKTIVITAS
+// ============================================================
 
-
-
-
-var INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; 
+var INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 menit
 var inactivityTimer = null;
 
 function stopInactivityTimer() {
@@ -591,7 +643,7 @@ function stopInactivityTimer() {
 }
 
 function resetInactivityTimer() {
-  
+  // Hanya aktif selagi user benar-benar sedang login.
   if (document.getElementById('screen-app').style.display === 'none') return;
   stopInactivityTimer();
   inactivityTimer = setTimeout(handleInactivityLogout, INACTIVITY_TIMEOUT_MS);
@@ -610,16 +662,16 @@ function handleInactivityLogout() {
 }
 
 
-
-
-
+// Aktivitas apa pun mereset hitungan mundur — dipasang sekali secara
+// global, resetInactivityTimer() sendiri yang memeriksa apakah user
+// sedang login sebelum menjadwalkan ulang.
 ['mousedown', 'keydown', 'touchstart', 'scroll'].forEach(function (evt) {
   document.addEventListener(evt, resetInactivityTimer, { passive: true });
 });
 
-
-
-
+// ============================================================
+// LOGIN & LOGOUT BUTTON LISTENERS
+// ============================================================
 
 document.getElementById('btn-login').addEventListener('click', handleLogin);
 document.getElementById('input-access-code').addEventListener('keydown', function (e) {
@@ -631,11 +683,19 @@ document.getElementById('btn-logout').addEventListener('click', function () {
   }, 'logout');
 });
 
+/**
+ * PATCH — Jaring pengaman manual: reset pageDataCache + reload halaman
+ * penuh. Reload penuh (bukan sekadar reset variabel) juga memastikan
+ * Service Worker/browser cache HTML/JS/CSS (bila ada) ikut ter-refresh,
+ * bukan hanya data runtime.
+ */
 
-
-
-
-
+/**
+ * Muat Ulang Data dengan determinate progress. TIDAK reload halaman.
+ * Progres = langkah yang benar-benar selesai (1 reset cache + N
+ * panggilan server berurutan). Hasil langsung diisikan ke
+ * pageDataCache sehingga halaman yang dibuka sesudahnya sudah segar.
+ */
 var reloadRunning = false;
 
 function setReloadProgress_(done, total, text, isError) {
@@ -671,7 +731,7 @@ function runReloadAppData_() {
       run: function (ok, fail) { google.script.run.withSuccessHandler(ok).withFailureHandler(fail).getHomeBootstrap(ac); },
       apply: function (d) { pageDataCache.dashboard = d.dashboard; pageDataCache.content = d.content; } }
   ];
-  var total = steps.length + 1; 
+  var total = steps.length + 1; // +1 = reset cache lokal
 
   document.getElementById('reload-actions').style.display = 'none';
   document.getElementById('reload-overlay').classList.add('show');
@@ -717,12 +777,12 @@ var btnReloadRetry = document.getElementById('btn-reload-retry');
 if (btnReloadRetry) btnReloadRetry.addEventListener('click', function () { reloadRunning = false; runReloadAppData_(); });
 var btnReloadClose = document.getElementById('btn-reload-close');
 if (btnReloadClose) btnReloadClose.addEventListener('click', closeReloadOverlay_);
-
-
-
-
-
-
+// ============================================================
+// HEADER HIDE ON SCROLL (seperti Twitter/Facebook)
+// ============================================================
+// Scroll turun -> header disembunyikan. Scroll naik -> muncul lagi.
+// Selalu tampil saat berada di dekat puncak halaman. THRESHOLD
+// mencegah header berkedip karena gerakan scroll yang sangat kecil.
 
 (function setupHideOnScrollHeader() {
   var header = document.querySelector('header.app-header');
@@ -733,7 +793,7 @@ if (btnReloadClose) btnReloadClose.addEventListener('click', closeReloadOverlay_
   var lastY = 0;
   var ticking = false;
 
-  
+  // Posisi scroll dari elemen mana pun yang sedang dipakai browser.
   function currentY(target) {
     if (target && target !== document && target !== window && typeof target.scrollTop === 'number') {
       return target.scrollTop;
@@ -753,8 +813,8 @@ if (btnReloadClose) btnReloadClose.addEventListener('click', closeReloadOverlay_
     ticking = false;
   }
 
-  
-  
+  // capture:true menangkap scroll dari elemen mana pun (scroll tidak
+  // bubbling), jadi tetap bekerja walau yang scroll bukan window.
   document.addEventListener('scroll', function (e) {
     if (ticking) return;
     ticking = true;

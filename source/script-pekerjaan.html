@@ -1,19 +1,19 @@
 <script>
-
-
-
-
+// ============================================================
+// PEKERJAAN — FORM "BUAT" (Tahap 4 Cutover — form dinamis pengganti
+// form Laporan & form Penugasan terpisah lama)
+// ============================================================
 
 var MAX_PHOTOS = 3;
-var selectedPhotos = []; 
+var selectedPhotos = []; // { base64, mimeType, previewUrl } — foto kondisi awal (atau foto penuntasan pada mode "Buat Laporan")
 var activePhotoSlotIndex = null;
 
-
-
-
-
-
-
+// 3.1 — Dropdown Jenis difilter PER ROLE di frontend. Validasi "siapa
+// boleh membuat" TETAP ditegakkan backend (createPekerjaan) — filter
+// ini murni UX, bukan satu-satunya lapisan keamanan.
+// PATCH — Admin job desk murni dispatcher: hanya Penugasan. Validasi
+// SERVER-SIDE (createPekerjaan, pekerjaan.gs) juga WAJIB diterapkan di
+// samping filter dropdown ini — filter ini murni UX.
 var JENIS_ROLE_FILTER = {
   admin: ['penugasan'],
   fs: ['lapor_kerusakan', 'permintaan', 'kebersihan', 'perbaikan', 'lainnya'],
@@ -21,8 +21,16 @@ var JENIS_ROLE_FILTER = {
 };
 
 
-
-
+/**
+ * Patch Bug Navigasi & Workflow (Bagian 3) — konteks prefill saat form
+ * "Buat" dibuka lewat tombol "Buat Laporan" dari sebuah Pekerjaan yang
+ * sedang DIKERJAKAN (lihat openBuatLaporanForPekerjaan()). null berarti
+ * form beroperasi dalam mode normal (createPekerjaan). Saat terisi,
+ * submit form memanggil selesaikanPekerjaan() TERHADAP pekerjaanId yang
+ * sama (bukan membuat Pekerjaan baru) — TIDAK ADA business logic baru,
+ * murni memakai ulang endpoint selesaikanPekerjaan yang sudah ada
+ * (sebelumnya hanya bisa diakses lewat modal "Selesaikan").
+ */
 var buatPrefillContext = null;
 
 function updateJenisIcon() {
@@ -38,9 +46,9 @@ function updateJenisIcon() {
 
 function updateAssignmentFieldsVisibility() {
   var jenisSelect = document.getElementById('form-jenis');
-  
-  
-  
+  // Mode "Buat Laporan" (prefill) selalu menyembunyikan field Mode
+  // Penugasan/Petugas Penerima — konteksnya sudah pekerjaan yang ada,
+  // bukan pembuatan Penugasan baru (Bagian 3).
   var isPenugasan = !buatPrefillContext && jenisSelect.value === 'penugasan';
   var modeGroup = document.getElementById('form-assignment-mode-group');
   if (modeGroup) modeGroup.style.display = isPenugasan ? 'block' : 'none';
@@ -70,8 +78,14 @@ function attachFormBuatListenersOnce_() {
 }
 
 
-
-
+/**
+ * PATCH — "Waktu Laporan" (hanya arah Mandiri). Default state tertutup
+ * ("Sekarang (otomatis)"), tap "Ubah" membuka picker datetime-local +
+ * preview teks format Indonesia lengkap. Reuse JENIS_MANDIRI_SET_ yang
+ * sudah ada (dipakai showPekerjaanSuccessCard) dan INDO_DAY_NAMES_
+ * (script-jadwal.html, SATU sumber kebenaran nama hari — sudah
+ * ter-include lebih dulu baik di index.html maupun buat-cepat.html).
+ */
 var INDO_MONTH_FULL_ = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 
 function formatDatetimeLocalInput_(d) {
@@ -79,7 +93,7 @@ function formatDatetimeLocalInput_(d) {
   return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
 }
 
- 
+/** "2026-10-04T20:25" (value datetime-local) -> "Minggu, 04 Oktober 2026 · 20:25". */
 function formatPerformedAtPreview_(datetimeLocalValue) {
   var d = new Date(datetimeLocalValue);
   if (isNaN(d.getTime())) return '';
@@ -98,8 +112,9 @@ function setPerformedAtBounds_() {
   input.min = minStr;
 }
 
-
-
+/** Kembali ke state tertutup ("Sekarang (otomatis)") — input dikosongkan
+ * supaya submit handler mengirim performedAt='' (backend default ke
+ * `now`, perilaku identik sebelum fitur ini ada). */
 function collapsePerformedAt_() {
   var input = document.getElementById('form-performed-at');
   if (input) input.value = '';
@@ -160,8 +175,11 @@ function updatePerformedAtFieldVisibility() {
 }
 
 
-
-
+/**
+ * Menyalakan/mematikan tampilan mode "Buat Laporan" (prefill) pada form
+ * Buat — Jenis & Lantai dikunci (locked-field) karena nilainya sudah
+ * ditentukan oleh Pekerjaan asal, bukan pilihan bebas (Bagian 3).
+ */
 function applyBuatModeUI_() {
   var isComplete = !!buatPrefillContext;
 
@@ -206,8 +224,12 @@ function applyBuatModeUI_() {
   if (submitBtn) submitBtn.innerHTML = mdIcon(isComplete ? 'checkCircle' : 'upload', 18) + '<span>' + (isComplete ? 'Kirim Laporan' : 'Simpan & Kirim') + '</span>';
 }
 
-
-
+/**
+ * Dipanggil dari tombol "Buat Laporan" pada kartu Pekerjaan yang sedang
+ * DIKERJAKAN (Menu Pekerjaan) — Bagian 2 & 3 Patch Bug Navigasi &
+ * Workflow. Prefill Lantai, Subjek, Keterangan, dan Job ID dari data
+ * Pekerjaan yang dipilih, lalu arahkan ke halaman Buat.
+ */
 
 function openBuatLaporanForPekerjaan(p) {
   buatPrefillContext = {
@@ -215,7 +237,7 @@ function openBuatLaporanForPekerjaan(p) {
     jenis: 'penugasan',
     floorCode: p.floorCode,
     subject: p.subject || '',
-    description: '' 
+    description: '' // keterangan penuntasan harus kosong, bukan salinan keterangan penugasan
   };
   goToPage('buat');
 }
@@ -239,7 +261,7 @@ function initPekerjaanForm() {
     jenisSelect.appendChild(opt);
   });
 
-  
+  // Lantai
   var floorSelect = document.getElementById('form-floor');
   floorSelect.innerHTML = '<option value="">Pilih lantai</option>';
   (appBootstrap.master.floors || []).forEach(function (f) {
@@ -249,7 +271,7 @@ function initPekerjaanForm() {
     floorSelect.appendChild(opt);
   });
 
-  
+  // Petugas Penerima (Direct Assignment)
   var targetSelect = document.getElementById('form-target-user');
   if (targetSelect) {
     targetSelect.innerHTML = '<option value="">Pilih petugas</option>';
@@ -285,8 +307,11 @@ function resetBuatPrefillContext_() {
   buatPrefillContext = null;
 }
 
-
-
+/**
+ * Progres pengisian form — Jenis, Lantai, Keterangan, dan foto
+ * masing-masing berkontribusi 25%. Subjek tidak dihitung karena
+ * eksplisit opsional.
+ */
 function updateFormProgress() {
   var progressEl = document.getElementById('form-progress-text');
   if (!progressEl) return;
@@ -306,11 +331,19 @@ function updateFormProgress() {
   progressEl.textContent = 'Progres: ' + percent + '% | ' + photoCount + ' Foto Terpilih';
 }
 
+// ------------------- PHOTO SLOTS (foto kondisi awal) -------------------
 
 
-
-
-
+/**
+ * PATCH — redesain slot foto berlabel. Kelas 'photo-slot-v2' SENGAJA
+ * BARU (bukan 'photo-slot' lama) — 'photo-slot'/'photo-slots' masih
+ * dipakai slot gambar Content Management (renderContentImageSlot_,
+ * script-jadwal.html), jadi dipisah supaya perubahan ini TIDAK ikut
+ * mengubah tampilan form Content Management. Caption per slot MURNI
+ * visual/saran urutan pengambilan foto — ketiganya tetap tersimpan
+ * generik sebagai array (initial_photos_json/completion_photos_json),
+ * tidak ada perbedaan perlakuan data per index.
+ */
 var PHOTO_SLOT_CAPTIONS_ = ['Foto Kondisi Awal', 'Foto Hasil / Sesudah', 'Foto Detail Tambahan'];
 
 function renderPhotoSlots() {
@@ -363,8 +396,17 @@ function renderPhotoSlots() {
 
   updateFormProgress();
 }
-
-
+/**
+ * Patch 10.x Bagian 3 — Perbaikan Upload Foto. Kontrol pemilihan sumber
+ * dipindah ke level aplikasi lewat Bottom Sheet — "Ambil Foto" memakai
+ * atribut capture="environment" (memaksa kamera), "Pilih dari Galeri"
+ * tanpa capture (Photo Picker/galeri seperti biasa).
+ *
+ * Generik lewat parameter targetInputId (default 'photo-file-input') —
+ * dipakai bersama oleh form Buat DAN oleh slot gambar Content Management
+ * (#content-image-file-input, script-jadwal.html) — satu implementasi,
+ * tidak diduplikasi.
+ */
 function openPhotoSourceSheet(targetInputId) {
   var inputId = targetInputId || 'photo-file-input';
   openBottomSheet([
@@ -399,8 +441,12 @@ document.getElementById('photo-file-input').addEventListener('change', function 
   });
 });
 
-
-
+/**
+ * Kompresi foto di client (Section 18.2):
+ * resize sisi terpanjang maks 1280px, JPEG, kompresi adaptif target ±100KB.
+ * Generik — dipakai baik oleh foto kondisi awal maupun foto penuntasan,
+ * juga oleh gambar Content Management.
+ */
 function compressImage(file) {
   return new Promise(function (resolve, reject) {
     var reader = new FileReader();
@@ -444,14 +490,14 @@ function compressImage(file) {
   });
 }
 
-
+// ------------------- SUBMIT PEKERJAAN -------------------
 
 document.getElementById('btn-submit-report').addEventListener('click', function () {
   var errorEl = document.getElementById('form-report-error');
   errorEl.textContent = '';
 
-  
-  
+  // Mode "Buat Laporan" (Bagian 3) — menyelesaikan Pekerjaan yang SUDAH
+  // ADA lewat selesaikanPekerjaan(), bukan membuat Pekerjaan baru.
   if (buatPrefillContext) {
     submitBuatLaporanCompletion_();
     return;
@@ -522,8 +568,10 @@ var performedAtEl = document.getElementById('form-performed-at');
     .createPekerjaan(session.accessCode, data);
 });
 
-
-
+/**
+ * Submit form Buat dalam mode "Buat Laporan" (Bagian 3) — memanggil
+ * selesaikanPekerjaan() dengan pekerjaanId dari konteks prefill.
+ */
 function submitBuatLaporanCompletion_() {
   var errorEl = document.getElementById('form-report-error');
   var descEl = document.getElementById('form-description');
@@ -568,7 +616,7 @@ function submitBuatLaporanCompletion_() {
     .selesaikanPekerjaan(session.accessCode, pekerjaanId, data);
 }
 
-
+// ------------------- SUCCESS CARD -------------------
 
 var JENIS_MANDIRI_SET_ = ['kebersihan', 'perbaikan', 'lainnya'];
 
@@ -608,10 +656,10 @@ document.getElementById('btn-buat-laporan-lagi').addEventListener('click', funct
 
 document.getElementById('btn-lihat-riwayat-setelah-submit').addEventListener('click', function () {
   hidePekerjaanSuccessCard();
-  
-  
-  
-  
+  // PATCH — di app utama, loadRiwayatPekerjaan() selalu ada (script-jadwal.html
+  // ter-include), jadi goToPage('jadwal') berjalan normal. Di halaman
+  // shortcut (buat-cepat.html), modul itu TIDAK dimuat — arahkan ke app
+  // utama; sesi sudah tersimpan di localStorage jadi otomatis resume.
   if (typeof loadRiwayatPekerjaan === 'function') {
     goToPage('jadwal');
   } else {
@@ -619,21 +667,21 @@ document.getElementById('btn-lihat-riwayat-setelah-submit').addEventListener('cl
   }
 });
 
-
-
-
+// ============================================================
+// BROWSER STATE CACHE — Patch 6.05 (Performance & Navigation Optimization)
+// ============================================================
 
 var pageDataCache = {
-  dashboard: null,               
-  pekerjaanInbox: null,          
-  pekerjaanRiwayatByKey: {},     
-  content: null,                 
-  pekerjaanAktivitas: null,      
-  jadwalAktif: null              
+  dashboard: null,               // { stats } (Patch 10.x — reminders dihapus)
+  pekerjaanInbox: null,          // [...] daftar inbox (Menu Pekerjaan)
+  pekerjaanRiwayatByKey: {},     // { '<filters JSON>': [...] }
+  content: null,                 // [...] Content Management aktif (Patch 10.x)
+  pekerjaanAktivitas: null,      // [...] timeline seluruh tim
+  jadwalAktif: null              // [...] Jadwal Piket & Libur Pengganti (Patch 10.x)
 };
 
-
-
+/** Seluruh cache Pekerjaan basi setelah mutasi apa pun (Create/Ambil/
+ * Lepas/Selesaikan/Hapus) — pola event-driven cache Patch 8.0. */
 function invalidateAllPekerjaanCaches_() {
   pageDataCache.pekerjaanInbox = null;
   pageDataCache.pekerjaanRiwayatByKey = {};
@@ -641,8 +689,14 @@ function invalidateAllPekerjaanCaches_() {
   pageDataCache.dashboard = null;
 }
 
-
-
+/**
+ * PATCH — Reset TOTAL seluruh pageDataCache, dipanggil SATU-SATUNYA
+ * saat logout (handleLogout, script-core.html). Lebih luas dari
+ * invalidateAllPekerjaanCaches_() di atas (yang hanya cache Pekerjaan,
+ * dipakai event-driven setelah mutasi) — ini mengosongkan SEMUA field
+ * termasuk content & jadwalAktif, supaya user berikutnya yang login di
+ * tab/browser yang sama tidak pernah melihat data user sebelumnya.
+ */
 function resetAllPageDataCache_() {
   pageDataCache.dashboard = null;
   pageDataCache.pekerjaanInbox = null;
@@ -663,8 +717,11 @@ function renderSkeleton(containerId, lineCount) {
   el.innerHTML = html;
 }
 
-
-
+/**
+ * PATCH: skeleton berbentuk kartu daftar Pekerjaan + pesan & spinner.
+ * Dipakai Menu Pekerjaan, Riwayat, dan Aktivitas supaya satu bahasa
+ * visual. renderSkeleton() lama tetap dipakai untuk kotak Ringkasan.
+ */
 function renderListSkeleton_(containerId, cardCount, message) {
   var el = document.getElementById(containerId);
   if (!el) return;
@@ -691,8 +748,9 @@ function renderListSkeleton_(containerId, cardCount, message) {
   el.innerHTML = html;
 }
 
-
-
+/**
+ * Perf — debounce ringan untuk input pencarian.
+ */
 function debounce_(fn, delayMs) {
   var timer = null;
   return function () {
@@ -703,10 +761,10 @@ function debounce_(fn, delayMs) {
   };
 }
 
-
-
-
-
+// ============================================================
+// KOMPONEN BERSAMA — Badge Jenis/Status Pekerjaan, Kartu, Bottom Sheet,
+// Detail, Modal Selesaikan (dipakai bersama Pekerjaan/Riwayat/Aktivitas)
+// ============================================================
 
 var JENIS_PEKERJAAN_BADGE = {
   kebersihan: { label: 'Kebersihan', cls: 'badge-available', icon: 'broom' },
@@ -728,8 +786,12 @@ var STATUS_BUBBLE_COLOR = {
   'badge-info':      { bg: 'var(--status-info-bg)',      fg: 'var(--status-info-fg)' }
 };
 
-
-
+/**
+ * Membangun satu kartu operasional gaya "v2": ikon kategori di kiri, badge
+ * + meta ber-ikon + judul/keterangan di tengah, thumbnail representatif +
+ * overlay jumlah foto di kanan. Dipakai bersama oleh render Pekerjaan
+ * (inbox/riwayat/aktivitas) agar satu bahasa visual konsisten.
+ */
 function createOpCardV2(cfg) {
   var card = document.createElement('div');
   card.className = 'op-card op-card-v2';
@@ -844,8 +906,17 @@ function createOpCardV2(cfg) {
 }
 
 
-
-
+/**
+ * Kartu Menu Pekerjaan (inbox) — gaya visual DISELARASKAN dengan
+ * buildPekerjaanListCard_ (Riwayat/Aktivitas, script-jadwal.html) agar
+ * satu bahasa visual konsisten di seluruh daftar Pekerjaan. Bedanya
+ * HANYA baris aksi (Ambil/Lepas/Buat Laporan) yang muncul kontekstual
+ * di bawah info petugas — tombol titik-tiga (moreVert) DIHAPUS, seluruh
+ * kartu bisa diklik untuk membuka Detail (chevron), sama seperti
+ * Riwayat/Aktivitas. Opsi Ubah/Hapus tetap tersedia lewat Detail
+ * (openPekerjaanDetail sudah punya tombol canUbah/canHapus) — tidak ada
+ * fungsi yang hilang, murni dipindah ke satu pintu yang konsisten.
+ */
 function buildPekerjaanInboxCard_(p) {
   var jenisInfo = JENIS_PEKERJAAN_BADGE[p.jenis] || { label: p.jenis, cls: 'badge-neutral', icon: 'description' };
   var statusCls = STATUS_PEKERJAAN_BADGE_CLASS[p.status] || 'badge-neutral';
@@ -900,13 +971,13 @@ function buildPekerjaanInboxCard_(p) {
   main.appendChild(personRow);
 
 
-  
-  
-  
-  
-  
-  
-  
+  // PATCH — Lepas dipindah ke Detail (lihat openPekerjaanDetail).
+  // Kartu inbox sekarang hanya punya 1 tombol aksi:
+  // - canAmbil -> "Ambil Pekerjaan", transform in-place jadi
+  //   "Buat Laporan" setelah sukses (lihat doAmbilPekerjaanInline_).
+  // - canLepas (sudah diambil, milik user ini) -> langsung "Buat
+  //   Laporan" di kartu (shortcut tercepat untuk kasus paling umum:
+  //   FS sedang kerjakan lalu lapor), Lepas tetap tersedia via Detail.
   if (p.canAmbil || p.canLepas) {
     var actionsRow = document.createElement('div');
     actionsRow.className = 'list-card-actions-row';
@@ -975,15 +1046,22 @@ function buildPekerjaanInboxCard_(p) {
 
 
 
-
-
+/**
+ * Foto representatif satu kartu — completion jika ada, fallback ke
+ * initial (pola sama dgn PDF Bagian 4.1 backend, simetris).
+ */
 function pilihFotoKartu_(p) {
   return (p.completionPhotos && p.completionPhotos.length > 0) ? p.completionPhotos : p.initialPhotos;
 }
 
 
-
-
+/**
+ * PATCH — Jendela waktu hapus dihapus total (keputusan Product Owner).
+ * Popup peringatan diperjelas supaya user sadar ini aksi PERMANEN TANPA
+ * BATAS WAKTU — bisa menghapus Pekerjaan lama sekalipun, termasuk
+ * dampaknya ke statistik periode lalu & Card Telegram yang mungkin jadi
+ * tidak ter-update lagi.
+ */
 
 
 function confirmHapusPekerjaan(pekerjaanId, onMutated) {
@@ -1017,7 +1095,7 @@ function doHapusPekerjaan(pekerjaanId, onMutated) {
     .hapusPekerjaan(session.accessCode, pekerjaanId);
 }
 
- 
+/** "11/10/2026 21:24" -> "Minggu, 11/10/26 • 21:24". */
 function formatDetailDateTime_(ddmmyyyyHHmm) {
   if (!ddmmyyyyHHmm) return '';
   var parts = String(ddmmyyyyHHmm).split(' ');
@@ -1097,7 +1175,7 @@ function openPekerjaanDetail(p) {
     actionsWrap.style.flexDirection = 'column';
     actionsWrap.style.gap = '10px';
 
-    
+    // PATCH — Lepas Pekerjaan dipindah ke sini dari kartu inbox.
     if (p.canLepas) {
       var lepasBtn = document.createElement('button');
       lepasBtn.className = 'btn-outlined danger';
@@ -1113,7 +1191,7 @@ function openPekerjaanDetail(p) {
       actionsWrap.appendChild(lepasBtn);
     }
 
-        
+        // PATCH — Edit/Batalkan Laporan Penuntasan (HANYA Penugasan SELESAI).
     if (p.canUbahPenuntasan || p.canBatalkanPenuntasan) {
       var penuntasanHeading = document.createElement('p');
       penuntasanHeading.className = 'form-label';
@@ -1207,16 +1285,19 @@ function openPekerjaanDetail(p) {
 
 
 
-
-
+/** Refresh daftar Pekerjaan pada halaman yang sedang aktif — dipakai
+ * setelah Ubah/Hapus dari Detail (yang bisa dibuka dari Inbox, Riwayat,
+ * maupun Aktivitas, jadi tidak tahu di muka harus me-refresh yang mana). */
 function refreshCurrentPekerjaanPage_() {
   if (currentPage === 'pekerjaan') loadPekerjaanInbox(true);
   else if (currentPage === 'jadwal') loadRiwayatPekerjaan(true);
   else if (currentPage === 'aktivitas') loadPekerjaanAktivitas(true);
 }
 
-
-
+/**
+ * Form Ubah Pekerjaan (Subjek/Keterangan saja) — menggantikan konten
+ * overlay Detail sementara, reuse class form yang sudah ada.
+ */
 
 function openPekerjaanEditForm_(p) {
   var isMandiri = p.arah === 'mandiri';
@@ -1295,8 +1376,10 @@ function openPekerjaanEditForm_(p) {
 }
 
 
-
-
+/**
+ * PATCH — Eksekusi Batalkan Laporan Penuntasan. Pola sama persis
+ * doLepasPekerjaan/doHapusPekerjaan (busy-mode Confirm Modal).
+ */
 function doBatalkanPenuntasan_(pekerjaanId) {
   var session = loadSession();
   beginAction(null, 'Membatalkan...');
@@ -1322,8 +1405,10 @@ function doBatalkanPenuntasan_(pekerjaanId) {
     .batalkanPenuntasanPekerjaan(session.accessCode, pekerjaanId);
 }
 
-
-
+/**
+ * PATCH — Form Ubah Catatan Penuntasan. Pola sama openPekerjaanEditForm_,
+ * HANYA 1 field (completion_notes), foto TIDAK bisa diubah di sini.
+ */
 function openPenuntasanEditForm_(p) {
   var body = document.getElementById('activity-detail-body');
   body.innerHTML =
@@ -1373,9 +1458,9 @@ function openPenuntasanEditForm_(p) {
 }
 
 
-
-
-
+// ============================================================
+// KOMENTAR pada Detail Pekerjaan
+// ============================================================
 
 function renderKomentarSection_(p, body) {
   var section = document.createElement('div');
@@ -1398,7 +1483,7 @@ function loadKomentar_(p) {
   google.script.run
     .withSuccessHandler(function (response) {
       listEl = document.getElementById('komentar-list');
-      if (!listEl) return; 
+      if (!listEl) return; // Detail sudah ditutup
       if (!response.success) { listEl.innerHTML = '<div class="komentar-empty">' + response.error + '</div>'; return; }
       p.commentCount = response.data.komentar.length;
       renderKomentarList_(p, response.data.komentar);
@@ -1435,7 +1520,7 @@ function renderKomentarList_(p, list) {
 
     var text = document.createElement('div');
     text.className = 'komentar-text';
-    text.textContent = k.text; 
+    text.textContent = k.text; // textContent: aman dari HTML injection
     item.appendChild(text);
 
     if (k.canUbah || k.canHapus) {
@@ -1507,7 +1592,7 @@ function doHapusKomentar_(p, komentarId) {
   beginAction(null, 'Menghapus...');
   google.script.run
     .withSuccessHandler(function (response) {
-      endAction(null); 
+      endAction(null); // juga menutup Confirm Modal (busy-mode)
       if (!response.success) { showSnackbar(response.error, 'error'); return; }
       showSnackbar('Komentar dihapus.', 'success');
       invalidateAllPekerjaanCaches_();
@@ -1522,7 +1607,7 @@ function doHapusKomentar_(p, komentarId) {
 
 function renderKomentarForm_(p, canKirim) {
   var wrap = document.getElementById('komentar-form-wrap');
-  if (!wrap || wrap.dataset.rendered) return; 
+  if (!wrap || wrap.dataset.rendered) return; // render sekali agar teks yang sedang diketik tidak hilang
   wrap.dataset.rendered = '1';
   if (!canKirim) { wrap.innerHTML = '<div class="komentar-empty">Akun Demo hanya dapat melihat komentar.</div>'; return; }
 
@@ -1555,7 +1640,7 @@ function renderKomentarForm_(p, canKirim) {
 }
 
 
- 
+/** Baris detail dengan ikon di depan label — reuse .icon-slot. */
 function detailRowWithIcon_(iconName, label, value) {
   return '<div class="activity-detail-row">' +
     '<span class="label" style="display:flex; align-items:center; gap:8px;"><span class="icon-slot">' + mdIcon(iconName, 16) + '</span>' + label + '</span>' +
@@ -1563,9 +1648,9 @@ function detailRowWithIcon_(iconName, label, value) {
   '</div>';
 }
 
-
-
-
+// ============================================================
+// MENU PEKERJAAN — Halaman Inbox (Tahap 4 Cutover, pengganti Task lama)
+// ============================================================
 
 var PEKERJAAN_AUTO_REFRESH_MS = 60000;
 var pekerjaanAutoRefreshTimer = null;
@@ -1618,7 +1703,7 @@ function initPekerjaanInboxPage() {
   loadPekerjaanInbox();
 }
 
- 
+/** Dropdown filter status. Pola & CSS sama dengan filter Aktivitas. */
 function renderPekerjaanFilter_() {
   var btn = document.getElementById('btn-pekerjaan-filter');
   var menu = document.getElementById('pekerjaan-filter-menu');
@@ -1688,12 +1773,12 @@ function loadPekerjaanInbox(force) {
       }
       pageDataCache.pekerjaanInbox = response.data.pekerjaan;
       renderPekerjaanInboxList(response.data.pekerjaan);
-      
-      
-      
-      
-      
-      
+      // PATCH — Jaring pengaman: SELALU matikan bar setelah render
+      // selesai, apa pun yang memicu loadPekerjaanInbox(true) (Ambil,
+      // Lepas, pull-to-refresh, auto-refresh 60 detik, dll). Mencegah
+      // bar "menggantung" akibat tumpang-tindih pemanggilan
+      // beginAction/endAction dari aksi-aksi yang terjadi berurutan
+      // cepat.
       var bar2 = document.getElementById('linear-progress');
       if (bar2) bar2.classList.remove('show');
     })
@@ -1755,10 +1840,25 @@ function doAmbilPekerjaan(pekerjaanId) {
 }
 
 
+/**
+ * PATCH — FIX bug "card tidak sinkron setelah Ambil" (status masih
+ * tampil 'Menunggu Diambil', tombol Lepas tidak muncul di Detail sampai
+ * refresh manual). Akar masalah SEBELUMNYA: hanya tombol & field
+ * p.status/p.handledBy yang ditambal manual — badge status di kartu,
+ * p.statusLabel, p.canLepas, p.canAmbil TIDAK ikut diperbarui, membuat
+ * objek `p` dalam state SEPARUH MATANG yang lalu dipakai Detail
+ * (openPekerjaanDetail) sehingga tombol Lepas gagal muncul.
+ *
+ * FIX: setelah ambilPekerjaan() sukses, panggil getPekerjaanList()
+ * ULANG (ringan — 1 row saja secara efektif karena filter di client)
+ * untuk mendapat OBJEK PEKERJAAN YANG BENAR-BENAR FRESH dari server
+ * (statusLabel/canLepas/canAmbil semua terhitung benar oleh backend,
+ * SATU sumber kebenaran — bukan ditambal manual di frontend lagi).
+ * Kartu LAMA di-replace total dengan kartu baru hasil
+ * buildPekerjaanInboxCard_(freshP) — bukan cuma ubah tombolnya saja.
+ */
 
-
-
- 
+/** Bar progres kecil di dalam kartu. set(pct) menaikkan bar & teks. */
 function attachCardProgress_(cardEl) {
   var main = cardEl && cardEl.querySelector('.list-card-row-main');
   if (!main) return { set: function () {}, remove: function () {} };
@@ -1781,8 +1881,11 @@ function attachCardProgress_(cardEl) {
   };
 }
 
-
-
+/**
+ * Ambil Pekerjaan in-place. Progres kartu mengikuti tahap NYATA:
+ * 10% mulai -> 55% pengambilan berhasil di server -> 100% data kartu
+ * terbaru diterima. Kartu lalu diganti kartu segar dari server.
+ */
 function doAmbilPekerjaanInline_(buttonEl, p) {
   var session = loadSession();
   var cardEl = buttonEl.closest('.list-card');
@@ -1848,8 +1951,17 @@ function doLepasPekerjaan(pekerjaanId) {
   }, 'delete', true, 'Melepas...');
 }
 
-
-
+/**
+ * PATCH — FIX bug "popup Lepas tidak pernah tertutup, terlihat freeze".
+ * Akar masalah: endAction(null) sengaja TIDAK dipanggil di jalur sukses
+ * (patch sebelumnya, untuk cegah race bar loading dengan
+ * loadPekerjaanInbox). TAPI endAction() jugalah satu-satunya titik yang
+ * otomatis menutup Confirm Modal (hook di script-core.html) — sehingga
+ * modal tidak pernah tertutup di jalur ini. FIX: panggil
+ * hideConfirmModal() SECARA EKSPLISIT & SEGERA begitu response diterima
+ * (terpisah dari urusan bar, yang tetap ditangani loadPekerjaanInbox
+ * sendiri seperti sebelumnya — TIDAK diubah).
+ */
 function executeLepasPekerjaan(pekerjaanId) {
   var session = loadSession();
   beginAction(null, 'Melepas...');
