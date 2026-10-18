@@ -8,12 +8,26 @@ const CACHE = CACHE_PREFIX + '__BUILD_ID__';
 const LEGACY_CACHE_RE = /^fastapp-[0-9a-f]{10}$/; // format lama versi sebelumnya
 const SHELL = __SHELL__;
 
+// Pemasangan ATOMIK: semua berkas kritis harus terunduh utuh (cache:'reload' = lewati cache HTTP
+// browser, jadi tidak pernah menyimpan salinan lama dari GitHub Pages yang ber-max-age 10 menit).
+// Gagal satu saja -> install ditolak, service worker lama tetap melayani (rollback otomatis).
 self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE)
-      .then((c) => Promise.all(SHELL.map((u) => c.add(u).catch(() => {}))))
-      .then(() => self.skipWaiting())
-  );
+  e.waitUntil((async () => {
+    const cache = await caches.open(CACHE);
+    const fresh = (u) => new Request(u, { cache: 'reload' });
+    try {
+      await Promise.all(SHELL.critical.map(async (u) => {
+        const res = await fetch(fresh(u));
+        if (!res.ok) throw new Error('precache gagal: ' + u + ' (' + res.status + ')');
+        await cache.put(u, res);
+      }));
+    } catch (err) {
+      await caches.delete(CACHE);
+      throw err;
+    }
+    await Promise.all(SHELL.optional.map((u) => fetch(fresh(u)).then((r) => (r.ok ? cache.put(u, r) : null)).catch(() => {})));
+    await self.skipWaiting();
+  })());
 });
 
 self.addEventListener('activate', (e) => {
@@ -24,22 +38,47 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-// Network-first: pembaruan selalu terambil; cache hanya cadangan saat offline.
+self.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
+// Network-first dengan revalidasi (cache:'no-cache' -> 304 murah bila belum berubah, sehingga tidak
+// pernah tersaji salinan HTTP lama). Jaringan lambat > 4 dtk -> pakai cache sambil menunggu jaringan.
+const NETWORK_TIMEOUT_MS = 4000;
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
-  if (!url.pathname.startsWith(SCOPE_PATH)) return; // hanya path aplikasi ini
-  e.respondWith(
-    fetch(req)
-      .then((res) => {
-        if (res && res.ok) { const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy)); }
-        return res;
-      })
-      .catch(() => caches.match(req, { ignoreSearch: true })
-        .then((r) => r || (req.mode === 'navigate' ? caches.match('index.html') : Response.error())))
-  );
+  if (!url.pathname.startsWith(SCOPE_PATH)) return;        // hanya path aplikasi ini
+  if (url.pathname.endsWith('/version.json')) return;      // pemeriksaan versi selalu langsung ke jaringan
+  e.respondWith(new Promise((resolve) => {
+    let done = false;
+    const cached = () => caches.match(req, { ignoreSearch: true })
+      .then((r) => r || (req.mode === 'navigate' ? caches.match('index.html') : null));
+    const timer = setTimeout(() => {
+      cached().then((r) => { if (r && !done) { done = true; resolve(r); } });
+    }, NETWORK_TIMEOUT_MS);
+
+    fetch(req, { cache: 'no-cache' }).then((res) => {
+      clearTimeout(timer);
+      if (res && res.ok) {
+        const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy));
+        if (!done) { done = true; resolve(res); }
+        return;
+      }
+      // Deploy bermasalah (berkas hilang / server error): pakai salinan yang pernah berhasil bila ada.
+      if (res && (res.status === 404 || res.status >= 500)) {
+        cached().then((r) => { if (!done) { done = true; resolve(r || res); } });
+        return;
+      }
+      if (!done) { done = true; resolve(res); }
+    }).catch(() => {
+      clearTimeout(timer);
+      if (done) return;
+      cached().then((r) => { done = true; resolve(r || Response.error()); });
+    });
+  }));
 });
 
 // ---------------------------------------------------------------------------
