@@ -1654,61 +1654,78 @@ function renderKomentarList_(p, list) {
     listEl.innerHTML = '<div class="komentar-empty">Belum ada komentar.</div>';
     return;
   }
-  list.forEach(function (k) {
-    var item = document.createElement('div');
-    item.className = 'komentar-item';
+  var chat = document.createElement('div');
+  chat.className = 'komentar-chat';
 
-    var meta = document.createElement('div');
-    meta.className = 'komentar-meta';
+  list.forEach(function (k) {
+    // Tampilan bubble ala chat: komentar pemilik laporan di kanan, lainnya di kiri.
+    var isOwnerReport = !!p.createdBy && k.userCode === p.createdBy;
+    var row = document.createElement('div');
+    row.className = 'komentar-row ' + (isOwnerReport ? 'right' : 'left');
+
+    var item = document.createElement('div');
+    item.className = 'komentar-bubble ' + (isOwnerReport ? 'owner' : 'other');
+
+    var head = document.createElement('div');
+    head.className = 'komentar-bubble-head';
     var name = document.createElement('span');
     name.className = 'name';
     name.textContent = k.userName;
-    meta.appendChild(name);
-    var when = document.createElement('span');
-    when.textContent = k.createdAt + (k.edited ? ' \u00b7 diedit' : '');
-    meta.appendChild(when);
-    item.appendChild(meta);
+    head.appendChild(name);
+
+    if (k.canUbah || k.canHapus) {
+      var more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'komentar-more';
+      more.setAttribute('aria-label', 'Opsi komentar');
+      more.innerHTML = mdIcon('moreHoriz', 18);
+      head.appendChild(more);
+    }
+    item.appendChild(head);
 
     var text = document.createElement('div');
     text.className = 'komentar-text';
     text.textContent = k.text; // textContent: aman dari HTML injection
     item.appendChild(text);
 
+    var when = document.createElement('div');
+    when.className = 'komentar-when';
+    when.textContent = k.createdAt + (k.edited ? ' · diedit' : '');
+    item.appendChild(when);
+
     if (k.canUbah || k.canHapus) {
-      var actions = document.createElement('div');
-      actions.className = 'komentar-actions';
-      if (k.canUbah) {
-        var editBtn = document.createElement('button');
-        editBtn.type = 'button';
-        editBtn.textContent = 'Edit';
-        editBtn.addEventListener('click', function () { startEditKomentar_(p, k, item, text, actions); });
-        actions.appendChild(editBtn);
-      }
-      if (k.canHapus) {
-        var delBtn = document.createElement('button');
-        delBtn.type = 'button';
-        delBtn.className = 'danger';
-        delBtn.textContent = 'Hapus';
-        delBtn.addEventListener('click', function () {
-          showConfirmModal('Hapus komentar ini?', function () { doHapusKomentar_(p, k.komentarId); }, 'delete', true, 'Menghapus...');
-        });
-        actions.appendChild(delBtn);
-      }
-      item.appendChild(actions);
+      // Menu opsi "•••": Edit / Hapus lewat bottom sheet (pola yang sama dengan menu lain).
+      item.querySelector('.komentar-more').addEventListener('click', function () {
+        var opts = [];
+        if (k.canUbah) {
+          opts.push({ icon: 'edit', label: 'Edit', onClick: function () { startEditKomentar_(p, k, item, text, when); } });
+        }
+        if (k.canHapus) {
+          opts.push({ icon: 'delete', label: 'Hapus', danger: true, onClick: function () {
+            showConfirmModal('Hapus komentar ini?', function () { doHapusKomentar_(p, k.komentarId); }, 'delete', true, 'Menghapus...');
+          } });
+        }
+        openBottomSheet(opts);
+      });
     }
-    listEl.appendChild(item);
+    row.appendChild(item);
+    chat.appendChild(row);
   });
+  listEl.appendChild(chat);
 }
 
-function startEditKomentar_(p, k, item, textEl, actionsEl) {
+function startEditKomentar_(p, k, item, textEl, whenEl) {
   var ta = document.createElement('textarea');
   ta.className = 'form-input';
   ta.rows = 3;
   ta.maxLength = 500;
   ta.value = k.text;
   item.replaceChild(ta, textEl);
-  actionsEl.innerHTML = '';
+  var moreBtn = item.querySelector('.komentar-more');
+  if (moreBtn) moreBtn.style.display = 'none';
 
+  var actionsEl = document.createElement('div');
+  actionsEl.className = 'komentar-actions';
   var save = document.createElement('button');
   save.type = 'button';
   save.textContent = 'Simpan';
@@ -1717,6 +1734,8 @@ function startEditKomentar_(p, k, item, textEl, actionsEl) {
   cancel.textContent = 'Batal';
   actionsEl.appendChild(save);
   actionsEl.appendChild(cancel);
+  item.replaceChild(actionsEl, whenEl);
+  ta.focus();
 
   cancel.addEventListener('click', function () { loadKomentar_(p); });
   save.addEventListener('click', function () {

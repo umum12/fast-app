@@ -2200,14 +2200,24 @@ select.form-input {
 .komentar-section { margin-top: 18px; border-top: 1px solid var(--color-border); padding-top: 14px; }
 .komentar-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
 .komentar-head .title { font-size:14px; font-weight:700; }
-.komentar-item { padding:10px 0; border-bottom:1px solid var(--color-border); }
-.komentar-item:last-child { border-bottom:none; }
-.komentar-meta { display:flex; align-items:center; gap:8px; font-size:12px; color:var(--color-text-faint); margin-bottom:3px; }
-.komentar-meta .name { font-weight:700; color:var(--color-text); font-size:13px; }
-.komentar-text { font-size:13.5px; line-height:1.45; white-space:pre-wrap; word-break:break-word; }
-.komentar-actions { display:flex; gap:14px; margin-top:6px; }
-.komentar-actions button { background:none; border:none; padding:2px 0; font-size:12px; font-weight:600; color:var(--color-primary); cursor:pointer; }
-.komentar-actions button.danger { color:var(--color-danger); }
+/* Komentar ala chat: pemilik laporan di kanan, pengguna lain di kiri */
+.komentar-chat { display:flex; flex-direction:column; gap:10px; background:var(--md-surface-container, #eef1f6); border-radius:16px; padding:12px 10px; max-height:55vh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+.komentar-row { display:flex; width:100%; }
+.komentar-row.right { justify-content:flex-end; }
+.komentar-row.left { justify-content:flex-start; }
+.komentar-bubble { max-width:84%; min-width:96px; padding:8px 10px 6px; border-radius:14px; box-shadow:0 1px 1px rgba(15,23,42,.08); }
+.komentar-bubble.owner { background:#dcf8e6; border-bottom-right-radius:4px; }
+.komentar-bubble.other { background:#ffffff; border-bottom-left-radius:4px; }
+.komentar-bubble-head { display:flex; align-items:center; justify-content:space-between; gap:6px; }
+.komentar-bubble .name { font-weight:700; font-size:12.5px; color:var(--color-primary-dark, #1d4ed8); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.komentar-bubble.owner .name { color:#15803d; }
+.komentar-more { flex-shrink:0; width:32px; height:32px; margin:-6px -8px -4px 0; display:inline-flex; align-items:center; justify-content:center; background:none; border:none; border-radius:50%; color:var(--color-text-muted); cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.komentar-more:active { background:rgba(15,23,42,.08); }
+.komentar-bubble .komentar-text { font-size:14px; line-height:1.45; white-space:pre-wrap; word-break:break-word; margin-top:2px; }
+.komentar-when { text-align:right; font-size:10.5px; color:var(--color-text-faint); margin-top:3px; }
+.komentar-bubble textarea { margin-top:6px; min-width:200px; }
+.komentar-actions { display:flex; gap:14px; margin-top:6px; justify-content:flex-end; }
+.komentar-actions button { background:none; border:none; padding:6px 2px; font-size:12.5px; font-weight:700; color:var(--color-primary); cursor:pointer; }
 .komentar-form { display:flex; gap:8px; align-items:flex-end; margin-top:12px; }
 .komentar-form textarea { flex:1; min-height:44px; max-height:110px; }
 .komentar-form .btn-primary { width:auto; min-height:44px; padding:0 16px; }
