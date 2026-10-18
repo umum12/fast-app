@@ -93,6 +93,7 @@ function inject(html, page, execUrlOk) {
   head.push('<link rel="apple-touch-icon" href="icons/icon-192.png">');
   // Adapter HARUS dimuat sebelum script aplikasi (mendefinisikan google.script.run).
   head.push('<script src="config.js"></script>');
+  head.push('<script src="firebase-config.js"></script>');
   head.push('<script src="api-adapter.js"></script>');
   head.push("<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}</script>");
   const block = '\n' + head.join('\n') + '\n';
@@ -144,10 +145,10 @@ function main() {
 
   // Service worker: versi cache + daftar shell.
   const hash = crypto.createHash('sha1');
-  for (const f of builtPages.concat(['api-adapter.js', 'config.js'])) hash.update(fs.readFileSync(path.join(OUT, f)));
+  for (const f of builtPages.concat(['api-adapter.js', 'config.js', 'firebase-config.js'])) hash.update(fs.readFileSync(path.join(OUT, f)));
   const buildId = hash.digest('hex').slice(0, 10);
   const swPath = path.join(OUT, 'sw.js');
-  const shell = ['./'].concat(builtPages, ['config.js', 'api-adapter.js', 'manifest.json', 'manifest-buat.json', 'icons/icon-192.png', 'icons/icon-512.png']);
+  const shell = ['./'].concat(builtPages, ['config.js', 'firebase-config.js', 'api-adapter.js', 'manifest.json', 'manifest-buat.json', 'icons/icon-192.png', 'icons/icon-512.png']);
   fs.writeFileSync(swPath, fs.readFileSync(swPath, 'utf8').replace(/__BUILD_ID__/g, buildId).replace('__SHELL__', JSON.stringify(shell)));
 
   fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
