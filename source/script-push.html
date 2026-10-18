@@ -113,7 +113,34 @@ var PushUI = (function () {
   }
   function show(id, on) { var e = el(id); if (e) e.style.display = on ? '' : 'none'; }
 
+  // ---------- indikator titik di header ----------
+  // Status AKTUAL, bukan sekadar toggle: konfigurasi lengkap + izin 'granted'
+  // + penanda aktif + langganan push benar-benar ada di browser (PushManager).
+  var indicatorSeq = 0;
+  function setDot(state, title) {
+    var dot = document.querySelector('#screen-app .header-status .status-dot') || document.querySelector('.header-status .status-dot');
+    if (!dot) return;
+    dot.classList.toggle('is-on', state === 'on');
+    dot.classList.toggle('is-off', state === 'off');
+    dot.title = title || '';
+  }
+  function refreshIndicator() {
+    var seq = ++indicatorSeq;
+    // Di versi /exec (atau Firebase belum diisi) notifikasi memang tidak tersedia:
+    // titik tetap hijau statis sebagai penanda "online" biasa.
+    if (!isGitHubMode() || !isConfigured()) { setDot('', ''); return; }
+    var offMsg = 'Notifikasi nonaktif';
+    if (!browserSupports() || Notification.permission !== 'granted' || ls(LS_ON) !== '1') { setDot('off', offMsg); return; }
+    navigator.serviceWorker.getRegistration().then(function (reg) {
+      return reg && reg.pushManager ? reg.pushManager.getSubscription() : null;
+    }).then(function (sub) {
+      if (seq !== indicatorSeq) return;
+      setDot(sub ? 'on' : 'off', sub ? 'Notifikasi aktif' : offMsg);
+    }).catch(function () { if (seq === indicatorSeq) setDot('off', offMsg); });
+  }
+
   function render() {
+    refreshIndicator();
     var card = el('card-notifikasi');
     if (!card) return;
     if (!isGitHubMode() || !isConfigured()) { card.style.display = 'none'; return; }
@@ -227,9 +254,20 @@ var PushUI = (function () {
     if (bd && !bd._pushBound) { bd._pushBound = true; bd.addEventListener('click', disable); }
     render();
     syncOnLogin();
+    if (!watching) {
+      watching = true;
+      try {
+        if (navigator.permissions && navigator.permissions.query) {
+          navigator.permissions.query({ name: 'notifications' }).then(function (st) { st.onchange = render; }).catch(function () {});
+        }
+      } catch (e) {}
+      document.addEventListener('visibilitychange', function () { if (!document.hidden) render(); });
+      window.addEventListener('focus', render);
+    }
   }
+  var watching = false;
 
-  return { init: init };
+  return { init: init, refreshIndicator: refreshIndicator };
 })();
 
 // Dipanggil otomatis setelah renderApp (script-core.html) tanpa mengubah file itu.

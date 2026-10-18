@@ -564,6 +564,9 @@ function renderSelesaiDetail_(p) {
   if (!body) return;
   body.innerHTML = '';
   body.appendChild(selesaiRow_('ID Laporan', p.pekerjaanId));
+  body.appendChild(selesaiRow_('Pelapor', p.createdByName || p.createdBy || '-'));
+  var whenRaw = p.performedAt || p.createdAt || '';
+  body.appendChild(selesaiRow_('Waktu Laporan', whenRaw ? (typeof formatDetailDateTime_ === 'function' ? formatDetailDateTime_(whenRaw) : whenRaw) : '-'));
   body.appendChild(selesaiRow_('Lantai', p.floorName || p.floorCode || '-'));
   body.appendChild(selesaiRow_('Subjek', p.subject || '-'));
 
