@@ -134,22 +134,64 @@ var PushUI = (function () {
    *  'lost' : sudah diaktifkan & izin ada, tetapi langganan push di browser HILANG
    *  'on'   : langganan push benar-benar ada
    */
-  function detectState() {
-    if (!isGitHubMode() || !isConfigured()) return Promise.resolve('na');
-    if (!browserSupports() || Notification.permission !== 'granted' || ls(LS_ON) !== '1') return Promise.resolve('off');
-    return Promise.race([
-      navigator.serviceWorker.ready,
-      new Promise(function (res) { setTimeout(function () { res(null); }, 5000); })
-    ]).then(function (reg) {
-      return reg && reg.pushManager ? reg.pushManager.getSubscription() : null;
-    }).then(function (sub) { return sub ? 'on' : 'lost'; })
-      .catch(function () { return 'lost'; });
+  function permissionGranted() {
+    return browserSupports() && Notification.permission === 'granted';
   }
 
+  /** Langganan push nyata dari service worker; 'unknown' bila service worker belum siap. */
+  function readSubscription() {
+    return Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise(function (res) { setTimeout(function () { res(null); }, 6000); })
+    ]).then(function (reg) {
+      if (!reg || !reg.pushManager) return { known: false, sub: null };
+      return reg.pushManager.getSubscription().then(function (sub) { return { known: true, sub: sub, scope: reg.scope }; });
+    }).catch(function () { return { known: false, sub: null }; });
+  }
+
+  var lastDiag = '';
+  var DIAG_KEY = 'fs_push_diag';
+  function pushDiagLog(line) {
+    // Simpan 4 catatan terakhir (lintas halaman: index / buat) agar bisa dibandingkan.
+    var t = new Date(), hh = ('0' + t.getHours()).slice(-2) + ':' + ('0' + t.getMinutes()).slice(-2) + ':' + ('0' + t.getSeconds()).slice(-2);
+    var arr = [];
+    try { arr = JSON.parse(ls(DIAG_KEY) || '[]'); } catch (e) {}
+    var entry = hh + ' ' + line;
+    if (arr.length && arr[arr.length - 1].slice(9) === line) return;
+    arr.push(entry); if (arr.length > 4) arr = arr.slice(-4);
+    ls(DIAG_KEY, JSON.stringify(arr));
+  }
+  function detectState() {
+    if (!isGitHubMode() || !isConfigured()) return Promise.resolve('na');
+    if (!browserSupports() || Notification.permission === 'denied') return Promise.resolve('off');
+    if (!permissionGranted()) {
+      lastDiag = 'Izin: ' + Notification.permission + ' · Mode: ' + (isStandalone() ? 'aplikasi' : 'browser') + ' · Halaman: ' + location.pathname.split('/').pop();
+      pushDiagLog(lastDiag);
+      return Promise.resolve('off');
+    }
+    return readSubscription().then(function (r) {
+      var marked = ls(LS_ON) === '1';
+      lastDiag = 'Izin: diberikan · Service worker: ' + (r.known ? 'siap' : 'belum siap') +
+        ' · Langganan: ' + (r.sub ? 'ada' : 'tidak ada') + ' · Penanda: ' + (marked ? 'ya' : 'tidak') +
+        ' · Mode: ' + (isStandalone() ? 'aplikasi' : 'browser') + ' · Halaman: ' + location.pathname.split('/').pop() +
+        (r.scope ? ' · Scope: ' + r.scope.replace(location.origin, '') : '');
+      pushDiagLog(lastDiag);
+      if (!r.known) return 'unknown';                       // jangan menebak merah
+      if (r.sub) { if (!marked) ls(LS_ON, '1'); return 'on'; } // langganan nyata = aktif (penanda dipulihkan)
+      return marked ? 'lost' : 'off';
+    });
+  }
+
+  var unknownRetries = 0;
   function refreshIndicator() {
     var seq = ++indicatorSeq;
     detectState().then(function (state) {
       if (seq !== indicatorSeq) return;
+      if (state === 'adopt') {
+        ls(LS_ON, '1');
+        lastHealAt = 0; healing = false;
+        state = 'lost'; // jalankan pendaftaran ulang token ke akun yang login
+      }
       if (state === 'na') setDot('', '');
       else if (state === 'on') setDot('on', 'Notifikasi aktif');
       else setDot('off', state === 'lost' ? 'Notifikasi terputus' : 'Notifikasi nonaktif');
@@ -172,11 +214,45 @@ var PushUI = (function () {
     }).catch(function () {}).then(function () { healing = false; refreshIndicator(); });
   }
 
+  function contextHint() {
+    var ua = navigator.userAgent || '';
+    var inFrame = false;
+    try { inFrame = window.top !== window.self; } catch (e) { inFrame = true; }
+    if (inFrame) return 'Aplikasi ini terbuka di dalam frame/halaman lain (mis. Launcher), sehingga izin notifikasi tidak bisa dipakai. Buka FAST langsung di tab atau aplikasi terpasang.';
+    if (/; wv\)|FBAN|FBAV|Instagram|Line\/|Telegram|GSA\//i.test(ua)) return 'Aplikasi terbuka di browser bawaan aplikasi lain. Izin notifikasi terpisah dari Chrome/aplikasi terpasang — buka lewat Chrome atau aplikasi FAST yang terpasang.';
+    if (!isStandalone()) return 'Terbuka di tab browser, bukan aplikasi terpasang. Bila notifikasi aktif di aplikasi terpasang tetapi tidak di sini, kemungkinan browser/profil berbeda.';
+    return '';
+  }
+
   function render() { refreshIndicator(); }
+
+  function showDiag() {
+    var host = el('push-status-text');
+    if (!host) return;
+    var d = el('push-diag');
+    if (!d) {
+      d = document.createElement('p');
+      d.id = 'push-diag';
+      d.style.cssText = 'margin:6px 0 0;font-size:11px;color:var(--color-text-faint, #94a3b8);';
+      host.insertAdjacentElement('afterend', d);
+    }
+    var arr = [];
+    try { arr = JSON.parse(ls(DIAG_KEY) || '[]'); } catch (e) {}
+    d.style.whiteSpace = 'pre-wrap';
+    d.textContent = arr.join('\n');
+    d.style.display = arr.length ? '' : 'none';
+  }
 
   function renderCard(state) {
     var card = el('card-notifikasi');
     if (!card) return;
+    showDiag();
+    var hintEl = el('push-hint-text');
+    if (hintEl) {
+      var hint = state === 'on' ? '' : contextHint();
+      hintEl.textContent = hint;
+      hintEl.style.display = hint ? '' : 'none';
+    }
     if (state === 'na') { card.style.display = 'none'; return; }
     card.style.display = '';
 
@@ -250,6 +326,10 @@ var PushUI = (function () {
     Promise.all(tasks).then(function () {
       if (sdkPromise) { return sdkPromise.then(function (m) { return m.deleteToken(); }).catch(function () {}); }
     }).then(function () {
+      return navigator.serviceWorker.getRegistration().then(function (reg) {
+        return reg && reg.pushManager ? reg.pushManager.getSubscription() : null;
+      }).then(function (sub) { return sub ? sub.unsubscribe() : null; }).catch(function () {});
+    }).then(function () {
       done();
       toast('Notifikasi dimatikan', 'success');
     }).then(function () { setBusy(false); render(); });
@@ -288,6 +368,7 @@ var PushUI = (function () {
   function init(session) {
     accessCode = (session && session.accessCode) || '';
     if (!accessCode) return;
+    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
     var be = el('btn-push-enable'), bt = el('btn-push-test'), bd = el('btn-push-disable');
     if (be && !be._pushBound) { be._pushBound = true; be.addEventListener('click', enable); }
     if (bt && !bt._pushBound) { bt._pushBound = true; bt.addEventListener('click', sendTest); }
