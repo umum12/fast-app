@@ -633,7 +633,9 @@ function handleLogout() {
 // AUTO-LOGOUT SETELAH 30 MENIT TIDAK ADA AKTIVITAS
 // ============================================================
 
-var INACTIVITY_TIMEOUT_MS = 30 * 60 * 1000; // 30 menit
+// Sesi tidak kedaluwarsa otomatis — berlaku sampai pengguna menekan Keluar
+// (atau akun dinonaktifkan). 0 = tanpa batas; isi milidetik bila ingin auto-logout.
+var INACTIVITY_TIMEOUT_MS = 0;
 var inactivityTimer = null;
 
 function stopInactivityTimer() {
@@ -647,6 +649,7 @@ function resetInactivityTimer() {
   // Hanya aktif selagi user benar-benar sedang login.
   if (document.getElementById('screen-app').style.display === 'none') return;
   stopInactivityTimer();
+  if (!INACTIVITY_TIMEOUT_MS) return;
   inactivityTimer = setTimeout(handleInactivityLogout, INACTIVITY_TIMEOUT_MS);
 }
 

@@ -124,26 +124,60 @@ var PushUI = (function () {
     dot.classList.toggle('is-off', state === 'off');
     dot.title = title || '';
   }
-  function refreshIndicator() {
-    var seq = ++indicatorSeq;
-    // Di versi /exec (atau Firebase belum diisi) notifikasi memang tidak tersedia:
-    // titik tetap hijau statis sebagai penanda "online" biasa.
-    if (!isGitHubMode() || !isConfigured()) { setDot('', ''); return; }
-    var offMsg = 'Notifikasi nonaktif';
-    if (!browserSupports() || Notification.permission !== 'granted' || ls(LS_ON) !== '1') { setDot('off', offMsg); return; }
-    navigator.serviceWorker.getRegistration().then(function (reg) {
+  var healing = false;
+  var lastHealAt = 0;
+
+  /**
+   * Status AKTUAL perangkat ini:
+   *  'na'   : tidak tersedia (versi /exec atau Firebase belum diisi)
+   *  'off'  : tidak didukung / izin ditolak / belum diaktifkan
+   *  'lost' : sudah diaktifkan & izin ada, tetapi langganan push di browser HILANG
+   *  'on'   : langganan push benar-benar ada
+   */
+  function detectState() {
+    if (!isGitHubMode() || !isConfigured()) return Promise.resolve('na');
+    if (!browserSupports() || Notification.permission !== 'granted' || ls(LS_ON) !== '1') return Promise.resolve('off');
+    return Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise(function (res) { setTimeout(function () { res(null); }, 5000); })
+    ]).then(function (reg) {
       return reg && reg.pushManager ? reg.pushManager.getSubscription() : null;
-    }).then(function (sub) {
-      if (seq !== indicatorSeq) return;
-      setDot(sub ? 'on' : 'off', sub ? 'Notifikasi aktif' : offMsg);
-    }).catch(function () { if (seq === indicatorSeq) setDot('off', offMsg); });
+    }).then(function (sub) { return sub ? 'on' : 'lost'; })
+      .catch(function () { return 'lost'; });
   }
 
-  function render() {
-    refreshIndicator();
+  function refreshIndicator() {
+    var seq = ++indicatorSeq;
+    detectState().then(function (state) {
+      if (seq !== indicatorSeq) return;
+      if (state === 'na') setDot('', '');
+      else if (state === 'on') setDot('on', 'Notifikasi aktif');
+      else setDot('off', state === 'lost' ? 'Notifikasi terputus' : 'Notifikasi nonaktif');
+      renderCard(state);
+      if (state === 'lost') heal();
+    });
+  }
+
+  /** Pulihkan otomatis langganan yang hilang (tanpa pengguna Matikan → Aktifkan). */
+  function heal() {
+    if (healing || busy || !accessCode) return;
+    if (Date.now() - lastHealAt < 60000) return; // jangan mengulang terus-menerus
+    healing = true; lastHealAt = Date.now();
+    setStatus('Notifikasi terputus. Menyambungkan ulang...', 'warn');
+    fetchToken().then(function (token) {
+      return call('registerPushToken', accessCode, token, deviceLabel()).then(function (res) {
+        unwrap(res);
+        ls(LS_TOKEN, token); ls(LS_SYNC, accessCode + '|' + Date.now());
+      });
+    }).catch(function () {}).then(function () { healing = false; refreshIndicator(); });
+  }
+
+  function render() { refreshIndicator(); }
+
+  function renderCard(state) {
     var card = el('card-notifikasi');
     if (!card) return;
-    if (!isGitHubMode() || !isConfigured()) { card.style.display = 'none'; return; }
+    if (state === 'na') { card.style.display = 'none'; return; }
     card.style.display = '';
 
     show('btn-push-enable', false); show('btn-push-test', false); show('btn-push-disable', false);
@@ -160,9 +194,15 @@ var PushUI = (function () {
       setStatus('Notifikasi diblokir untuk aplikasi ini. Izinkan kembali lewat pengaturan situs/aplikasi di perangkat Anda, lalu muat ulang.', 'warn');
       return;
     }
-    if (ls(LS_ON) === '1' && Notification.permission === 'granted') {
+    if (state === 'on') {
       setStatus('Aktif di perangkat ini. Anda akan diberi tahu saat ada pekerjaan baru atau komentar baru.', 'ok');
       show('btn-push-test', true); show('btn-push-disable', true);
+    } else if (state === 'lost') {
+      if (healing) { setStatus('Notifikasi terputus. Menyambungkan ulang...', 'warn'); }
+      else {
+        setStatus('Notifikasi terputus di perangkat ini. Tekan Aktifkan untuk menyambungkan kembali.', 'warn');
+        show('btn-push-enable', true); show('btn-push-disable', true);
+      }
     } else {
       setStatus('Dapatkan pemberitahuan saat ada pekerjaan baru untuk Anda dan komentar baru di pekerjaan terkait.');
       show('btn-push-enable', true);
@@ -254,6 +294,7 @@ var PushUI = (function () {
     if (bd && !bd._pushBound) { bd._pushBound = true; bd.addEventListener('click', disable); }
     render();
     syncOnLogin();
+    setTimeout(refreshIndicator, 6000);
     if (!watching) {
       watching = true;
       try {
