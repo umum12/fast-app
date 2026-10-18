@@ -1,0 +1,831 @@
+<script>
+// ============================================================
+// FIELD VALIDATION HIGHLIGHT (Sprint 6.02 #5)
+// ============================================================
+
+function clearFieldErrors(fieldEls) {
+  fieldEls.forEach(function (el) { if (el) el.classList.remove('input-error'); });
+}
+
+function showFieldError(fieldEl, errorEl, message) {
+  if (fieldEl) {
+    fieldEl.classList.add('input-error');
+    fieldEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  if (errorEl) errorEl.textContent = message;
+}
+
+// ============================================================
+// CONFIRM MODAL (Sprint 6.02 #4) — pengganti window.confirm() bawaan
+// ============================================================
+
+
+var pendingConfirmCallback = null;
+var confirmModalBusyLabel = 'Memproses...';
+var confirmModalIsBusyMode = false;
+
+/**
+ * PATCH — FIX bug "popup Reset/Logout freeze". Akar masalah sebelumnya:
+ * showConfirmModal() diubah supaya TIDAK auto-close, dengan asumsi
+ * SEMUA onConfirm pada akhirnya memanggil endAction() (pola async
+ * hapus/lepas). Tapi banyak pemanggil (Reset form, Logout) adalah
+ * fungsi SINKRON yang tidak pernah memanggil endAction/hideConfirmModal
+ * sama sekali -> modal menggantung selamanya.
+ *
+ * FIX: busy-mode (loading state di tombol + modal tetap terbuka sampai
+ * endAction dipanggil) SEKARANG OPT-IN lewat parameter ke-4 `busyMode`
+ * (boolean, default false/undefined). Tanpa parameter ini, perilaku
+ * KEMBALI seperti semula: modal langsung tertutup begitu tombol ditekan
+ * (aman untuk proses sinkron seperti Reset/Logout). HANYA pemanggil
+ * yang eksplisit mengirim busyMode=true (Hapus Pekerjaan/Jadwal/
+ * Content, Lepas Pekerjaan — proses async yang pakai beginAction/
+ * endAction(null)) yang mendapat loading state di tombol.
+ */
+function showConfirmModal(message, onConfirm, iconName, busyMode, busyLabel) {
+  pendingConfirmCallback = onConfirm;
+  confirmModalIsBusyMode = !!busyMode;
+  confirmModalBusyLabel = busyLabel || 'Memproses...';
+  document.getElementById('confirm-modal-icon').innerHTML = mdIcon(iconName || 'delete', 24);
+  document.getElementById('confirm-modal-message').textContent = message;
+  document.getElementById('confirm-modal-cancel').disabled = false;
+  document.getElementById('confirm-modal-cancel').innerHTML = '<span>Batal</span>';
+  var confirmBtn = document.getElementById('confirm-modal-confirm');
+  confirmBtn.disabled = false;
+  confirmBtn.innerHTML = mdIcon('checkCircle', 18) + '<span>Ya, Lanjutkan</span>';
+  document.getElementById('confirm-modal-overlay').classList.add('show');
+}
+
+function hideConfirmModal() {
+  document.getElementById('confirm-modal-overlay').classList.remove('show');
+  pendingConfirmCallback = null;
+  confirmModalIsBusyMode = false;
+}
+
+document.getElementById('confirm-modal-cancel').addEventListener('click', hideConfirmModal);
+document.getElementById('confirm-modal-confirm').addEventListener('click', function () {
+  var cb = pendingConfirmCallback;
+
+  if (!confirmModalIsBusyMode) {
+    // Perilaku LAMA (default) — tutup modal dulu, baru jalankan
+    // callback. Aman untuk proses sinkron (Reset form, Logout) maupun
+    // async yang TIDAK memakai pola beginAction/endAction(null).
+    hideConfirmModal();
+    if (cb) cb();
+    return;
+  }
+
+  // Busy mode — tombol jadi loading state, modal TETAP TERBUKA sampai
+  // endAction(null) dipanggil pemanggil (lihat hook di endAction di
+  // bawah).
+  var confirmBtn = document.getElementById('confirm-modal-confirm');
+  var cancelBtn = document.getElementById('confirm-modal-cancel');
+  confirmBtn.disabled = true;
+  cancelBtn.disabled = true;
+  confirmBtn.innerHTML = '<span class="btn-loading-dots"><span></span><span></span><span></span></span><span>' + confirmModalBusyLabel + '</span>';
+
+  if (cb) cb();
+});
+
+// ============================================================
+// BOTTOM SHEET (Patch 7.2) — pengganti pop-up aksi kontekstual per item.
+// items: [{ icon, label, danger (opsional), onClick }]
+// ============================================================
+
+function openBottomSheet(items) {
+  var body = document.getElementById('bottom-sheet-body');
+  body.innerHTML = '';
+  (items || []).forEach(function (item) {
+    var btn = document.createElement('button');
+    btn.className = 'bottom-sheet-item' + (item.danger ? ' danger' : '');
+    btn.innerHTML = '<span class="bs-icon">' + mdIcon(item.icon, 20) + '</span><span>' + item.label + '</span>';
+    btn.addEventListener('click', function () {
+      closeBottomSheet();
+      if (item.onClick) item.onClick();
+    });
+    body.appendChild(btn);
+  });
+  document.getElementById('bottom-sheet-overlay').classList.add('show');
+}
+
+function closeBottomSheet() {
+  document.getElementById('bottom-sheet-overlay').classList.remove('show');
+}
+
+document.getElementById('bottom-sheet-overlay').addEventListener('click', function (e) {
+  if (e.target === this) closeBottomSheet(); // tap backdrop untuk menutup
+});
+
+// ============================================================
+// Menu Akun (#btn-back-from-akun) & Detail overlay ✕
+// ============================================================
+
+function closeActivityDetail() {
+  document.getElementById('activity-detail-overlay').classList.remove('show');
+}
+
+document.getElementById('btn-close-activity-detail-x').addEventListener('click', closeActivityDetail);
+document.getElementById('activity-detail-overlay').addEventListener('click', function (e) {
+  if (e.target === this) closeActivityDetail(); // tap backdrop untuk menutup
+});
+
+document.getElementById('btn-back-from-akun').addEventListener('click', function () {
+  goToPage(lastMainPage); // kembali ke halaman utama sebelum membuka Akun
+});
+
+// ============================================================
+// SESSION (localStorage) — SDS Section 17
+// ============================================================
+
+var SESSION_KEY = 'fs_session';
+
+function saveSession(session) {
+  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+}
+
+function loadSession() {
+  var raw = localStorage.getItem(SESSION_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    return null;
+  }
+}
+
+function clearSession() {
+  localStorage.removeItem(SESSION_KEY);
+}
+
+// ============================================================
+// UI HELPERS (Patch 7.2 — MD3 loading & feedback)
+// ============================================================
+
+function showSpinner() {
+  document.getElementById('global-spinner').style.display = 'flex';
+  var bar = document.getElementById('linear-progress');
+  if (bar) bar.classList.add('show');
+}
+
+function hideSpinner() {
+  document.getElementById('global-spinner').style.display = 'none';
+  var bar = document.getElementById('linear-progress');
+  if (bar) bar.classList.remove('show');
+}
+
+/**
+ * Progress feedback non-blocking untuk operasi lain (simpan laporan,
+ * upload foto, hapus laporan, ambil/lepas tugas, buat status, refresh,
+ * dsb.) — Linear Progress Indicator di App Bar + tombol pemicu berubah
+ * ke status "sedang berjalan" (disabled + label progres) agar aplikasi
+ * tidak pernah terasa freeze, tanpa menutup layar dengan overlay.
+ */
+
+/**
+ * PATCH — spinner lingkaran polos di dalam tombol diganti dot-pulse
+ * (3 titik berdenyut bergantian, lihat .btn-loading-dots di
+ * styles.html) — terasa lebih hidup dibanding spinner statis berputar,
+ * tanpa menambah dependency apa pun.
+ */
+function beginAction(buttonEl, progressLabel) {
+  var bar = document.getElementById('linear-progress');
+  if (bar) bar.classList.add('show');
+  if (buttonEl) {
+    buttonEl.dataset.actionOriginalHtml = buttonEl.innerHTML;
+    buttonEl.disabled = true;
+    buttonEl.style.opacity = '0.65';
+    if (progressLabel) {
+      buttonEl.innerHTML = '<span class="btn-loading-dots"><span></span><span></span><span></span></span><span>' + progressLabel + '</span>';
+    }
+  }
+}
+
+
+/**
+ * PATCH — menutup Confirm Modal otomatis (bila sedang terbuka) setiap
+ * endAction() dipanggil. Ini hook TERPUSAT: seluruh fungsi hapus yang
+ * SUDAH ADA (doHapusPekerjaan, doHapusJadwal, doHapusContent_, dll)
+ * memanggil endAction(null) di withSuccessHandler/withFailureHandler
+ * mereka masing-masing — dengan baris ini, modal otomatis ikut tertutup
+ * di titik yang sama TANPA perlu mengubah fungsi-fungsi itu satu-satu.
+ */
+
+function endAction(buttonEl) {
+  var bar = document.getElementById('linear-progress');
+  if (bar) bar.classList.remove('show');
+  if (buttonEl) {
+    buttonEl.disabled = false;
+    buttonEl.style.opacity = '';
+    if (buttonEl.dataset.actionOriginalHtml != null) {
+      buttonEl.innerHTML = buttonEl.dataset.actionOriginalHtml;
+      delete buttonEl.dataset.actionOriginalHtml;
+    }
+  }
+  // PATCH — hanya tutup modal bila memang sedang busy-mode (lihat
+  // showConfirmModal). Mencegah hook ini menutup modal yang sebenarnya
+  // sudah tidak terkait modal manapun (endAction dipanggil di banyak
+  // tempat di luar konteks Confirm Modal, mis. submit form Buat).
+  if (confirmModalIsBusyMode) {
+    var confirmOverlay = document.getElementById('confirm-modal-overlay');
+    if (confirmOverlay && confirmOverlay.classList.contains('show')) {
+      hideConfirmModal();
+    }
+  }
+}
+
+var SNACKBAR_ICONS = { success: 'checkCircle', error: 'warning', warning: 'warning', info: 'notification' };
+var snackbarTimer = null;
+
+/**
+ * type: 'success' | 'error' | 'warning' | 'info' (default 'info').
+ * Style/animasi/durasi konsisten di semua tipe (Patch 7.2) — hanya
+ * warna aksen & ikon yang membedakan makna pesan.
+ */
+
+/**
+ * type: 'success' | 'error' | 'warning' | 'info'. Parameter `detail`
+ * (opsional) menampilkan baris kedua dan memperbesar toast + durasinya
+ * (untuk konfirmasi penting). Pesan lama tanpa detail tidak berubah.
+ */
+function showSnackbar(message, type, detail) {
+  var el = document.getElementById('snackbar');
+  var t = type || 'info';
+  el.className = 'snackbar-' + t + (detail ? ' snackbar-rich' : '');
+  el.innerHTML = '';
+
+  var icon = document.createElement('span');
+  icon.className = 'snackbar-icon';
+  icon.innerHTML = mdIcon(SNACKBAR_ICONS[t] || 'notification', detail ? 24 : 18);
+  el.appendChild(icon);
+
+  if (detail) {
+    var wrap = document.createElement('span');
+    wrap.className = 'snackbar-body';
+    var title = document.createElement('span');
+    title.className = 'snackbar-title';
+    title.textContent = message;
+    var sub = document.createElement('span');
+    sub.className = 'snackbar-detail';
+    sub.textContent = detail; // textContent: aman dari HTML injection
+    wrap.appendChild(title);
+    wrap.appendChild(sub);
+    el.appendChild(wrap);
+  } else {
+    var msg = document.createElement('span');
+    msg.innerHTML = message;
+    el.appendChild(msg);
+  }
+
+  void el.offsetWidth;
+  el.classList.add('show');
+  if (snackbarTimer) clearTimeout(snackbarTimer);
+  snackbarTimer = setTimeout(function () {
+    el.classList.remove('show');
+  }, detail ? 4500 : 3000);
+}
+
+
+
+// ============================================================
+// NAVIGASI
+// ============================================================
+
+var currentPage = 'beranda';
+var lastMainPage = 'beranda'; // dipakai tombol "Kembali" di halaman Akun (Patch 6.1.0)
+var pekerjaanFilterUIInitialized = false; // Tahap 4 Cutover — init filter Aktivitas hanya sekali, saat halaman Aktivitas pertama kali dibuka
+
+document.getElementById('btn-open-akun').addEventListener('click', function () {
+  goToPage('akun');
+});
+
+// ============================================================
+// MATERIAL SYMBOLS — inline SVG (Patch 6.1.5)
+// ============================================================
+// Dibuat manual meniru gaya "Material Symbols Outlined" — BUKAN memuat font
+// dari Google Fonts CDN, agar aplikasi tetap tidak punya dependency jaringan
+// eksternal (konsisten dengan keputusan ikon nav di Patch 6.06).
+var MD_ICONS = {
+  stats: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  save: '<path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7z"/><path d="M17 21v-8H7v8M7 3v5h8"/>',
+  edit: '<path d="m17 3 4 4L7 21H3v-4z"/>',
+  delete: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/>',
+  calendar: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/>',
+  description: '<path d="M8 3h6l4 4v14a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>',
+  photoCamera: '<path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="14" r="3.5"/>',
+  refresh: '<path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/>',
+  visibility: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
+  tune: '<path d="M4 6h10M18 6h2M4 12h2M8 12h12M4 18h14M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="6" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
+  add: '<path d="M12 5v14M5 12h14"/>',
+  close: '<path d="M6 6l12 12M18 6 6 18"/>',
+  arrowBack: '<path d="M19 12H5M12 19l-7-7 7-7"/>',
+  dashboard: '<rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="10" width="8" height="11" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/>',
+  task: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M9 3v4M15 3v4M4 10h16"/><path d="m8.5 14 2 2 4-4"/>',
+  photo: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m21 15-5-5L5 20"/>',
+  statistics: '<path d="M5 21V10M12 21V4M19 21v-7"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1Z"/>',
+  notification: '<path d="M6 8a6 6 0 1 1 12 0c0 4 1.5 6 1.5 6h-15S6 12 6 8Z"/><path d="M9.5 21a2.5 2.5 0 0 0 5 0"/>',
+  reminder: '<circle cx="12" cy="13" r="7"/><path d="M12 10v3.5l2.5 1.5M9 3h6"/>',
+  account: '<circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 5-6 8-6s6.5 2 8 6"/>',
+  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/>',
+  login: '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l-5-5 5-5M5 12h12"/>',
+  upload: '<path d="M12 20V6M6 12l6-6 6 6"/><path d="M4 20h16"/>',
+  send: '<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7Z"/>',
+  download: '<path d="M12 4v14M6 12l6 6 6-6"/><path d="M4 20h16"/>',
+  history: '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5M12 8v5l3 2"/>',
+  sunny: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  moon: '<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/>',
+  checkCircle: '<circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.5 2.5L16 9"/>',
+  activity: '<path d="M3 12h4l2-7 4 14 2-7h6"/>',
+  inbox: '<path d="M4 12h4l1.5 3h5L16 12h4"/><path d="M4 12 5.5 5a1 1 0 0 1 1-.8h11a1 1 0 0 1 1 .8L20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/>',
+  broom: '<path d="M20 4 10 14"/><path d="M8.5 15.5 4 20l1.5-4.5L9 12l3 3-3.5 .5Z"/><path d="M13 9l3-3 3 3-3 3Z"/>',
+  wrench: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2-2Z"/>',
+  warning: '<path d="M12 2 1 21h22L12 2Z"/><path d="M12 9v5M12 17h.01"/>',
+  calendarCheck: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/><path d="m9 15 2 2 4-4"/>',
+  location: '<path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/>',
+  moreVert: '<circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/>',
+  lightbulb: '<path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2.3h6c0-1.1.4-1.8 1-2.3A7 7 0 0 0 12 2Z"/>',
+  building: '<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1"/><path d="M10 21v-3h4v3"/>',
+  chevronDown: '<path d="m6 9 6 6 6-6"/>',
+  chevronUp: '<path d="m6 15 6-6 6 6"/>',
+  chevronRight: '<path d="m9 6 6 6-6 6"/>'
+};
+
+function mdIcon(name, size) {
+  var s = size || 20;
+  return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + (MD_ICONS[name] || '') + '</svg>';
+}
+
+var NAV_ICONS = {
+  beranda: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9"/></svg>',
+  pekerjaan: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M9 3v4M15 3v4M4 10h16"/><path d="m8.5 14 2 2 4-4"/></svg>',
+  buat: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>',
+  jadwal: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 14h.01M12 14h.01M15 14h.01M9 17h.01M12 17h.01"/></svg>',
+  akun: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 5-6 8-6s6.5 2 8 6"/></svg>',
+  aktivitas: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>'
+};
+
+function renderNav(navItems) {
+  var bottomContainer = document.getElementById('bottom-nav-container');
+  var sidebarContainer = document.getElementById('sidebar-nav-container');
+  bottomContainer.innerHTML = '';
+  sidebarContainer.innerHTML = '';
+
+  navItems.forEach(function (item) {
+    var icon = NAV_ICONS[item.key] || '';
+
+    var bBtn = document.createElement('button');
+    bBtn.className = 'nav-item';
+    bBtn.dataset.page = item.key;
+    bBtn.innerHTML = '<span class="nav-icon">' + icon + '</span><span class="nav-label">' + item.label + '</span>';
+    bBtn.addEventListener('click', function () { goToPage(item.key); });
+    bottomContainer.appendChild(bBtn);
+
+    var sBtn = document.createElement('button');
+    sBtn.className = 'nav-item';
+    sBtn.dataset.page = item.key;
+    sBtn.innerHTML = '<span class="nav-icon">' + icon + '</span><span class="nav-label">' + item.label + '</span>';
+    sBtn.addEventListener('click', function () { goToPage(item.key); });
+    sidebarContainer.appendChild(sBtn);
+  });
+}
+
+/**
+ * Perf/UX — fungsi start/stopPekerjaanAutoRefresh() didefinisikan di
+ * script-pekerjaan.html (bersama loadPekerjaanInbox()). Aman dipanggil
+ * dari sini karena seluruh file include() digabung menjadi SATU blok
+ * <script>, sehingga function declaration ter-hoist lintas file.
+ */
+
+function goToPage(pageKey) {
+  // Auto-refresh Pekerjaan hanya relevan selama halaman Pekerjaan terbuka.
+  if (typeof stopPekerjaanAutoRefresh === 'function') stopPekerjaanAutoRefresh();
+
+  // Meninggalkan halaman Buat (mis. lewat nav) tanpa submit/batal
+  // eksplisit tetap membatalkan mode "Buat Laporan" (Bagian 3) — supaya
+  // kunjungan berikutnya ke Buat selalu mulai dari mode normal.
+  if (pageKey !== 'buat' && buatPrefillContext) {
+    resetBuatPrefillContext_();
+  }
+
+  // Simpan posisi scroll halaman yang sedang ditinggalkan sebelum berpindah.
+  if (currentPage) {
+    var session = loadSession();
+    if (session) {
+      session.uiState = session.uiState || {};
+      session.uiState.scrollPositions = session.uiState.scrollPositions || {};
+      session.uiState.scrollPositions[currentPage] = window.scrollY;
+      saveSession(session);
+    }
+  }
+
+  currentPage = pageKey;
+  var appHeaderEl = document.querySelector('header.app-header');
+  if (appHeaderEl) appHeaderEl.classList.remove('header-hidden');
+  if (pageKey !== 'akun') lastMainPage = pageKey;
+
+  document.querySelectorAll('.page-section').forEach(function (section) {
+    section.classList.toggle('active', section.dataset.page === pageKey);
+  });
+
+  document.querySelectorAll('.nav-item').forEach(function (btn) {
+    btn.classList.toggle('active', btn.dataset.page === pageKey);
+  });
+
+  var session = loadSession();
+  if (session) {
+    session.uiState = session.uiState || {};
+    session.uiState.activePage = pageKey;
+    saveSession(session);
+  }
+
+
+  if (pageKey === 'beranda' && appBootstrap && typeof initBerandaPage === 'function') {
+    initBerandaPage();
+  }
+  if (pageKey === 'pekerjaan' && appBootstrap && typeof initPekerjaanInboxPage === 'function') {
+    initPekerjaanInboxPage();
+    if (typeof startPekerjaanAutoRefresh === 'function') startPekerjaanAutoRefresh();
+  }
+  if (pageKey === 'buat' && appBootstrap && typeof initPekerjaanForm === 'function') {
+    initPekerjaanForm();
+  }
+  if (pageKey === 'jadwal' && appBootstrap && typeof loadRiwayatPekerjaan === 'function') {
+    // "Riwayat" kini berisi Riwayat Pekerjaan (arsip pribadi). Filter &
+    // Unduh PDF dipindah ke Aktivitas (3.4).
+    loadRiwayatPekerjaan();
+  }
+  if (pageKey === 'aktivitas' && appBootstrap && typeof loadAktivitasSummary === 'function') {
+    // Ringkasan (statistik) + timeline Pekerjaan. Filter & Unduh PDF
+    // sekarang di halaman terpisah (/exec?page=pdfrender).
+    if (!pekerjaanFilterUIInitialized && typeof initPdfRenderButton_ === 'function') {
+      initPdfRenderButton_();
+      pekerjaanFilterUIInitialized = true;
+    }
+    loadAktivitasSummary();
+    if (typeof loadPekerjaanAktivitas === 'function') loadPekerjaanAktivitas();
+  }
+
+
+  // Restore posisi scroll halaman yang baru ditampilkan (setelah konten dirender).
+  setTimeout(function () {
+    var s = loadSession();
+    var savedScroll = (s && s.uiState && s.uiState.scrollPositions) ? s.uiState.scrollPositions[pageKey] : 0;
+    window.scrollTo(0, savedScroll || 0);
+  }, 50);
+}
+
+// ============================================================
+// RENDER APP (POST-LOGIN)
+// ============================================================
+
+var ROLE_LABELS = {
+  admin: 'Administrator',
+  fs: 'Facility Support',
+  demo: 'Demo'
+};
+
+var appBootstrap = null;
+
+function renderApp(bootstrap, session) {
+  appBootstrap = bootstrap;
+
+  document.getElementById('screen-login').style.display = 'none';
+  document.getElementById('screen-app').style.display = 'block';
+
+  var user = bootstrap.currentUser;
+  document.getElementById('header-username').textContent = user.displayName;
+  document.getElementById('header-avatar-initial').textContent = (user.displayName || '?').trim().charAt(0).toUpperCase();
+
+  document.getElementById('akun-nama').textContent = user.displayName;
+  document.getElementById('akun-kode').textContent = user.userCode;
+  document.getElementById('akun-role').textContent = ROLE_LABELS[user.role] || user.role;
+
+
+  renderNav(bootstrap.navItems);
+
+  // Patch 8.x (2.3) — halaman default kini ditentukan server
+  // (bootstrap.defaultPage), dikirim bersama respons login/bootstrap.
+  // Fallback ke perhitungan role tetap dijaga untuk kompatibilitas.
+  //
+  // PATCH — Shortcut ?page=buat (buat-cepat.html) mendeklarasikan
+  // FORCE_LANDING_PAGE = 'buat' supaya SELALU mendarat di form Buat apa
+  // pun defaultPage role-nya (termasuk Admin/Demo yang defaultPage
+  // normalnya 'beranda' — modul Beranda tidak dimuat di halaman
+  // shortcut ini). Di app utama, FORCE_LANDING_PAGE tidak pernah
+  // dideklarasikan (typeof === 'undefined'), jadi baris ini TIDAK
+  // berpengaruh sama sekali pada perilaku app utama.
+  var lastPage;
+  if (typeof FORCE_LANDING_PAGE !== 'undefined' && FORCE_LANDING_PAGE) {
+    lastPage = FORCE_LANDING_PAGE;
+  } else {
+    var defaultPage = bootstrap.defaultPage || (user.role === 'fs' ? 'buat' : 'beranda');
+    lastPage = (session.uiState && session.uiState.activePage) || defaultPage;
+  }
+  goToPage(lastPage);
+
+
+  if (user.role !== 'demo') {
+    document.getElementById('btn-submit-report').style.display = '';
+  } else {
+    document.getElementById('btn-submit-report').style.display = 'none';
+  }
+
+  // Auto-logout 30 menit tidak ada aktivitas — mulai/reset hitungan
+  // mundur begitu user berhasil masuk (login baru atau resume sesi).
+  resetInactivityTimer();
+}
+
+// ============================================================
+// AUTH FLOW
+// ============================================================
+
+// Dipakai HANYA untuk resume sesi dari localStorage (tanpa form login) —
+// login baru langsung dapat payload bootstrap penuh, lihat handleLogin().
+function attemptBootstrap(session) {
+  showSpinner();
+  google.script.run
+    .withSuccessHandler(function (response) {
+      hideSpinner();
+      if (response.success) {
+        renderApp(response.data, session);
+      } else {
+        // Sesi tidak valid lagi (mis. user dinonaktifkan) — Final A3.
+        clearSession();
+        document.getElementById('screen-app').style.display = 'none';
+        document.getElementById('screen-login').style.display = 'flex';
+        document.getElementById('login-error').textContent = response.error;
+      }
+    })
+    .withFailureHandler(function (error) {
+      hideSpinner();
+      showSnackbar('Gagal terhubung ke server. Periksa koneksi internet Anda.', 'error');
+    })
+    .getBootstrapData(session.accessCode);
+}
+
+/**
+ * Patch 8.x (Bagian 2.3) — loginByAccessCode() sekarang mengembalikan
+ * seluruh payload bootstrap sekaligus (user, master data, navItems,
+ * jenisPekerjaanList, default page), jadi login TIDAK LAGI memanggil
+ * getBootstrapData() secara terpisah setelahnya. Startup = SATU
+ * request, bukan dua berurutan.
+ */
+function handleLogin() {
+  var input = document.getElementById('input-access-code');
+  var errorEl = document.getElementById('login-error');
+  var code = input.value.trim().toUpperCase();
+
+  errorEl.textContent = '';
+
+  if (!code) {
+    errorEl.textContent = 'Kode akses wajib diisi.';
+    return;
+  }
+
+  showSpinner();
+  google.script.run
+    .withSuccessHandler(function (response) {
+      hideSpinner();
+      if (!response.success) {
+        errorEl.textContent = response.error;
+        return;
+      }
+
+      var user = response.data.currentUser;
+      var session = {
+        accessCode: user.userCode,
+        role: user.role,
+        displayName: user.displayName,
+        uiState: {}
+      };
+      saveSession(session);
+      renderApp(response.data, session);
+    })
+    .withFailureHandler(function (error) {
+      hideSpinner();
+      errorEl.textContent = 'Gagal terhubung ke server. Coba lagi.';
+    })
+    .loginByAccessCode(code);
+}
+
+
+/**
+ * PATCH — FIX bug cache browser "nyangkut" antar akun: pageDataCache
+ * (script-pekerjaan.html) hidup di memori JS, TIDAK otomatis kosong
+ * saat logout. Tanpa reset ini, user B yang login di tab/browser yang
+ * sama persis setelah user A logout masih melihat data cache milik
+ * user A (Pekerjaan/Riwayat/Aktivitas/Jadwal/Content/Dashboard) sampai
+ * salah satu cache itu di-invalidate lewat aksi atau force-refresh.
+ * resetAllPageDataCache_() didefinisikan di script-pekerjaan.html.
+ */
+function handleLogout() {
+  stopInactivityTimer();
+  clearSession();
+  if (typeof resetAllPageDataCache_ === 'function') resetAllPageDataCache_();
+  appBootstrap = null;
+  document.getElementById('screen-app').style.display = 'none';
+  document.getElementById('screen-login').style.display = 'flex';
+  document.getElementById('input-access-code').value = '';
+}
+
+// ============================================================
+// AUTO-LOGOUT SETELAH 30 MENIT TIDAK ADA AKTIVITAS
+// ============================================================
+
+// Sesi tidak kedaluwarsa otomatis — berlaku sampai pengguna menekan Keluar
+// (atau akun dinonaktifkan). 0 = tanpa batas; isi milidetik bila ingin auto-logout.
+var INACTIVITY_TIMEOUT_MS = 0;
+var inactivityTimer = null;
+
+function stopInactivityTimer() {
+  if (inactivityTimer) {
+    clearTimeout(inactivityTimer);
+    inactivityTimer = null;
+  }
+}
+
+function resetInactivityTimer() {
+  // Hanya aktif selagi user benar-benar sedang login.
+  if (document.getElementById('screen-app').style.display === 'none') return;
+  stopInactivityTimer();
+  if (!INACTIVITY_TIMEOUT_MS) return;
+  inactivityTimer = setTimeout(handleInactivityLogout, INACTIVITY_TIMEOUT_MS);
+}
+
+
+function handleInactivityLogout() {
+  stopInactivityTimer();
+  clearSession();
+  if (typeof resetAllPageDataCache_ === 'function') resetAllPageDataCache_();
+  appBootstrap = null;
+  document.getElementById('screen-app').style.display = 'none';
+  document.getElementById('screen-login').style.display = 'flex';
+  document.getElementById('input-access-code').value = '';
+  document.getElementById('login-error').textContent = 'Sesi berakhir otomatis karena 30 menit tidak ada aktivitas. Silakan masuk kembali.';
+}
+
+
+// Aktivitas apa pun mereset hitungan mundur — dipasang sekali secara
+// global, resetInactivityTimer() sendiri yang memeriksa apakah user
+// sedang login sebelum menjadwalkan ulang.
+['mousedown', 'keydown', 'touchstart', 'scroll'].forEach(function (evt) {
+  document.addEventListener(evt, resetInactivityTimer, { passive: true });
+});
+
+// ============================================================
+// LOGIN & LOGOUT BUTTON LISTENERS
+// ============================================================
+
+document.getElementById('btn-login').addEventListener('click', handleLogin);
+document.getElementById('input-access-code').addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') handleLogin();
+});
+document.getElementById('btn-logout').addEventListener('click', function () {
+  showConfirmModal('Keluar dari aplikasi? Anda perlu memasukkan kode akses lagi untuk masuk kembali.', function () {
+    handleLogout();
+  }, 'logout');
+});
+
+/**
+ * PATCH — Jaring pengaman manual: reset pageDataCache + reload halaman
+ * penuh. Reload penuh (bukan sekadar reset variabel) juga memastikan
+ * Service Worker/browser cache HTML/JS/CSS (bila ada) ikut ter-refresh,
+ * bukan hanya data runtime.
+ */
+
+/**
+ * Muat Ulang Data dengan determinate progress. TIDAK reload halaman.
+ * Progres = langkah yang benar-benar selesai (1 reset cache + N
+ * panggilan server berurutan). Hasil langsung diisikan ke
+ * pageDataCache sehingga halaman yang dibuka sesudahnya sudah segar.
+ */
+var reloadRunning = false;
+
+function setReloadProgress_(done, total, text, isError) {
+  var fill = document.getElementById('reload-bar-fill');
+  fill.style.width = Math.round((done / total) * 100) + '%';
+  fill.classList.toggle('error', !!isError);
+  document.getElementById('reload-step-text').textContent = text;
+}
+
+function closeReloadOverlay_() {
+  document.getElementById('reload-overlay').classList.remove('show');
+  reloadRunning = false;
+}
+
+function runReloadAppData_() {
+  if (reloadRunning) return;
+  var session = loadSession();
+  if (!session) return;
+  reloadRunning = true;
+  var ac = session.accessCode;
+
+  var steps = [
+    { label: 'Memuat data akun & master...',
+      run: function (ok, fail) { google.script.run.withSuccessHandler(ok).withFailureHandler(fail).getBootstrapData(ac); },
+      apply: function (d) { appBootstrap = d; } },
+    { label: 'Memuat pekerjaan...',
+      run: function (ok, fail) { google.script.run.withSuccessHandler(ok).withFailureHandler(fail).getPekerjaanList(ac, { view: 'inbox' }); },
+      apply: function (d) { pageDataCache.pekerjaanInbox = d.pekerjaan; } },
+    { label: 'Memuat riwayat & aktivitas...',
+      run: function (ok, fail) { google.script.run.withSuccessHandler(ok).withFailureHandler(fail).getPekerjaanList(ac, { view: 'aktivitas' }); },
+      apply: function (d) { pageDataCache.pekerjaanAktivitas = d.pekerjaan; } },
+    { label: 'Memuat beranda & statistik...',
+      run: function (ok, fail) { google.script.run.withSuccessHandler(ok).withFailureHandler(fail).getHomeBootstrap(ac); },
+      apply: function (d) { pageDataCache.dashboard = d.dashboard; pageDataCache.content = d.content; } }
+  ];
+  var total = steps.length + 1; // +1 = reset cache lokal
+
+  document.getElementById('reload-actions').style.display = 'none';
+  document.getElementById('reload-overlay').classList.add('show');
+
+  resetAllPageDataCache_();
+  setReloadProgress_(1, total, 'Cache lokal dibersihkan', false);
+
+  function fail(message) {
+    setReloadProgress_(0, total, message || 'Gagal memuat data.', true);
+    document.getElementById('reload-bar-fill').style.width = '100%';
+    document.getElementById('reload-actions').style.display = 'flex';
+  }
+
+  function runStep(i) {
+    if (i >= steps.length) {
+      setReloadProgress_(total, total, 'Selesai', false);
+      setTimeout(function () {
+        closeReloadOverlay_();
+        if (typeof goToPage === 'function') goToPage(currentPage);
+        showSnackbar('Data berhasil diperbarui.', 'success');
+      }, 400);
+      return;
+    }
+    setReloadProgress_(i + 1, total, steps[i].label, false);
+    steps[i].run(function (response) {
+      if (!response || !response.success) { fail((response && response.error) || 'Gagal memuat data.'); return; }
+      steps[i].apply(response.data);
+      runStep(i + 1);
+    }, function () {
+      fail('Gagal terhubung ke server. Periksa koneksi Anda.');
+    });
+  }
+
+  runStep(0);
+}
+
+var btnReloadAppData = document.getElementById('btn-reload-app-data');
+if (btnReloadAppData) {
+  btnReloadAppData.innerHTML = mdIcon('refresh', 18) + '<span>Muat Ulang Data</span>';
+  btnReloadAppData.addEventListener('click', runReloadAppData_);
+}
+var btnReloadRetry = document.getElementById('btn-reload-retry');
+if (btnReloadRetry) btnReloadRetry.addEventListener('click', function () { reloadRunning = false; runReloadAppData_(); });
+var btnReloadClose = document.getElementById('btn-reload-close');
+if (btnReloadClose) btnReloadClose.addEventListener('click', closeReloadOverlay_);
+// ============================================================
+// HEADER HIDE ON SCROLL (seperti Twitter/Facebook)
+// ============================================================
+// Scroll turun -> header disembunyikan. Scroll naik -> muncul lagi.
+// Selalu tampil saat berada di dekat puncak halaman. THRESHOLD
+// mencegah header berkedip karena gerakan scroll yang sangat kecil.
+
+(function setupHideOnScrollHeader() {
+  var header = document.querySelector('header.app-header');
+  if (!header) return;
+
+  var THRESHOLD = 8;
+  var ALWAYS_SHOW_TOP = 60;
+  var lastY = 0;
+  var ticking = false;
+
+  // Posisi scroll dari elemen mana pun yang sedang dipakai browser.
+  function currentY(target) {
+    if (target && target !== document && target !== window && typeof target.scrollTop === 'number') {
+      return target.scrollTop;
+    }
+    return window.pageYOffset ||
+      document.documentElement.scrollTop ||
+      document.body.scrollTop || 0;
+  }
+
+  function update(y) {
+    if (y <= ALWAYS_SHOW_TOP) {
+      header.classList.remove('header-hidden');
+    } else if (Math.abs(y - lastY) > THRESHOLD) {
+      header.classList.toggle('header-hidden', y > lastY);
+    }
+    lastY = y < 0 ? 0 : y;
+    ticking = false;
+  }
+
+  // capture:true menangkap scroll dari elemen mana pun (scroll tidak
+  // bubbling), jadi tetap bekerja walau yang scroll bukan window.
+  document.addEventListener('scroll', function (e) {
+    if (ticking) return;
+    ticking = true;
+    var y = currentY(e.target);
+    window.requestAnimationFrame(function () { update(y); });
+  }, { passive: true, capture: true });
+})();
+
+
+</script>
