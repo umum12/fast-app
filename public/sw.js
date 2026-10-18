@@ -1,6 +1,11 @@
 /* sw.js — FAST APP. Hanya cache "cangkang" statis. Data selalu lewat jaringan
  * (request ke script.google.com / googleusercontent tidak pernah disentuh). */
-const CACHE = 'fastapp-__BUILD_ID__';
+// Nama cache unik per aplikasi: memuat path scope (mis. /fast-app/), sehingga tidak
+// bentrok dengan project GitHub Pages lain di domain yang sama (user.github.io).
+const SCOPE_PATH = new URL(self.registration.scope).pathname;
+const CACHE_PREFIX = 'fastapp:' + SCOPE_PATH + ':';
+const CACHE = CACHE_PREFIX + '__BUILD_ID__';
+const LEGACY_CACHE_RE = /^fastapp-[0-9a-f]{10}$/; // format lama versi sebelumnya
 const SHELL = __SHELL__;
 
 self.addEventListener('install', (e) => {
@@ -14,7 +19,7 @@ self.addEventListener('install', (e) => {
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k.startsWith('fastapp-')).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE && (k.startsWith(CACHE_PREFIX) || LEGACY_CACHE_RE.test(k))).map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -25,6 +30,7 @@ self.addEventListener('fetch', (e) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
+  if (!url.pathname.startsWith(SCOPE_PATH)) return; // hanya path aplikasi ini
   e.respondWith(
     fetch(req)
       .then((res) => {
