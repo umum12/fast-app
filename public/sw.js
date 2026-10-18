@@ -35,3 +35,40 @@ self.addEventListener('fetch', (e) => {
         .then((r) => r || (req.mode === 'navigate' ? caches.match('index.html') : Response.error())))
   );
 });
+
+// ---------------------------------------------------------------------------
+// Notifikasi push (FCM Web Push). Pesan dikirim server sebagai data-only:
+// { title, body, tag, url }. Service worker inilah yang menampilkannya.
+// ---------------------------------------------------------------------------
+self.addEventListener('push', (e) => {
+  let payload = {};
+  try { payload = e.data ? e.data.json() : {}; }
+  catch (err) { try { payload = { data: { body: e.data.text() } }; } catch (_) { payload = {}; } }
+
+  // FCM membungkus: { data: {...}, notification: {...} }; toleran bila datar.
+  const d = Object.assign({}, payload.notification || {}, payload.data || (payload.title || payload.body ? payload : {}));
+  const title = d.title || 'Facility Support';
+  const options = {
+    body: d.body || '',
+    icon: 'icons/icon-192.png',
+    badge: 'icons/icon-192.png',
+    tag: d.tag || 'fastapp',
+    renotify: true,
+    data: { url: d.url || '' }
+  };
+  e.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  const rel = (e.notification.data && e.notification.data.url) || '';
+  const target = new URL(rel, self.registration.scope).href;
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const c of list) {
+        if (c.url.startsWith(self.registration.scope) && 'focus' in c) return c.focus();
+      }
+      return self.clients.openWindow(target);
+    })
+  );
+});
