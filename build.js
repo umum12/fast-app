@@ -95,6 +95,7 @@ function inject(html, page, execUrlOk) {
   head.push('<script src="config.js"></script>');
   head.push('<script src="firebase-config.js"></script>');
   head.push('<script src="pwa-install.js"></script>');
+  head.push('<script src="pwa-update.js"></script>');
   head.push('<script src="api-adapter.js"></script>');
   head.push("<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js',{scope:'./'}).catch(function(){});});}</script>");
   const block = '\n' + head.join('\n') + '\n';
@@ -172,16 +173,38 @@ function main() {
     console.log('  ok  ' + page.out + '  (' + Math.round(html.length / 1024) + ' KB)');
   }
 
-  const cfgJs = 'window.FASTAPP_CONFIG=' + JSON.stringify({ EXEC_URL: execUrl, TIMEOUT_MS: 330000 }) + ';\n';
-  fs.writeFileSync(path.join(OUT, 'config.js'), cfgJs);
+  const cfgObj = { EXEC_URL: execUrl, TIMEOUT_MS: 330000 };
+  const cfgBase = 'window.FASTAPP_CONFIG=' + JSON.stringify(cfgObj) + ';\n';
+
+  // BUILD_ID = sidik isi seluruh situs (kecuali config.js/sw.js/version.json yang memuat id itu sendiri,
+  // config.js diwakili isi dasarnya). Isi sama -> id sama, jadi deploy ulang tanpa perubahan
+  // tidak memunculkan "Pembaruan tersedia".
+  const hash = crypto.createHash('sha1');
+  hash.update(cfgBase);
+  (function walk(dir, rel) {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true }).sort((x, y) => x.name.localeCompare(y.name))) {
+      const r = rel ? rel + '/' + e.name : e.name;
+      if (e.isDirectory()) { walk(path.join(dir, e.name), r); continue; }
+      if (['config.js', 'sw.js', 'version.json', '.nojekyll'].includes(r)) continue;
+      hash.update(r); hash.update(fs.readFileSync(path.join(dir, e.name)));
+    }
+  })(OUT, '');
+  const buildId = hash.digest('hex').slice(0, 10);
+  const builtAt = new Date().toISOString();
+
+  fs.writeFileSync(path.join(OUT, 'config.js'), cfgBase + 'window.FASTAPP_BUILD=' + JSON.stringify({ id: buildId, at: builtAt }) + ';\n');
+  fs.writeFileSync(path.join(OUT, 'version.json'), JSON.stringify({ id: buildId, at: builtAt }) + '\n');
 
   // Service worker: versi cache + daftar shell.
-  const hash = crypto.createHash('sha1');
-  for (const f of builtPages.concat(['api-adapter.js', 'config.js', 'firebase-config.js', 'pwa-install.js'])) hash.update(fs.readFileSync(path.join(OUT, f)));
-  const buildId = hash.digest('hex').slice(0, 10);
+  //   critical = wajib berhasil di-download penuh; jika salah satu gagal, pemasangan dibatalkan
+  //              dan service worker lama TETAP aktif (rollback otomatis).
+  //   optional = dicoba semampunya.
+  const critical = ['./', 'config.js', 'api-adapter.js', 'manifest.json'].concat(builtPages);
+  const optional = ['firebase-config.js', 'pwa-install.js', 'pwa-update.js', 'manifest-buat.json', 'icons/icon-192.png', 'icons/icon-512.png'];
   const swPath = path.join(OUT, 'sw.js');
-  const shell = ['./'].concat(builtPages, ['config.js', 'firebase-config.js', 'pwa-install.js', 'api-adapter.js', 'manifest.json', 'manifest-buat.json', 'icons/icon-192.png', 'icons/icon-512.png']);
-  fs.writeFileSync(swPath, fs.readFileSync(swPath, 'utf8').replace(/__BUILD_ID__/g, buildId).replace('__SHELL__', JSON.stringify(shell)));
+  fs.writeFileSync(swPath, fs.readFileSync(swPath, 'utf8')
+    .replace(/__BUILD_ID__/g, buildId)
+    .replace('__SHELL__', JSON.stringify({ critical, optional })));
 
   fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
   console.log('Selesai -> ' + path.relative(ROOT, OUT) + '/  (build ' + buildId + ')');
