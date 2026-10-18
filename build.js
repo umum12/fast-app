@@ -94,13 +94,42 @@ function inject(html, page, execUrlOk) {
   // Adapter HARUS dimuat sebelum script aplikasi (mendefinisikan google.script.run).
   head.push('<script src="config.js"></script>');
   head.push('<script src="firebase-config.js"></script>');
+  head.push('<script src="pwa-install.js"></script>');
   head.push('<script src="api-adapter.js"></script>');
-  head.push("<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}</script>");
+  head.push("<script>if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js',{scope:'./'}).catch(function(){});});}</script>");
   const block = '\n' + head.join('\n') + '\n';
 
   if (/<head[^>]*>/i.test(html)) return html.replace(/<head[^>]*>/i, (m) => m + block);
   if (/<html[^>]*>/i.test(html)) return html.replace(/<html[^>]*>/i, (m) => m + '<head>' + block + '</head>');
   return '<!DOCTYPE html><html><head>' + block + '</head><body>' + html + '</body></html>';
+}
+
+
+// Identitas PWA yang UNIK per aplikasi. "id" pada manifest di-resolve terhadap
+// ORIGIN (bukan folder), jadi "./" akan sama dengan project GitHub Pages lain di
+// user.github.io. Karena itu id diisi path repo, mis. /fast-app/.
+function basePath(cfg) {
+  const fromCfg = (cfg.BASE_PATH || '').trim();
+  let p = fromCfg;
+  if (!p && process.env.GITHUB_REPOSITORY) {
+    const repo = process.env.GITHUB_REPOSITORY.split('/')[1] || '';
+    p = /\.github\.io$/i.test(repo) ? '/' : '/' + repo + '/';
+  }
+  if (!p) p = '/fast-app/';
+  if (p[0] !== '/') p = '/' + p;
+  if (p[p.length - 1] !== '/') p += '/';
+  return p;
+}
+function writeManifests(outDir, base) {
+  for (const f of ['manifest.json', 'manifest-buat.json']) {
+    const fp = path.join(outDir, f);
+    if (!fs.existsSync(fp)) continue;
+    const m = JSON.parse(fs.readFileSync(fp, 'utf8'));
+    m.id = f === 'manifest-buat.json' ? base + 'buat.html' : base;
+    m.start_url = f === 'manifest-buat.json' ? './buat.html' : './';
+    m.scope = './';
+    fs.writeFileSync(fp, JSON.stringify(m, null, 2) + '\n');
+  }
 }
 
 function copyDir(from, to) {
@@ -121,6 +150,9 @@ function main() {
 
   fs.rmSync(OUT, { recursive: true, force: true });
   copyDir(PUBLIC, OUT);
+  const base = basePath(cfg);
+  writeManifests(OUT, base);
+  console.log('  PWA id/scope: ' + base);
 
   const builtPages = [];
   for (const page of PAGES) {
@@ -145,10 +177,10 @@ function main() {
 
   // Service worker: versi cache + daftar shell.
   const hash = crypto.createHash('sha1');
-  for (const f of builtPages.concat(['api-adapter.js', 'config.js', 'firebase-config.js'])) hash.update(fs.readFileSync(path.join(OUT, f)));
+  for (const f of builtPages.concat(['api-adapter.js', 'config.js', 'firebase-config.js', 'pwa-install.js'])) hash.update(fs.readFileSync(path.join(OUT, f)));
   const buildId = hash.digest('hex').slice(0, 10);
   const swPath = path.join(OUT, 'sw.js');
-  const shell = ['./'].concat(builtPages, ['config.js', 'firebase-config.js', 'api-adapter.js', 'manifest.json', 'manifest-buat.json', 'icons/icon-192.png', 'icons/icon-512.png']);
+  const shell = ['./'].concat(builtPages, ['config.js', 'firebase-config.js', 'pwa-install.js', 'api-adapter.js', 'manifest.json', 'manifest-buat.json', 'icons/icon-192.png', 'icons/icon-512.png']);
   fs.writeFileSync(swPath, fs.readFileSync(swPath, 'utf8').replace(/__BUILD_ID__/g, buildId).replace('__SHELL__', JSON.stringify(shell)));
 
   fs.writeFileSync(path.join(OUT, '.nojekyll'), '');
