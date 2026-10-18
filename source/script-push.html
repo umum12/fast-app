@@ -1,0 +1,245 @@
+<script>
+/**
+ * script-push.html — Notifikasi Push (PWA GitHub Pages)
+ *
+ * File BARU. Di-include di index.html SETELAH script-aktivitas.
+ * - Kartu "Notifikasi" di menu Akun: Aktifkan / Kirim Tes / Matikan.
+ * - Hanya aktif di versi GitHub Pages (ada window.FASTAPP_CONFIG dari
+ *   config.js) DAN Firebase sudah diisi di firebase-config.js. Di /exec
+ *   (Apps Script) kartu tersembunyi — service worker tidak bisa jalan di sana.
+ * - SDK Firebase dimuat dinamis hanya saat dibutuhkan (Aktifkan / sinkron).
+ * - Service worker (sw.js) yang menampilkan notifikasi; file ini hanya
+ *   mengurus izin, token, dan pendaftaran token ke server.
+ */
+var PushUI = (function () {
+  var SDK_VERSION = '10.14.1';
+  var LS_ON = 'fs_push_on';          // '1' bila pengguna mengaktifkan di perangkat ini
+  var LS_TOKEN = 'fs_push_token';
+  var LS_SYNC = 'fs_push_sync';      // 'KODE|timestamp' — sinkron token ke akun yang login
+  var SYNC_EVERY_MS = 24 * 60 * 60 * 1000;
+
+  var accessCode = '';
+  var busy = false;
+  var sdkPromise = null;
+
+  function cfg() { return window.FASTAPP_FIREBASE || {}; }
+  function ls(key, val) {
+    try {
+      if (val === undefined) return localStorage.getItem(key);
+      if (val === null) localStorage.removeItem(key); else localStorage.setItem(key, val);
+    } catch (e) {}
+    return null;
+  }
+  function el(id) { return document.getElementById(id); }
+
+  function isGitHubMode() { return !!window.FASTAPP_CONFIG; }
+  function isConfigured() { var c = cfg(); return !!(c.apiKey && c.projectId && c.messagingSenderId && c.appId && c.vapidKey); }
+  function isIos() { return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+  function isStandalone() { return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true; }
+  function browserSupports() { return ('serviceWorker' in navigator) && ('PushManager' in window) && ('Notification' in window); }
+
+  function deviceLabel() {
+    var ua = navigator.userAgent || '';
+    var os = /android/i.test(ua) ? 'Android' : isIos() ? 'iOS' : /windows/i.test(ua) ? 'Windows' : /mac/i.test(ua) ? 'Mac' : /linux/i.test(ua) ? 'Linux' : 'Perangkat';
+    var br = /edg\//i.test(ua) ? 'Edge' : /chrome|crios/i.test(ua) ? 'Chrome' : /safari/i.test(ua) ? 'Safari' : /firefox|fxios/i.test(ua) ? 'Firefox' : 'Browser';
+    return os + ' · ' + br + (isStandalone() ? ' (PWA)' : '');
+  }
+
+  // ---------- panggilan backend (google.script.run / adapter) ----------
+  function call(fnName) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return new Promise(function (resolve, reject) {
+      var runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(function (e) {
+        reject(new Error((e && e.message) || 'Gagal terhubung ke server.'));
+      });
+      runner[fnName].apply(runner, args);
+    });
+  }
+  function unwrap(res, fallbackMsg) {
+    if (res && res.success) return res.data;
+    throw new Error((res && res.error) || fallbackMsg || 'Permintaan gagal.');
+  }
+
+  // ---------- SDK Firebase (dimuat dinamis) ----------
+  function loadScript(src) {
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = src; s.async = true;
+      s.onload = resolve;
+      s.onerror = function () { reject(new Error('Gagal memuat komponen notifikasi (cek koneksi internet).')); };
+      document.head.appendChild(s);
+    });
+  }
+  function loadSdk() {
+    if (sdkPromise) return sdkPromise;
+    var base = 'https://www.gstatic.com/firebasejs/' + SDK_VERSION + '/';
+    sdkPromise = loadScript(base + 'firebase-app-compat.js')
+      .then(function () { return loadScript(base + 'firebase-messaging-compat.js'); })
+      .then(function () {
+        if (!window.firebase.apps.length) {
+          var c = cfg();
+          window.firebase.initializeApp({
+            apiKey: c.apiKey, authDomain: c.authDomain, projectId: c.projectId,
+            messagingSenderId: c.messagingSenderId, appId: c.appId
+          });
+        }
+        return window.firebase.messaging();
+      })
+      .catch(function (e) { sdkPromise = null; throw e; });
+    return sdkPromise;
+  }
+
+  function getRegistration() {
+    return navigator.serviceWorker.getRegistration().then(function (reg) {
+      return reg || navigator.serviceWorker.register('sw.js');
+    }).then(function () { return navigator.serviceWorker.ready; });
+  }
+
+  function fetchToken() {
+    return Promise.all([loadSdk(), getRegistration()]).then(function (r) {
+      return r[0].getToken({ vapidKey: cfg().vapidKey, serviceWorkerRegistration: r[1] });
+    }).then(function (token) {
+      if (!token) throw new Error('Token notifikasi tidak diterima. Coba lagi.');
+      return token;
+    });
+  }
+
+  // ---------- tampilan ----------
+  function setStatus(text, tone) {
+    var p = el('push-status-text');
+    if (!p) return;
+    p.textContent = text;
+    p.style.color = tone === 'ok' ? '#15803d' : tone === 'warn' ? '#b45309' : '';
+  }
+  function show(id, on) { var e = el(id); if (e) e.style.display = on ? '' : 'none'; }
+
+  function render() {
+    var card = el('card-notifikasi');
+    if (!card) return;
+    if (!isGitHubMode() || !isConfigured()) { card.style.display = 'none'; return; }
+    card.style.display = '';
+
+    show('btn-push-enable', false); show('btn-push-test', false); show('btn-push-disable', false);
+
+    if (!browserSupports()) {
+      if (isIos() && !isStandalone()) {
+        setStatus('Di iPhone/iPad, notifikasi hanya bisa dipakai dari aplikasi yang sudah ditambahkan ke Layar Utama: buka menu Bagikan di Safari → "Tambah ke Layar Utama", lalu buka aplikasi dari ikonnya dan aktifkan di sini.', 'warn');
+      } else {
+        setStatus('Browser ini belum mendukung notifikasi. Gunakan Chrome/Edge terbaru atau pasang aplikasinya (PWA).', 'warn');
+      }
+      return;
+    }
+    if (Notification.permission === 'denied') {
+      setStatus('Notifikasi diblokir untuk aplikasi ini. Izinkan kembali lewat pengaturan situs/aplikasi di perangkat Anda, lalu muat ulang.', 'warn');
+      return;
+    }
+    if (ls(LS_ON) === '1' && Notification.permission === 'granted') {
+      setStatus('Aktif di perangkat ini. Anda akan diberi tahu saat ada pekerjaan baru atau komentar baru.', 'ok');
+      show('btn-push-test', true); show('btn-push-disable', true);
+    } else {
+      setStatus('Dapatkan pemberitahuan saat ada pekerjaan baru untuk Anda dan komentar baru di pekerjaan terkait.');
+      show('btn-push-enable', true);
+    }
+  }
+
+  function setBusy(on, label) {
+    busy = on;
+    ['btn-push-enable', 'btn-push-test', 'btn-push-disable'].forEach(function (id) {
+      var b = el(id); if (b) b.disabled = on;
+    });
+    if (on && label) setStatus(label);
+  }
+  function toast(msg, type) { if (typeof showSnackbar === 'function') showSnackbar(msg, type || 'info'); }
+
+  // ---------- aksi ----------
+  function enable() {
+    if (busy) return;
+    if (!browserSupports()) { render(); return; }
+    setBusy(true, 'Meminta izin notifikasi...');
+    var p = (Notification.permission === 'granted') ? Promise.resolve('granted') : Notification.requestPermission();
+    Promise.resolve(p).then(function (perm) {
+      if (perm !== 'granted') throw new Error(perm === 'denied' ? 'Izin notifikasi ditolak.' : 'Izin notifikasi tidak diberikan.');
+      setStatus('Menyiapkan perangkat...');
+      return fetchToken();
+    }).then(function (token) {
+      setStatus('Mendaftarkan perangkat...');
+      return call('registerPushToken', accessCode, token, deviceLabel()).then(function (res) {
+        unwrap(res, 'Gagal mendaftarkan perangkat.');
+        ls(LS_TOKEN, token); ls(LS_ON, '1'); ls(LS_SYNC, accessCode + '|' + Date.now());
+        toast('Notifikasi diaktifkan', 'success');
+      });
+    }).catch(function (e) {
+      toast(e.message || 'Gagal mengaktifkan notifikasi.', 'error');
+    }).then(function () { setBusy(false); render(); });
+  }
+
+  function disable() {
+    if (busy) return;
+    setBusy(true, 'Mematikan notifikasi...');
+    var token = ls(LS_TOKEN);
+    var done = function () { ls(LS_ON, null); ls(LS_TOKEN, null); ls(LS_SYNC, null); };
+    var tasks = [];
+    if (token) tasks.push(call('unregisterPushToken', accessCode, token).catch(function () {}));
+    Promise.all(tasks).then(function () {
+      if (sdkPromise) { return sdkPromise.then(function (m) { return m.deleteToken(); }).catch(function () {}); }
+    }).then(function () {
+      done();
+      toast('Notifikasi dimatikan', 'success');
+    }).then(function () { setBusy(false); render(); });
+  }
+
+  function sendTest() {
+    if (busy) return;
+    setBusy(true, 'Mengirim notifikasi tes...');
+    call('sendTestPush', accessCode).then(function (res) {
+      unwrap(res, 'Gagal mengirim notifikasi tes.');
+      toast('Tes terkirim — notifikasi akan muncul sebentar lagi', 'success');
+    }).catch(function (e) {
+      toast(e.message, 'error');
+    }).then(function () { setBusy(false); render(); });
+  }
+
+  /**
+   * Dipanggil setiap kali aplikasi terbuka & login. Bila notifikasi sudah
+   * aktif di perangkat ini, token didaftarkan ulang ke AKUN YANG SEDANG LOGIN
+   * (perangkat bersama: kepemilikan pindah ke pengguna terakhir) — maksimal
+   * sekali per 24 jam per akun agar tidak memuat SDK di setiap buka aplikasi.
+   */
+  function syncOnLogin() {
+    if (!isGitHubMode() || !isConfigured() || !browserSupports()) return;
+    if (ls(LS_ON) !== '1' || Notification.permission !== 'granted') return;
+    var last = (ls(LS_SYNC) || '').split('|');
+    if (last[0] === accessCode && (Date.now() - (parseInt(last[1], 10) || 0)) < SYNC_EVERY_MS) return;
+    fetchToken().then(function (token) {
+      return call('registerPushToken', accessCode, token, deviceLabel()).then(function (res) {
+        unwrap(res);
+        ls(LS_TOKEN, token); ls(LS_SYNC, accessCode + '|' + Date.now());
+      });
+    }).catch(function () { /* diam-diam; dicoba lagi pada pembukaan berikutnya */ });
+  }
+
+  function init(session) {
+    accessCode = (session && session.accessCode) || '';
+    if (!accessCode) return;
+    var be = el('btn-push-enable'), bt = el('btn-push-test'), bd = el('btn-push-disable');
+    if (be && !be._pushBound) { be._pushBound = true; be.addEventListener('click', enable); }
+    if (bt && !bt._pushBound) { bt._pushBound = true; bt.addEventListener('click', sendTest); }
+    if (bd && !bd._pushBound) { bd._pushBound = true; bd.addEventListener('click', disable); }
+    render();
+    syncOnLogin();
+  }
+
+  return { init: init };
+})();
+
+// Dipanggil otomatis setelah renderApp (script-core.html) tanpa mengubah file itu.
+(function () {
+  var original = window.renderApp;
+  if (typeof original !== 'function') return;
+  window.renderApp = function (bootstrap, session) {
+    var out = original.apply(this, arguments);
+    try { PushUI.init(session || (typeof loadSession === 'function' ? loadSession() : null)); } catch (e) {}
+    return out;
+  };
+})();
+</script>

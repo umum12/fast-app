@@ -352,6 +352,16 @@
             </div>
 
 
+            <div class="card" id="card-notifikasi" style="display:none;">
+              <h2>Notifikasi</h2>
+              <p class="md-body-sm" id="push-status-text" style="margin-bottom:12px;">&nbsp;</p>
+              <button class="btn-primary" id="btn-push-enable" type="button" style="display:none;">Aktifkan Notifikasi</button>
+              <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                <button class="btn-outlined primary" id="btn-push-test" type="button" style="display:none; flex:1; min-height:44px;">Kirim Tes</button>
+                <button class="btn-outlined" id="btn-push-disable" type="button" style="display:none; flex:1; min-height:44px;">Matikan</button>
+              </div>
+            </div>
+
             <div class="card">
               <h2>Data</h2>
               <p class="md-body-sm" style="margin-bottom:12px;">Muat ulang seluruh data aplikasi dari server bila tampilan terasa tidak sesuai (mis. setelah perubahan oleh Admin).</p>
@@ -467,5 +477,6 @@
   <?!= include('script-pekerjaan'); ?>
   <?!= include('script-jadwal'); ?>
   <?!= include('script-aktivitas'); ?>
+  <?!= include('script-push'); ?>
 </body>
 </html>
