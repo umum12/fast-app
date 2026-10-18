@@ -8,7 +8,8 @@ self.FASTAPP_FIREBASE = {
   apiKey: "AIzaSyA6EhMegFq41VY4yb5oX9hSBbq4E2GmoMY",
   authDomain: "fast-app-fca4a.firebaseapp.com",
   projectId: "fast-app-fca4a",
+  storageBucket: "fast-app-fca4a.firebasestorage.app",
   messagingSenderId: "76065419886",
-  appId: "76065419886:web:5036ab0270ef683a946c7f",
+  appId: "1:76065419886:web:5036ab0270ef683a946c7f",
   vapidKey: "BPp-LM6TuhgqEtkyIxiXTau6YJeMis0j0F2OyRidagyPGthNRZXIyPzNXzhj_PrffgITLr8NdLZpVaRnagyJVAI"
 };
