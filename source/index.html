@@ -215,6 +215,42 @@
 
           <section class="page-section" data-page="buat">
 
+            <!-- ===== FORM PENYELESAIAN TUGAS (dibuka dari tombol "Buat Laporan" di menu Pekerjaan) ===== -->
+            <div id="buat-selesai-wrap" style="display:none;">
+              <div class="card" id="selesai-detail-card">
+                <div class="card-header-row">
+                  <div class="card-header-icon" id="selesai-detail-icon"></div>
+                  <div class="card-header-text">
+                    <p class="card-header-title" style="text-transform:uppercase; letter-spacing:0.02em;">Penyelesaian Tugas</p>
+                  </div>
+                  <div class="card-header-row-actions">
+                    <button class="btn-icon" id="btn-selesai-back" type="button" aria-label="Kembali"></button>
+                  </div>
+                </div>
+                <p class="form-label" style="text-transform:uppercase; letter-spacing:0.04em; font-weight:600;">Detail Laporan</p>
+                <div id="selesai-detail-body"></div>
+              </div>
+
+              <div class="card" id="selesai-form-card">
+                <p class="form-label" style="text-transform:uppercase; letter-spacing:0.04em; font-weight:600;">Penuntasan</p>
+                <div class="form-group">
+                  <label class="form-label" for="selesai-notes">Keterangan Penuntasan</label>
+                  <textarea id="selesai-notes" class="form-input" rows="4" maxlength="500" placeholder="Jelaskan hasil pengerjaan..."></textarea>
+                  <div class="char-counter" id="selesai-notes-counter">0/500</div>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Foto Penuntasan (opsional, maks. 3)</label>
+                  <div class="photo-slots-v2" id="selesai-photo-slots"></div>
+                  <input type="file" id="selesai-photo-input" accept="image/*" style="display:none">
+                </div>
+                <div class="form-actions-row">
+                  <button class="btn-primary" id="btn-selesai-submit" type="button"></button>
+                </div>
+                <div class="form-error" id="selesai-error"></div>
+              </div>
+            </div>
+
+
               <div class="card" id="buat-form-card">
               <div class="card-header-row">
                 <div class="card-header-icon" id="buat-header-icon"></div>

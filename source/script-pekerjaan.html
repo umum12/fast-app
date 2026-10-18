@@ -176,84 +176,64 @@ function updatePerformedAtFieldVisibility() {
 
 
 /**
- * Menyalakan/mematikan tampilan mode "Buat Laporan" (prefill) pada form
- * Buat — Jenis & Lantai dikunci (locked-field) karena nilainya sudah
- * ditentukan oleh Pekerjaan asal, bukan pilihan bebas (Bagian 3).
+ * Tampilan form Buat (mode normal). Mode "Buat Laporan" TIDAK lagi memakai
+ * form ini — lihat form Penyelesaian Tugas (#buat-selesai-wrap) di bawah.
  */
 function applyBuatModeUI_() {
-  var isComplete = !!buatPrefillContext;
-
   var banner = document.getElementById('buat-context-banner');
-  var idEl = document.getElementById('buat-context-pekerjaan-id');
-  if (banner) banner.style.display = isComplete ? 'block' : 'none';
-  if (idEl && isComplete) idEl.textContent = buatPrefillContext.pekerjaanId;
+  if (banner) banner.style.display = 'none';
 
   var headerTitle = document.getElementById('buat-header-title');
-  if (headerTitle) headerTitle.textContent = isComplete ? 'Buat Laporan Pekerjaan' : 'Buat Pekerjaan';
+  if (headerTitle) headerTitle.textContent = 'Buat Pekerjaan';
 
   var jenisSelect = document.getElementById('form-jenis');
   var floorSelect = document.getElementById('form-floor');
-
-
-
-    var contextBanner = document.getElementById('buat-context-banner');
-  if (contextBanner) {
-    contextBanner.style.background = isComplete ? 'var(--status-completed-bg)' : '';
-    contextBanner.style.color = isComplete ? 'var(--status-completed-fg)' : '';
-  }
   [jenisSelect, floorSelect].forEach(function (el) {
     if (!el) return;
-    el.classList.toggle('locked-field-green', isComplete);
-  });
-
-
-
-  
-  [jenisSelect, floorSelect].forEach(function (el) {
-    if (!el) return;
-    el.disabled = isComplete;
-    el.classList.toggle('locked-field', isComplete);
+    el.disabled = false;
+    el.classList.remove('locked-field', 'locked-field-green');
   });
 
   var descLabel = document.getElementById('form-description-label');
   var photoLabel = document.getElementById('form-photo-label');
-  if (descLabel) descLabel.textContent = isComplete ? 'Keterangan Penuntasan' : 'Keterangan';
-  if (photoLabel) photoLabel.textContent = isComplete ? 'Foto Penuntasan (opsional, maks. 3)' : 'Foto Kondisi Awal (opsional, maks. 3)';
+  if (descLabel) descLabel.textContent = 'Keterangan';
+  if (photoLabel) photoLabel.textContent = 'Foto Kondisi Awal (opsional, maks. 3)';
 
   var submitBtn = document.getElementById('btn-submit-report');
-  if (submitBtn) submitBtn.innerHTML = mdIcon(isComplete ? 'checkCircle' : 'upload', 18) + '<span>' + (isComplete ? 'Kirim Laporan' : 'Simpan & Kirim') + '</span>';
+  if (submitBtn) submitBtn.innerHTML = mdIcon('upload', 18) + '<span>Simpan & Kirim</span>';
 }
 
 /**
  * Dipanggil dari tombol "Buat Laporan" pada kartu Pekerjaan yang sedang
- * DIKERJAKAN (Menu Pekerjaan) — Bagian 2 & 3 Patch Bug Navigasi &
- * Workflow. Prefill Lantai, Subjek, Keterangan, dan Job ID dari data
- * Pekerjaan yang dipilih, lalu arahkan ke halaman Buat.
+ * DIKERJAKAN (Menu Pekerjaan). Menyimpan SELURUH data pekerjaan sebagai
+ * referensi (read-only) lalu membuka form Penyelesaian Tugas di menu Buat.
+ * Berlaku untuk kedua arah (Admin → FS dan FS → Admin) — tidak ada jenis
+ * yang dipaksa; backend selesaikanPekerjaan() yang memvalidasi hak akses.
  */
-
 function openBuatLaporanForPekerjaan(p) {
-  buatPrefillContext = {
-    pekerjaanId: p.pekerjaanId,
-    jenis: 'penugasan',
-    floorCode: p.floorCode,
-    subject: p.subject || '',
-    description: '' // keterangan penuntasan harus kosong, bukan salinan keterangan penugasan
-  };
+  buatPrefillContext = { pekerjaanId: p.pekerjaanId, pekerjaan: p };
   goToPage('buat');
 }
 
-
 function initPekerjaanForm() {
   if (!appBootstrap) return;
+
+  // Mode Penyelesaian Tugas: form terpisah, state terpisah.
+  if (buatPrefillContext && document.getElementById('buat-selesai-wrap')) {
+    showBuatMode_(true);
+    renderSelesaiForm_();
+    return;
+  }
+  buatPrefillContext = null;
+  showBuatMode_(false);
+
   var role = appBootstrap.currentUser.role;
 
   var allowedJenis = JENIS_ROLE_FILTER[role] || [];
   var jenisSelect = document.getElementById('form-jenis');
   jenisSelect.innerHTML = '';
 
-  var jenisSource = buatPrefillContext
-    ? (appBootstrap.jenisPekerjaanList || []).filter(function (j) { return j.value === buatPrefillContext.jenis; })
-    : (appBootstrap.jenisPekerjaanList || []).filter(function (j) { return allowedJenis.indexOf(j.value) !== -1; });
+  var jenisSource = (appBootstrap.jenisPekerjaanList || []).filter(function (j) { return allowedJenis.indexOf(j.value) !== -1; });
   jenisSource.forEach(function (j) {
     var opt = document.createElement('option');
     opt.value = j.value;
@@ -285,16 +265,7 @@ function initPekerjaanForm() {
 
   attachFormBuatListenersOnce_();
 
-  if (buatPrefillContext) {
-    jenisSelect.value = buatPrefillContext.jenis;
-    floorSelect.value = buatPrefillContext.floorCode;
-    document.getElementById('form-subject').value = buatPrefillContext.subject;
-    document.getElementById('form-description').value = buatPrefillContext.description;
-    var descCounterEl = document.getElementById('form-description-counter');
-    if (descCounterEl) descCounterEl.textContent = buatPrefillContext.description.length + '/500';
-  }
-
-applyBuatModeUI_();
+  applyBuatModeUI_();
   updateJenisIcon();
   updateAssignmentFieldsVisibility();
   updatePerformedAtFieldVisibility();
@@ -496,13 +467,6 @@ document.getElementById('btn-submit-report').addEventListener('click', function 
   var errorEl = document.getElementById('form-report-error');
   errorEl.textContent = '';
 
-  // Mode "Buat Laporan" (Bagian 3) — menyelesaikan Pekerjaan yang SUDAH
-  // ADA lewat selesaikanPekerjaan(), bukan membuat Pekerjaan baru.
-  if (buatPrefillContext) {
-    submitBuatLaporanCompletion_();
-    return;
-  }
-
   var jenisEl = document.getElementById('form-jenis');
   var floorEl = document.getElementById('form-floor');
   var descEl = document.getElementById('form-description');
@@ -568,24 +532,201 @@ var performedAtEl = document.getElementById('form-performed-at');
     .createPekerjaan(session.accessCode, data);
 });
 
-/**
- * Submit form Buat dalam mode "Buat Laporan" (Bagian 3) — memanggil
- * selesaikanPekerjaan() dengan pekerjaanId dari konteks prefill.
- */
-function submitBuatLaporanCompletion_() {
-  var errorEl = document.getElementById('form-report-error');
-  var descEl = document.getElementById('form-description');
-  var pekerjaanId = buatPrefillContext.pekerjaanId;
+// ------------------- FORM PENYELESAIAN TUGAS -------------------
+// State terpisah dari form Buat (tidak berbagi selectedPhotos / field).
 
+var selesaiPhotos = [];            // { base64, mimeType, previewUrl } — foto penuntasan
+var selesaiActiveSlot = null;
+var SELESAI_PHOTO_CAPTIONS_ = ['Foto Hasil', 'Foto Sesudah', 'Foto Detail'];
+var lastSuccessWasSelesai_ = false;
+
+function showBuatMode_(isSelesai) {
+  var wrap = document.getElementById('buat-selesai-wrap');
+  var formCard = document.getElementById('buat-form-card');
+  var okCard = document.getElementById('buat-success-card');
+  if (wrap) wrap.style.display = isSelesai ? 'block' : 'none';
+  if (formCard) formCard.style.display = isSelesai ? 'none' : 'block';
+  if (okCard) okCard.style.display = 'none';
+}
+
+function selesaiRow_(label, value) {
+  var row = document.createElement('div');
+  row.className = 'profile-row';
+  var l = document.createElement('span'); l.className = 'label'; l.textContent = label;
+  var v = document.createElement('span'); v.style.textAlign = 'right'; v.style.fontWeight = '600'; v.textContent = value;
+  row.appendChild(l); row.appendChild(v);
+  return row;
+}
+
+/** Card Detail Laporan — murni referensi (read-only), semua lewat textContent. */
+function renderSelesaiDetail_(p) {
+  var body = document.getElementById('selesai-detail-body');
+  if (!body) return;
+  body.innerHTML = '';
+  body.appendChild(selesaiRow_('ID Laporan', p.pekerjaanId));
+  body.appendChild(selesaiRow_('Lantai', p.floorName || p.floorCode || '-'));
+  body.appendChild(selesaiRow_('Subjek', p.subject || '-'));
+
+  var descLabel = document.createElement('p');
+  descLabel.className = 'form-label';
+  descLabel.style.marginTop = '12px';
+  descLabel.textContent = 'Keterangan' + (p.createdByName ? ' (' + p.createdByName + ')' : '');
+  body.appendChild(descLabel);
+  var desc = document.createElement('div');
+  desc.className = 'md-body-sm';
+  desc.style.whiteSpace = 'pre-wrap';
+  desc.style.wordBreak = 'break-word';
+  desc.textContent = p.description || '-';
+  body.appendChild(desc);
+
+  var photos = p.initialPhotos || [];
+  if (photos.length > 0) {
+    var pl = document.createElement('p');
+    pl.className = 'form-label';
+    pl.style.marginTop = '12px';
+    pl.textContent = 'Foto Awal';
+    body.appendChild(pl);
+    var thumbs = document.createElement('div');
+    thumbs.className = 'op-card-thumbs';
+    photos.forEach(function (ph, idx) {
+      var img = document.createElement('img');
+      img.src = ph.thumbUrl || ph.url;
+      img.alt = 'Foto awal';
+      img.style.cursor = 'pointer';
+      img.addEventListener('click', function () {
+        if (typeof openPhotoViewer === 'function') openPhotoViewer(photos.map(function (x) { return x.url; }), idx);
+      });
+      thumbs.appendChild(img);
+    });
+    body.appendChild(thumbs);
+  }
+}
+
+function renderSelesaiPhotoSlots_() {
+  var container = document.getElementById('selesai-photo-slots');
+  if (!container) return;
+  container.innerHTML = '';
+  for (var i = 0; i < MAX_PHOTOS; i++) {
+    var slot = document.createElement('div');
+    slot.className = 'photo-slot-v2';
+    var open = (function (idx) { return function () { selesaiActiveSlot = idx; openPhotoSourceSheet('selesai-photo-input'); }; })(i);
+    if (selesaiPhotos[i]) {
+      var inner = document.createElement('div');
+      inner.className = 'photo-thumb-inner';
+      var img = document.createElement('img');
+      img.src = selesaiPhotos[i].previewUrl;
+      inner.appendChild(img);
+      inner.addEventListener('click', open);
+      slot.appendChild(inner);
+      var rm = document.createElement('button');
+      rm.className = 'remove-btn';
+      rm.type = 'button';
+      rm.textContent = '×';
+      rm.setAttribute('aria-label', 'Hapus foto');
+      rm.addEventListener('click', (function (idx) {
+        return function (e) { e.stopPropagation(); selesaiPhotos.splice(idx, 1); renderSelesaiPhotoSlots_(); };
+      })(i));
+      slot.appendChild(rm);
+    } else {
+      slot.innerHTML = '<span class="plus-icon">+</span><span class="slot-caption">' + SELESAI_PHOTO_CAPTIONS_[i] + '</span>';
+      slot.addEventListener('click', open);
+    }
+    container.appendChild(slot);
+  }
+}
+
+function renderSelesaiForm_() {
+  var p = buatPrefillContext.pekerjaan;
+  var iconEl = document.getElementById('selesai-detail-icon');
+  if (iconEl) iconEl.innerHTML = mdIcon('checkCircle', 22);
+  var backBtn = document.getElementById('btn-selesai-back');
+  if (backBtn) backBtn.innerHTML = mdIcon('close', 18);
+  var submitBtn = document.getElementById('btn-selesai-submit');
+  if (submitBtn) submitBtn.innerHTML = mdIcon('checkCircle', 18) + '<span>Kirim Laporan</span>';
+
+  renderSelesaiDetail_(p);
+
+  // Input penuntasan selalu mulai kosong — tidak pernah menyalin data awal.
+  selesaiPhotos = [];
+  selesaiActiveSlot = null;
+  var notes = document.getElementById('selesai-notes');
+  if (notes) { notes.value = ''; notes.classList.remove('input-error'); }
+  var counter = document.getElementById('selesai-notes-counter');
+  if (counter) counter.textContent = '0/500';
+  var err = document.getElementById('selesai-error');
+  if (err) err.textContent = '';
+  renderSelesaiPhotoSlots_();
+}
+
+function leaveSelesaiForm_() {
+  resetBuatPrefillContext_();
+  selesaiPhotos = [];
+  if (typeof goToPage === 'function') goToPage('pekerjaan');
+}
+
+(function bindSelesaiForm_() {
+  var notes = document.getElementById('selesai-notes');
+  if (!notes) return; // halaman shortcut (buat-cepat.html) tidak memiliki form ini
+
+  notes.addEventListener('input', function () {
+    var c = document.getElementById('selesai-notes-counter');
+    if (c) c.textContent = notes.value.length + '/500';
+  });
+
+  document.getElementById('selesai-photo-input').addEventListener('change', function (e) {
+    var file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    var slotIdx = selesaiActiveSlot;
+    beginAction(null);
+    compressImage(file).then(function (result) {
+      endAction(null);
+      selesaiPhotos[slotIdx] = result;
+      renderSelesaiPhotoSlots_();
+    }).catch(function () {
+      endAction(null);
+      showSnackbar('Gagal memproses foto. Coba foto lain.', 'error');
+    });
+  });
+
+  document.getElementById('btn-selesai-back').addEventListener('click', function () {
+    var dirty = notes.value.trim() || selesaiPhotos.filter(Boolean).length > 0;
+    if (dirty) {
+      showConfirmModal('Batalkan laporan penuntasan? Isian yang sudah diketik akan hilang.', leaveSelesaiForm_, 'warning');
+    } else {
+      leaveSelesaiForm_();
+    }
+  });
+
+  document.getElementById('btn-selesai-submit').addEventListener('click', submitSelesaiForm_);
+})();
+
+/**
+ * Submit Penuntasan — memanggil selesaikanPekerjaan() terhadap pekerjaan
+ * yang SUDAH ADA (bukan membuat baru). Hak akses & status divalidasi backend.
+ */
+function submitSelesaiForm_() {
+  if (!buatPrefillContext) return;
+  var errorEl = document.getElementById('selesai-error');
+  var notesEl = document.getElementById('selesai-notes');
+  errorEl.textContent = '';
+  clearFieldErrors([notesEl]);
+
+  if (!notesEl.value.trim()) {
+    showFieldError(notesEl, errorEl, 'Keterangan penuntasan wajib diisi.');
+    return;
+  }
+
+  var pekerjaanId = buatPrefillContext.pekerjaanId;
   var data = {
-    notes: descEl.value,
-    photos: selectedPhotos.filter(Boolean).map(function (p) {
-      return { base64: p.base64, mimeType: p.mimeType };
+    notes: notesEl.value,
+    photos: selesaiPhotos.filter(Boolean).map(function (ph) {
+      return { base64: ph.base64, mimeType: ph.mimeType };
     })
   };
 
   var session = loadSession();
-  var submitBtn = document.getElementById('btn-submit-report');
+  var submitBtn = document.getElementById('btn-selesai-submit');
   beginAction(submitBtn, 'Mengirim...');
   google.script.run
     .withSuccessHandler(function (response) {
@@ -596,16 +737,8 @@ function submitBuatLaporanCompletion_() {
         return;
       }
       resetBuatPrefillContext_();
-      selectedPhotos = [];
-      renderPhotoSlots();
-      document.getElementById('form-subject').value = '';
-      document.getElementById('form-description').value = '';
-      var descCounterEl = document.getElementById('form-description-counter');
-      if (descCounterEl) descCounterEl.textContent = '0/500';
-      updateFormProgress();
-
+      selesaiPhotos = [];
       invalidateAllPekerjaanCaches_();
-
       showLaporanSuccessCard_(pekerjaanId);
     })
     .withFailureHandler(function () {
@@ -620,7 +753,14 @@ function submitBuatLaporanCompletion_() {
 
 var JENIS_MANDIRI_SET_ = ['kebersihan', 'perbaikan', 'lainnya'];
 
+function setSuccessButtons_(isSelesai) {
+  lastSuccessWasSelesai_ = isSelesai;
+  var again = document.getElementById('btn-buat-laporan-lagi');
+  if (again) again.textContent = isSelesai ? 'Kembali ke Pekerjaan' : 'Buat Pekerjaan Lain';
+}
+
 function showPekerjaanSuccessCard(jenis) {
+  setSuccessButtons_(false);
   document.getElementById('buat-form-card').style.display = 'none';
   var isMandiri = JENIS_MANDIRI_SET_.indexOf(jenis) !== -1;
   document.getElementById('buat-success-message').textContent = 'Pekerjaan berhasil dibuat.';
@@ -636,6 +776,9 @@ function showPekerjaanSuccessCard(jenis) {
 }
 
 function showLaporanSuccessCard_(pekerjaanId) {
+  setSuccessButtons_(true);
+  var wrap = document.getElementById('buat-selesai-wrap');
+  if (wrap) wrap.style.display = 'none';
   document.getElementById('buat-form-card').style.display = 'none';
   document.getElementById('buat-success-message').textContent = 'Laporan berhasil dikirim.';
   var subtextEl = document.getElementById('buat-success-subtext');
@@ -650,6 +793,11 @@ function hidePekerjaanSuccessCard() {
 
 document.getElementById('btn-buat-laporan-lagi').addEventListener('click', function () {
   hidePekerjaanSuccessCard();
+  if (lastSuccessWasSelesai_ && typeof initPekerjaanInboxPage === 'function') {
+    setSuccessButtons_(false);
+    goToPage('pekerjaan');
+    return;
+  }
   initPekerjaanForm();
 });
 
