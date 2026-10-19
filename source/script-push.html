@@ -109,7 +109,7 @@ var PushUI = (function () {
     var p = el('push-status-text');
     if (!p) return;
     p.textContent = text;
-    p.style.color = tone === 'ok' ? '#15803d' : tone === 'warn' ? '#b45309' : '';
+    p.setAttribute('data-tone', tone || '');
   }
   function show(id, on) { var e = el(id); if (e) e.style.display = on ? '' : 'none'; }
 
@@ -226,21 +226,40 @@ var PushUI = (function () {
 
   function render() { refreshIndicator(); }
 
+  var DIAG_COLS = [['Waktu', null], ['Izin', 'Izin'], ['Service Worker', 'Service worker'], ['Langganan', 'Langganan'], ['Penanda', 'Penanda'], ['Mode', 'Mode'], ['Halaman', 'Halaman'], ['Scope', 'Scope']];
   function showDiag() {
-    var host = el('push-status-text');
-    if (!host) return;
-    var d = el('push-diag');
-    if (!d) {
-      d = document.createElement('p');
-      d.id = 'push-diag';
-      d.style.cssText = 'margin:6px 0 0;font-size:11px;color:var(--color-text-faint, #94a3b8);';
-      host.insertAdjacentElement('afterend', d);
-    }
+    var box = el('push-diag-box'), wrap = el('push-details');
+    if (!box) return;
     var arr = [];
     try { arr = JSON.parse(ls(DIAG_KEY) || '[]'); } catch (e) {}
-    d.style.whiteSpace = 'pre-wrap';
-    d.textContent = arr.join('\n');
-    d.style.display = arr.length ? '' : 'none';
+    if (wrap) wrap.style.display = arr.length ? '' : 'none';
+    var table = document.createElement('table');
+    table.className = 'akun-table';
+    var thead = table.createTHead().insertRow();
+    DIAG_COLS.forEach(function (c) { var th = document.createElement('th'); th.textContent = c[0]; thead.appendChild(th); });
+    var tbody = table.createTBody();
+    arr.forEach(function (line) {
+      var row = tbody.insertRow();
+      var fields = {};
+      String(line).slice(9).split(' · ').forEach(function (part) {
+        var i = part.indexOf(': ');
+        if (i > 0) fields[part.slice(0, i)] = part.slice(i + 2);
+      });
+      DIAG_COLS.forEach(function (c) {
+        var td = row.insertCell();
+        var v = c[1] === null ? String(line).slice(0, 8) : (fields[c[1]] || '-');
+        if (c[1] === 'Langganan' || c[1] === 'Penanda') {
+          var good = (v === 'ada' || v === 'ya');
+          var badge = document.createElement('span');
+          badge.className = 'akun-badge ' + (good ? 'ok' : 'off');
+          badge.textContent = v; td.appendChild(badge);
+        } else if (c[1] === 'Scope') {
+          var code = document.createElement('code'); code.textContent = v; td.appendChild(code);
+        } else { td.textContent = v; }
+      });
+    });
+    box.innerHTML = '';
+    box.appendChild(table);
   }
 
   function renderCard(state) {
@@ -326,6 +345,12 @@ var PushUI = (function () {
     Promise.all(tasks).then(function () {
       if (sdkPromise) { return sdkPromise.then(function (m) { return m.deleteToken(); }).catch(function () {}); }
     }).then(function () {
+      // Batalkan juga langganan push yang nyata di browser (SDK mungkin belum dimuat di halaman ini);
+      // tanpa ini status aktual akan kembali "aktif" karena langganan masih ada.
+      return readSubscription().then(function (r) {
+        return r.sub && r.sub.unsubscribe ? r.sub.unsubscribe().catch(function () {}) : null;
+      });
+    }).then(function () {
       return navigator.serviceWorker.getRegistration().then(function (reg) {
         return reg && reg.pushManager ? reg.pushManager.getSubscription() : null;
       }).then(function (sub) { return sub ? sub.unsubscribe() : null; }).catch(function () {});
@@ -365,7 +390,20 @@ var PushUI = (function () {
     }).catch(function () { /* diam-diam; dicoba lagi pada pembukaan berikutnya */ });
   }
 
+  // Ikon pada kartu menu Akun (SVG inline dari mdIcon; tanpa ketergantungan CDN).
+  function applyAkunIcons() {
+    var nodes = document.querySelectorAll('[data-ico]');
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      if (n.getAttribute('data-ico-done')) continue;
+      var big = n.classList.contains('akun-card-icon');
+      n.innerHTML = mdIcon(n.getAttribute('data-ico'), big ? 22 : 18);
+      n.setAttribute('data-ico-done', '1');
+    }
+  }
+
   function init(session) {
+    applyAkunIcons();
     accessCode = (session && session.accessCode) || '';
     if (!accessCode) return;
     try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}

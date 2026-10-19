@@ -378,46 +378,59 @@
           </section>
 
           <section class="page-section" data-page="akun">
-            <button id="btn-back-from-akun" type="button" style="background:none;border:none;color:var(--color-primary);font-size:14px;font-weight:600;padding:8px 0;margin-bottom:4px;cursor:pointer;">&larr; Kembali</button>
-            <div class="card">
-              <h2>Akun</h2>
-              <div class="profile-row"><span class="label">Nama</span><span id="akun-nama">—</span></div>
-              <div class="profile-row"><span class="label">Kode Akses</span><span id="akun-kode">—</span></div>
-              <div class="profile-row"><span class="label">Role</span><span id="akun-role">—</span></div>
+            <button id="btn-back-from-akun" class="akun-back" type="button">&larr; Kembali</button>
+
+            <!-- Profil -->
+            <div class="card akun-hero">
+              <div class="akun-hero-top">
+                <div class="akun-avatar" id="akun-avatar">?</div>
+                <div class="akun-hero-text">
+                  <div class="akun-name" id="akun-nama">—</div>
+                  <span class="akun-role-chip"><span class="akun-ico" data-ico="shield"></span><span id="akun-role">—</span></span>
+                </div>
+              </div>
+              <div class="akun-row">
+                <span class="akun-row-label"><span class="akun-ico" data-ico="key"></span>Kode Akses</span>
+                <span class="akun-code" id="akun-kode">—</span>
+              </div>
               <button class="btn-logout" id="btn-logout">Keluar</button>
             </div>
 
-
             <div class="card" id="card-pasang" style="display:none;">
-              <h2>Pasang Aplikasi</h2>
+              <div class="akun-card-head"><span class="akun-card-icon" data-ico="download"></span><h2>Pasang Aplikasi</h2></div>
               <p class="md-body-sm" id="pasang-hint" style="margin-bottom:12px;">&nbsp;</p>
               <button class="btn-primary" id="btn-pasang-app" type="button" style="display:none;">Pasang Aplikasi</button>
             </div>
 
             <div class="card" id="card-notifikasi" style="display:none;">
-              <h2>Notifikasi</h2>
-              <p class="md-body-sm" id="push-status-text" style="margin-bottom:12px;">&nbsp;</p>
-              <button class="btn-success" id="btn-push-enable" type="button" style="display:none;">Aktifkan Notifikasi</button>
-              <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                <button class="btn-outlined primary" id="btn-push-test" type="button" style="display:none; flex:1; min-height:44px;">Kirim Tes</button>
-                <button class="btn-danger-solid" id="btn-push-disable" type="button" style="display:none; flex:1; min-height:44px; width:auto;">Matikan</button>
+              <div class="akun-card-head"><span class="akun-card-icon" data-ico="bellRing"></span><h2>Notifikasi</h2></div>
+              <p class="akun-banner" id="push-status-text" data-tone="">&nbsp;</p>
+              <p class="md-body-sm" id="push-hint-text" style="margin:-4px 0 12px; display:none; color:var(--color-text-muted);"></p>
+              <details class="akun-details" id="push-details" style="display:none;">
+                <summary>Detail teknis</summary>
+                <div class="akun-table-wrap" id="push-diag-box"></div>
+              </details>
+              <div class="akun-actions">
+                <button class="btn-success" id="btn-push-enable" type="button" style="display:none;"><span class="akun-ico" data-ico="bellRing"></span><span>Aktifkan Notifikasi</span></button>
+                <button class="btn-outlined primary" id="btn-push-test" type="button" style="display:none;"><span class="akun-ico" data-ico="send"></span><span>Kirim Tes</span></button>
+                <button class="btn-danger-solid" id="btn-push-disable" type="button" style="display:none;"><span class="akun-ico" data-ico="bellOff"></span><span>Matikan</span></button>
               </div>
             </div>
 
             <div class="card">
-              <h2>Data</h2>
+              <div class="akun-card-head"><span class="akun-card-icon" data-ico="database"></span><h2>Data</h2></div>
               <p class="md-body-sm" style="margin-bottom:12px;">Muat ulang seluruh data aplikasi dari server bila tampilan terasa tidak sesuai (mis. setelah perubahan oleh Admin).</p>
               <button class="btn-outlined" id="btn-reload-app-data" type="button" style="display:flex; align-items:center; justify-content:center; gap:8px;"></button>
             </div>
 
             <div class="card">
-              <h2>About Application</h2>
-              <div class="profile-row"><span class="label">Application Name</span><span>Facility Support</span></div>
-              <div class="profile-row"><span class="label">Framework</span><span>PWA (GitHub) + GAS + FCM</span></div>
+              <div class="akun-card-head"><span class="akun-card-icon" data-ico="info"></span><h2>Tentang Aplikasi</h2></div>
+              <div class="akun-row"><span class="akun-row-label"><span class="akun-ico" data-ico="apps"></span>Nama Aplikasi</span><span class="akun-row-value">Facility Support</span></div>
+              <div class="akun-row"><span class="akun-row-label"><span class="akun-ico" data-ico="layers"></span>Versi Arsitektur</span><span class="akun-row-value">Patch 10.x</span></div>
               <div id="app-update-box" style="display:none;">
-                <div class="profile-row"><span class="label">Build Patch</span><span id="app-build-label">—</span></div>
+                <div class="akun-row"><span class="akun-row-label"><span class="akun-ico" data-ico="build"></span>Versi Aplikasi</span><span class="akun-row-value" id="app-build-label">—</span></div>
                 <p class="md-body-sm" id="app-update-status" style="margin:10px 0 0;min-height:18px;"></p>
-                <button class="btn-outlined primary" id="btn-check-update" type="button" style="margin-top:10px; min-height:44px;">Periksa Pembaruan</button>
+                <button class="btn-outlined primary" id="btn-check-update" type="button" style="margin-top:10px; min-height:44px;"><span class="akun-ico" data-ico="sysUpdate"></span><span id="btn-check-update-label">Periksa Pembaruan</span></button>
               </div>
             </div>
           </section>
