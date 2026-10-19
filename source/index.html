@@ -64,34 +64,7 @@
                 <div class="inline-loading"><span class="spinner-sm"></span>Memuat jadwal...</div>
               </div>
 
-              <div id="jadwal-piket-table" style="margin-top:10px;"></div>
-
-              <div id="jadwal-form-panel" style="display:none; margin-top:14px;">
-                <p class="md-title-sm" id="jadwal-form-heading" style="margin:0 0 10px;">Tambah Jadwal</p>
-                <div class="form-group">
-                  <label class="form-label">Tanggal</label>
-                  <input id="jadwal-form-date" class="form-input" type="date">
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Jenis</label>
-                  <select id="jadwal-form-jenis" class="form-input"></select>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Petugas</label>
-                  <select id="jadwal-form-user" class="form-input">
-                    <option value="">Pilih petugas</option>
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Catatan (opsional)</label>
-                  <input id="jadwal-form-notes" class="form-input" type="text" maxlength="200">
-                </div>
-                <div class="form-actions-row">
-                  <button class="btn-outlined" id="btn-cancel-jadwal-form" type="button">Batal</button>
-                  <button class="btn-primary" id="btn-submit-jadwal">Simpan Jadwal</button>
-                </div>
-                <div class="form-error" id="jadwal-form-error"></div>
-              </div>
+              <div id="jadwal-piket-table" class="jk-table-wrap"></div>
             </div>
 
             <div class="card" id="admin-content-card" style="display:none;">
@@ -498,6 +471,63 @@
         <button class="btn-cancel" id="confirm-modal-cancel">Batal</button>
         <button class="btn-confirm" id="confirm-modal-confirm">Ya, Lanjutkan</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Jadwal Kolaborasi: modal tengah (form, detail, pemilih) -->
+  <div class="jk-overlay" id="jk-form-overlay">
+    <div class="jk-modal" role="dialog" aria-modal="true" aria-labelledby="jadwal-form-heading">
+      <div class="jk-modal-header">
+        <h3 id="jadwal-form-heading">Tambah Jadwal</h3>
+        <button class="jk-close" type="button" data-jk-close aria-label="Tutup"></button>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="jadwal-form-date">Tanggal</label>
+        <input id="jadwal-form-date" class="form-input" type="date">
+        <div class="field-error-msg" id="jadwal-err-date"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Jenis</label>
+        <button class="jk-select" id="jk-open-jenis" type="button"><span id="jk-jenis-label">Pilih jenis</span><span class="jk-arrow" data-ico="chevronDown"></span></button>
+        <select id="jadwal-form-jenis" hidden></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Petugas</label>
+        <button class="jk-select" id="jk-open-user" type="button"><span id="jk-user-label" class="is-placeholder">Pilih petugas</span><span class="jk-arrow" data-ico="chevronDown"></span></button>
+        <select id="jadwal-form-user" hidden>
+          <option value="">Pilih petugas</option>
+        </select>
+        <div class="field-error-msg" id="jadwal-err-user"></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="jadwal-form-notes">Catatan (opsional)</label>
+        <input id="jadwal-form-notes" class="form-input" type="text" maxlength="200" placeholder="Tambahkan catatan...">
+      </div>
+      <div class="form-error" id="jadwal-form-error"></div>
+      <div class="jk-footer">
+        <button class="btn-outlined" id="btn-cancel-jadwal-form" type="button">Batal</button>
+        <button class="btn-primary" id="btn-submit-jadwal" type="button">Simpan Jadwal</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="jk-overlay" id="jk-picker-overlay">
+    <div class="jk-modal" role="dialog" aria-modal="true" aria-labelledby="jk-picker-title">
+      <div class="jk-modal-header">
+        <h3 id="jk-picker-title">Pilih</h3>
+        <button class="jk-close" type="button" data-jk-close aria-label="Kembali"></button>
+      </div>
+      <div class="jk-picker-list" id="jk-picker-list"></div>
+    </div>
+  </div>
+
+  <div class="jk-overlay" id="jk-detail-overlay">
+    <div class="jk-modal" role="dialog" aria-modal="true" aria-labelledby="jk-detail-title">
+      <div class="jk-modal-header">
+        <h3 id="jk-detail-title">DETAIL JADWAL</h3>
+        <button class="jk-close" type="button" data-jk-close aria-label="Tutup"></button>
+      </div>
+      <div id="jk-detail-body"></div>
     </div>
   </div>
 

@@ -187,19 +187,97 @@ function initJadwalPiketSection() {
     });
   }
 
+  jkSyncLabels_();
   loadJadwalAktif();
 }
 
 document.getElementById('btn-toggle-jadwal-form').addEventListener('click', function () {
-  if (jadwalFormEditId !== null || document.getElementById('jadwal-form-panel').style.display === 'block') {
-    closeJadwalForm();
-  } else {
-    openJadwalForm(null);
-  }
+  openJadwalForm(null);
 });
 
 document.getElementById('btn-cancel-jadwal-form').addEventListener('click', function () {
   closeJadwalForm();
+});
+
+// ---- Modal tengah (Jadwal Kolaborasi) ----
+function jkShow_(id) { document.getElementById(id).classList.add('show'); }
+function jkHide_(id) { document.getElementById(id).classList.remove('show'); }
+
+function jkInitIcons_() {
+  var nodes = document.querySelectorAll('.jk-overlay [data-jk-close]');
+  for (var i = 0; i < nodes.length; i++) nodes[i].innerHTML = mdIcon('close', 16);
+  var arrows = document.querySelectorAll('.jk-arrow');
+  for (var j = 0; j < arrows.length; j++) arrows[j].innerHTML = mdIcon('chevronDown', 16);
+  document.getElementById('jk-detail-overlay').addEventListener('click', function (e) {
+    if (e.target === this || e.target.closest('[data-jk-close]')) jkHide_('jk-detail-overlay');
+  });
+  document.getElementById('jk-form-overlay').addEventListener('click', function (e) {
+    if (e.target === this || e.target.closest('[data-jk-close]')) closeJadwalForm();
+  });
+  document.getElementById('jk-picker-overlay').addEventListener('click', function (e) {
+    if (e.target === this || e.target.closest('[data-jk-close]')) jkHide_('jk-picker-overlay');
+  });
+}
+jkInitIcons_();
+
+function jkSyncLabels_() {
+  var js = document.getElementById('jadwal-form-jenis');
+  var us = document.getElementById('jadwal-form-user');
+  var jl = document.getElementById('jk-jenis-label');
+  var ul = document.getElementById('jk-user-label');
+  jl.textContent = js.selectedIndex >= 0 && js.options[js.selectedIndex] ? js.options[js.selectedIndex].textContent : 'Pilih jenis';
+  var hasUser = !!us.value;
+  ul.textContent = hasUser ? us.options[us.selectedIndex].textContent : 'Pilih petugas';
+  ul.classList.toggle('is-placeholder', !hasUser);
+}
+
+/** Pemilih bergaya modal tengah; select asli tetap menjadi sumber nilai. */
+function jkOpenPicker_(selectId, title) {
+  var sel = document.getElementById(selectId);
+  document.getElementById('jk-picker-title').textContent = title;
+  var list = document.getElementById('jk-picker-list');
+  list.innerHTML = '';
+  Array.prototype.forEach.call(sel.options, function (opt) {
+    if (!opt.value) return;
+    var item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'jk-picker-item' + (opt.value === sel.value ? ' selected' : '');
+    var label = document.createElement('span');
+    label.textContent = opt.textContent;
+    var radio = document.createElement('span');
+    radio.className = 'jk-radio';
+    item.appendChild(label);
+    item.appendChild(radio);
+    item.addEventListener('click', function () {
+      sel.value = opt.value;
+      sel.dispatchEvent(new Event('change', { bubbles: true }));
+      jkSyncLabels_();
+      jkHide_('jk-picker-overlay');
+    });
+    list.appendChild(item);
+  });
+  jkShow_('jk-picker-overlay');
+}
+
+document.getElementById('jk-open-jenis').addEventListener('click', function () { jkOpenPicker_('jadwal-form-jenis', 'Pilih Jenis Jadwal'); });
+document.getElementById('jk-open-user').addEventListener('click', function () { jkOpenPicker_('jadwal-form-user', 'Pilih Petugas'); });
+
+function jkSetErr_(inputEl, errId, msg) {
+  inputEl.classList.add('field-invalid');
+  document.getElementById(errId).textContent = msg;
+}
+function jkClearErrs_() {
+  ['jadwal-form-date', 'jk-open-user'].forEach(function (id) { document.getElementById(id).classList.remove('field-invalid'); });
+  document.getElementById('jadwal-err-date').textContent = '';
+  document.getElementById('jadwal-err-user').textContent = '';
+}
+document.getElementById('jadwal-form-date').addEventListener('input', function () {
+  this.classList.remove('field-invalid');
+  document.getElementById('jadwal-err-date').textContent = '';
+});
+document.getElementById('jadwal-form-user').addEventListener('change', function () {
+  document.getElementById('jk-open-user').classList.remove('field-invalid');
+  document.getElementById('jadwal-err-user').textContent = '';
 });
 
 function openJadwalForm(entry) {
@@ -210,13 +288,15 @@ function openJadwalForm(entry) {
   document.getElementById('jadwal-form-user').value = entry ? entry.userCode : '';
   document.getElementById('jadwal-form-notes').value = entry ? entry.catatan : '';
   document.getElementById('jadwal-form-error').textContent = '';
-  document.getElementById('jadwal-form-panel').style.display = 'block';
-  document.getElementById('jadwal-form-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  jkClearErrs_();
+  jkSyncLabels_();
+  jkShow_('jk-form-overlay');
 }
 
 function closeJadwalForm() {
   jadwalFormEditId = null;
-  document.getElementById('jadwal-form-panel').style.display = 'none';
+  jkHide_('jk-picker-overlay');
+  jkHide_('jk-form-overlay');
   document.getElementById('jadwal-form-error').textContent = '';
 }
 
@@ -231,8 +311,11 @@ document.getElementById('btn-submit-jadwal').addEventListener('click', function 
     catatan: document.getElementById('jadwal-form-notes').value
   };
 
-  if (!data.tanggal) { errorEl.textContent = 'Tanggal wajib diisi.'; return; }
-  if (!data.userCode) { errorEl.textContent = 'Petugas wajib dipilih.'; return; }
+  jkClearErrs_();
+  var bad = false;
+  if (!data.tanggal) { jkSetErr_(document.getElementById('jadwal-form-date'), 'jadwal-err-date', 'Tanggal wajib diisi.'); bad = true; }
+  if (!data.userCode) { jkSetErr_(document.getElementById('jk-open-user'), 'jadwal-err-user', 'Petugas wajib dipilih.'); bad = true; }
+  if (bad) return;
 
   var session = loadSession();
   var editId = jadwalFormEditId;
@@ -361,57 +444,66 @@ function renderJadwalPiket_(fullList) {
 function renderJadwalTable_(list) {
   var container = document.getElementById('jadwal-piket-table');
   container.innerHTML = '';
+  var emptyEl = document.getElementById('jadwal-piket-empty');
 
   if (!list || list.length === 0) {
-    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('calendarCheck', 22) + '</div>Belum ada jadwal dalam 3 minggu ke depan.</div>';
+    container.style.display = 'none';
+    if (!emptyEl) {
+      emptyEl = document.createElement('div');
+      emptyEl.id = 'jadwal-piket-empty';
+      emptyEl.className = 'empty-state';
+      container.parentNode.insertBefore(emptyEl, container.nextSibling);
+    }
+    var windowDays = (appBootstrap && appBootstrap.scheduleDisplayWindowDays) || 21;
+    emptyEl.innerHTML = '<div class="empty-state-icon">' + mdIcon('calendarCheck', 22) + '</div>Belum ada jadwal dalam ' + Math.round(windowDays / 7) + ' minggu ke depan.';
+    emptyEl.style.display = '';
     return;
   }
+  container.style.display = '';
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  var today = todayDateStr_();
+  var table = document.createElement('table');
+  table.className = 'jk-table';
+  table.innerHTML = '<thead><tr><th>Hari &amp; Tanggal</th><th>Petugas</th><th>Jenis</th><th>Detail</th></tr></thead>';
+  var tbody = document.createElement('tbody');
 
   list.forEach(function (e) {
     var colors = JADWAL_JENIS_COLOR[e.jenis] || { bg: 'var(--status-neutral-bg)', fg: 'var(--status-neutral-fg)' };
+    var tr = document.createElement('tr');
+    if (e.tanggal === today) tr.className = 'is-today';
 
-    var card = document.createElement('div');
-    card.className = 'list-card';
+    var tdDate = document.createElement('td');
+    tdDate.textContent = formatJadwalDateLong_(e.tanggal);
+    tr.appendChild(tdDate);
 
+    var tdUser = document.createElement('td');
+    tdUser.textContent = e.userName;
+    tr.appendChild(tdUser);
+
+    var tdJenis = document.createElement('td');
     var badge = document.createElement('span');
-    badge.className = 'badge-pill';
+    badge.className = 'jk-badge';
     badge.style.background = colors.bg;
     badge.style.color = colors.fg;
-    var dot = document.createElement('span');
-    dot.className = 'dot';
-    badge.appendChild(dot);
-    badge.appendChild(document.createTextNode(e.jenisLabel));
-    card.appendChild(badge);
+    badge.textContent = e.jenisLabel;
+    tdJenis.appendChild(badge);
+    tr.appendChild(tdJenis);
 
-    var dateRow = document.createElement('div');
-    dateRow.className = 'list-card-date-row';
-    var dateEl = document.createElement('span');
-    dateEl.className = 'list-card-date';
-    dateEl.innerHTML = '<span class="icon-slot">' + mdIcon('calendar', 16) + '</span><span>' + formatJadwalDateLong_(e.tanggal) + '</span>';
-    dateRow.appendChild(dateEl);
-    var chevron = document.createElement('span');
-    chevron.className = 'list-card-chevron';
-    chevron.innerHTML = mdIcon('chevronRight', 18);
-    dateRow.appendChild(chevron);
-    card.appendChild(dateRow);
+    var tdAct = document.createElement('td');
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'jk-btn-detail';
+    btn.textContent = 'Detail';
+    btn.addEventListener('click', function () { openJadwalDetail_(e); });
+    tdAct.appendChild(btn);
+    tr.appendChild(tdAct);
 
-    var personRow = document.createElement('div');
-    personRow.className = 'list-card-person-row';
-    var avatar = document.createElement('span');
-    avatar.className = 'avatar-circle';
-    avatar.style.background = colors.bg;
-    avatar.style.color = colors.fg;
-    avatar.innerHTML = mdIcon('account', 18);
-    personRow.appendChild(avatar);
-    var personText = document.createElement('div');
-    personText.className = 'list-card-person-text';
-    personText.innerHTML = '<div class="name">' + e.userName + '</div><div class="subtext">' + e.jenisLabel + '</div>';
-    personRow.appendChild(personText);
-    card.appendChild(personRow);
-
-    card.addEventListener('click', function () { openJadwalDetail_(e); });
-    container.appendChild(card);
+    tbody.appendChild(tr);
   });
+
+  table.appendChild(tbody);
+  container.appendChild(table);
 }
 
 function openJadwalDetail_(entry) {
@@ -420,78 +512,56 @@ function openJadwalDetail_(entry) {
   var dateLong = formatJadwalDateLong_(entry.tanggal);
   var dayNameOnly = dateLong.split(',')[0];
 
-  var body = document.getElementById('activity-detail-body');
-  document.getElementById('activity-detail-title').textContent = 'DETAIL JADWAL';
-  var html = '';
-
-  html += '<div style="display:flex; align-items:center; gap:12px; margin-bottom:18px;">' +
-    '<div class="card-header-icon" style="background:' + colors.bg + '; color:' + colors.fg + ';">' + mdIcon('calendarCheck', 22) + '</div>' +
-    '<p style="font-size:18px; font-weight:800; color:' + colors.fg + '; margin:0;">' + entry.jenisLabel + '</p>' +
-  '</div>';
-
-  html += '<div style="display:flex; align-items:center; gap:8px; font-weight:700; font-size:15px;">' +
-    mdIcon('calendar', 18) + '<span>' + dateLong + '</span>' +
-  '</div>' +
-  '<p class="md-body-sm" style="margin:2px 0 14px 26px;">(Hari ' + dayNameOnly + ')</p>';
-
-  html += '<p class="form-label" style="margin:14px 0 8px;">Petugas</p>' +
-    '<div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">' +
-      '<span class="avatar-circle" style="background:' + colors.bg + '; color:' + colors.fg + ';">' + mdIcon('account', 18) + '</span>' +
-      '<div><div style="font-weight:700; font-size:14px;">' + entry.userName + '</div><div class="md-body-sm">' + entry.jenisLabel + '</div></div>' +
-    '</div>';
-
+  var body = document.getElementById('jk-detail-body');
+  var html = '<div class="jk-detail-card">';
+  html += '<div style="font-weight:700; font-size:16px; color:' + colors.fg + '; margin-bottom:8px;">' + escapeHtmlJk_(entry.jenisLabel) + '</div>';
+  html += '<div style="font-size:14px; color:var(--color-text-muted);">' + dateLong + ' (Hari ' + dayNameOnly + ')</div>';
+  html += '<hr class="jk-detail-hr"><p class="jk-detail-label">Petugas</p>' +
+    '<div style="font-weight:600;">' + escapeHtmlJk_(entry.userName) + '</div>';
   if (entry.catatan) {
-    html += '<p class="form-label" style="margin:14px 0 4px;">Keterangan</p>' +
-      '<p style="font-size:14px; margin:0 0 14px; white-space:pre-wrap;">' + entry.catatan + '</p>';
+    html += '<hr class="jk-detail-hr"><p class="jk-detail-label">Keterangan</p>' +
+      '<div style="font-size:14px; white-space:pre-wrap;">' + escapeHtmlJk_(entry.catatan) + '</div>';
   }
-
-  html += '<div style="border-top:1px solid var(--color-border); margin:14px 0;"></div>';
-
-  html += '<p class="form-label" style="margin:0 0 8px;">Dibuat oleh</p>' + buildJadwalPersonChip_(entry.createdBy, entry.createdAt);
-
+  html += '<hr class="jk-detail-hr"><p class="jk-detail-label">Dibuat oleh</p>' + buildJadwalPersonChip_(entry.createdBy, entry.createdAt);
   if (entry.updatedBy) {
-    html += '<p class="form-label" style="margin:14px 0 8px;">Terakhir diubah</p>' + buildJadwalPersonChip_(entry.updatedBy, entry.updatedAt);
+    html += '<hr class="jk-detail-hr"><p class="jk-detail-label">Terakhir diubah</p>' + buildJadwalPersonChip_(entry.updatedBy, entry.updatedAt);
   }
-
+  html += '</div>';
   body.innerHTML = html;
 
   if (canEdit) {
-    var actionsWrap = document.createElement('div');
-    actionsWrap.style.marginTop = '20px';
-    actionsWrap.style.display = 'flex';
-    actionsWrap.style.flexDirection = 'column';
-    actionsWrap.style.gap = '10px';
+    var actions = document.createElement('div');
+    actions.className = 'jk-actions';
 
     var editBtn = document.createElement('button');
+    editBtn.type = 'button';
     editBtn.className = 'btn-outlined primary';
-    editBtn.style.display = 'inline-flex';
-    editBtn.style.alignItems = 'center';
-    editBtn.style.justifyContent = 'center';
-    editBtn.style.gap = '8px';
     editBtn.innerHTML = mdIcon('edit', 16) + '<span>Ubah Jadwal</span>';
     editBtn.addEventListener('click', function () {
-      closeActivityDetail();
+      jkHide_('jk-detail-overlay');
       openJadwalForm(entry);
     });
-    actionsWrap.appendChild(editBtn);
+    actions.appendChild(editBtn);
 
     var deleteBtn = document.createElement('button');
+    deleteBtn.type = 'button';
     deleteBtn.className = 'btn-outlined danger';
-    deleteBtn.style.display = 'inline-flex';
-    deleteBtn.style.alignItems = 'center';
-    deleteBtn.style.justifyContent = 'center';
-    deleteBtn.style.gap = '8px';
     deleteBtn.innerHTML = mdIcon('delete', 16) + '<span>Hapus Jadwal</span>';
     deleteBtn.addEventListener('click', function () {
-      closeActivityDetail();
+      jkHide_('jk-detail-overlay');
       confirmHapusJadwal(entry.jadwalId);
     });
-    actionsWrap.appendChild(deleteBtn);
-
-    body.appendChild(actionsWrap);
+    actions.appendChild(deleteBtn);
+    body.appendChild(actions);
   }
 
-  document.getElementById('activity-detail-overlay').classList.add('show');
+  jkShow_('jk-detail-overlay');
+}
+
+function escapeHtmlJk_(t) {
+  return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+  });
 }
 
 /** Baris kecil "Dibuat oleh"/"Terakhir diubah". */
