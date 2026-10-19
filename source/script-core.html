@@ -7,6 +7,40 @@ function clearFieldErrors(fieldEls) {
   fieldEls.forEach(function (el) { if (el) el.classList.remove('input-error'); });
 }
 
+/** Border merah + pesan kecil tepat di bawah input terkait (hilang sendiri saat diisi/diubah). */
+function setInlineError_(fieldEl, message) {
+  if (!fieldEl) return;
+  var host = fieldEl.closest('.select-field-wrap') || fieldEl;
+  host.classList.add('field-invalid');
+  var msg = host.parentNode.querySelector(':scope > .field-error-msg[data-for="' + (fieldEl.id || '') + '"]');
+  if (!msg) {
+    msg = document.createElement('div');
+    msg.className = 'field-error-msg';
+    msg.setAttribute('data-for', fieldEl.id || '');
+    msg.setAttribute('role', 'alert');
+    host.insertAdjacentElement('afterend', msg);
+    // untuk textarea: pindahkan setelah penghitung karakter bila ada
+    var counter = host.nextElementSibling && host.nextElementSibling.nextElementSibling;
+    if (counter && counter.classList && counter.classList.contains('char-counter')) counter.insertAdjacentElement('afterend', msg);
+  }
+  msg.textContent = message;
+  var clear = function () { clearInlineError_(fieldEl); };
+  if (!fieldEl._inlineErrBound) {
+    fieldEl._inlineErrBound = true;
+    fieldEl.addEventListener('input', clear);
+    fieldEl.addEventListener('change', clear);
+  }
+  try { host.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+}
+function clearInlineError_(fieldEl) {
+  if (!fieldEl) return;
+  var host = fieldEl.closest('.select-field-wrap') || fieldEl;
+  host.classList.remove('field-invalid');
+  var scope = host.parentNode;
+  var msg = scope && scope.querySelector('.field-error-msg[data-for="' + (fieldEl.id || '') + '"]');
+  if (msg) msg.remove();
+}
+
 function showFieldError(fieldEl, errorEl, message) {
   if (fieldEl) {
     fieldEl.classList.add('input-error');
@@ -358,6 +392,15 @@ var MD_ICONS = {
   sysUpdate: '<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M12 7v7M9 11l3 3 3-3"/>',
   bellRing: '<path d="M6 8a6 6 0 1 1 12 0c0 4 1.5 6 1.5 6h-15S6 12 6 8Z"/><path d="M10 18a2 2 0 0 0 4 0M3 8c.4-2 1.4-3.6 2.8-4.8M21 8c-.4-2-1.4-3.6-2.8-4.8"/>',
   bellOff: '<path d="M9 5a6 6 0 0 1 9 3c0 3 .9 4.9 1.5 5.8M6 8c0 4-1.5 6-1.5 6H15M10 18a2 2 0 0 0 4 0M3 3l18 18"/>',
+  postAdd: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 11v6M9 14h6"/>',
+  schedule: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
+  addAPhoto: '<path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><path d="M12 11v6M9 14h6"/>',
+  taskAlt: '<path d="M21 12a9 9 0 1 1-4-7.5"/><path d="m8 12 3 3 10-10"/>',
+  accountCircle: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.5c1.5-2 3.4-3 5.5-3s4 1 5.5 3"/>',
+  badge: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M6 17c.6-1.5 1.8-2.2 3-2.2s2.4.7 3 2.2M15 9h3M15 13h3"/>',
+  adminPanel: '<path d="M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6l-8-3Z"/><circle cx="12" cy="10" r="2"/><path d="M8.5 16c.8-1.4 2-2 3.5-2s2.7.6 3.5 2"/>',
+  integration: '<path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14"/>',
+  buildCircle: '<circle cx="12" cy="12" r="9"/><path d="M14.5 8.5a2.6 2.6 0 0 0-3 3.4L8 15.4 9 16.5l3.5-3.5a2.6 2.6 0 0 0 3.4-3l-1.6 1.6-1.4-.4-.4-1.4 1.6-1.3Z"/>',
   chevronDown: '<path d="m6 9 6 6 6-6"/>',
   chevronUp: '<path d="m6 15 6-6 6 6"/>',
   chevronRight: '<path d="m9 6 6 6-6 6"/>'
@@ -522,21 +565,15 @@ function renderApp(bootstrap, session) {
   // Patch 8.x (2.3) — halaman default kini ditentukan server
   // (bootstrap.defaultPage), dikirim bersama respons login/bootstrap.
   // Fallback ke perhitungan role tetap dijaga untuk kompatibilitas.
-  //
-  // PATCH — Shortcut ?page=buat (buat-cepat.html) mendeklarasikan
-  // FORCE_LANDING_PAGE = 'buat' supaya SELALU mendarat di form Buat apa
-  // pun defaultPage role-nya (termasuk Admin/Demo yang defaultPage
-  // normalnya 'beranda' — modul Beranda tidak dimuat di halaman
-  // shortcut ini). Di app utama, FORCE_LANDING_PAGE tidak pernah
-  // dideklarasikan (typeof === 'undefined'), jadi baris ini TIDAK
-  // berpengaruh sama sekali pada perilaku app utama.
-  var lastPage;
-  if (typeof FORCE_LANDING_PAGE !== 'undefined' && FORCE_LANDING_PAGE) {
-    lastPage = FORCE_LANDING_PAGE;
-  } else {
-    var defaultPage = bootstrap.defaultPage || (user.role === 'fs' ? 'buat' : 'beranda');
-    lastPage = (session.uiState && session.uiState.activePage) || defaultPage;
-  }
+  var defaultPage = bootstrap.defaultPage || (user.role === 'fs' ? 'buat' : 'beranda');
+  var lastPage = (session.uiState && session.uiState.activePage) || defaultPage;
+  // Tautan lama / launcher: index.html#buat -> langsung ke menu Buat.
+  try {
+    if (location.hash === '#buat') {
+      lastPage = 'buat';
+      history.replaceState(null, '', location.pathname + location.search);
+    }
+  } catch (e) {}
   goToPage(lastPage);
 
 

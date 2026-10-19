@@ -215,7 +215,7 @@ function attachPerformedAtListenersOnce_() {
   if (input) input.addEventListener('change', updatePerformedAtPreview_);
 
   var labelIcon = document.getElementById('performed-at-label-icon');
-  if (labelIcon) labelIcon.innerHTML = mdIcon('reminder', 16);
+  if (labelIcon) labelIcon.innerHTML = mdIcon('schedule', 16);
 }
 
 function updatePerformedAtFieldVisibility() {
@@ -322,6 +322,7 @@ function initPekerjaanForm() {
   }
 
   attachFormBuatListenersOnce_();
+  ['form-floor', 'form-description', 'form-target-user'].forEach(function (id) { clearInlineError_(document.getElementById(id)); });
 
   applyBuatModeUI_();
   updateJenisIcon();
@@ -412,7 +413,7 @@ function renderPhotoSlots() {
       }(i));
       slot.appendChild(removeBtn);
     } else {
-      slot.innerHTML = '<span class="slot-ico">' + mdIcon('photoCamera', 24) + '</span><span class="slot-caption">' + (PHOTO_SLOT_CAPTIONS_[i] || '') + '</span>';
+      slot.innerHTML = '<span class="slot-ico">' + mdIcon('addAPhoto', 24) + '</span><span class="slot-caption">' + (PHOTO_SLOT_CAPTIONS_[i] || '') + '</span>';
       slot.addEventListener('click', function (idx) {
         return function () {
           activePhotoSlotIndex = idx;
@@ -554,11 +555,14 @@ var performedAtEl = document.getElementById('form-performed-at');
 
 
   if (!jenis) { errorEl.textContent = 'Jenis pekerjaan wajib dipilih.'; return; }
-  if (!data.floorCode) { showFieldError(floorEl, errorEl, 'Lantai wajib dipilih.'); return; }
-  if (!data.description.trim()) { showFieldError(descEl, errorEl, 'Keterangan wajib diisi.'); return; }
+  [floorEl, descEl, targetEl].forEach(clearInlineError_);
+  var firstBad = null;
+  if (!data.floorCode) { setInlineError_(floorEl, 'Lantai wajib dipilih.'); firstBad = firstBad || floorEl; }
+  if (!data.description.trim()) { setInlineError_(descEl, 'Keterangan wajib diisi.'); firstBad = firstBad || descEl; }
   if (isPenugasan && assignmentMode === 'direct' && !data.targetUserCode) {
-    showFieldError(targetEl, errorEl, 'Pilih petugas penerima.'); return;
+    setInlineError_(targetEl, 'Pilih petugas penerima.'); firstBad = firstBad || targetEl;
   }
+  if (firstBad) return;
 
   var session = loadSession();
   var submitBtn = document.getElementById('btn-submit-report');
@@ -693,7 +697,7 @@ function renderSelesaiPhotoSlots_() {
       })(i));
       slot.appendChild(rm);
     } else {
-      slot.innerHTML = '<span class="slot-ico">' + mdIcon('photoCamera', 24) + '</span><span class="slot-caption">' + SELESAI_PHOTO_CAPTIONS_[i] + '</span>';
+      slot.innerHTML = '<span class="slot-ico">' + mdIcon('addAPhoto', 24) + '</span><span class="slot-caption">' + SELESAI_PHOTO_CAPTIONS_[i] + '</span>';
       slot.addEventListener('click', open);
     }
     container.appendChild(slot);
@@ -777,8 +781,9 @@ function submitSelesaiForm_() {
   errorEl.textContent = '';
   clearFieldErrors([notesEl]);
 
+  clearInlineError_(notesEl);
   if (!notesEl.value.trim()) {
-    showFieldError(notesEl, errorEl, 'Keterangan penuntasan wajib diisi.');
+    setInlineError_(notesEl, 'Keterangan penuntasan wajib diisi.');
     return;
   }
 

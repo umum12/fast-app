@@ -2456,3 +2456,11 @@ header.app-header .app-logo svg { height: 34px; width: auto; display: block; }
 .sending-bar-fill { height: 100%; width: 40%; background: var(--color-primary); border-radius: 3px; animation: sending-slide 1.4s infinite ease-in-out; }
 @keyframes sending-slide { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
 .sending-sub { font-size: 13px; color: var(--color-text-muted); font-weight: 500; }
+
+/* blur latar saat memilih dropdown (bottom sheet) */
+#bottom-sheet-overlay { backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+
+/* error langsung pada input terkait */
+.field-invalid, .field-invalid.form-input, textarea.field-invalid, input.field-invalid { border-color: #d93025 !important; background-color: #fdf8f8 !important; }
+.field-error-msg { font-size: 12px; font-weight: 500; color: #d93025; margin-top: 6px; }
+

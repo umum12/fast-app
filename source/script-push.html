@@ -290,7 +290,7 @@ var PushUI = (function () {
       return;
     }
     if (state === 'on') {
-      setStatus('Aktif di perangkat ini. Anda akan diberi tahu saat ada pekerjaan baru atau komentar baru.', 'ok');
+      setStatus('Perangkat ini aktif menerima notifikasi pekerjaan dan komentar baru.', 'ok');
       show('btn-push-test', true); show('btn-push-disable', true);
     } else if (state === 'lost') {
       if (healing) { setStatus('Notifikasi terputus. Menyambungkan ulang...', 'warn'); }
