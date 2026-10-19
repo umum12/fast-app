@@ -75,6 +75,64 @@ function attachFormBuatListenersOnce_() {
 
   var floorSelect = document.getElementById('form-floor');
   floorSelect.addEventListener('change', updateFormProgress);
+
+  // Tampilan baru: Jenis & Lantai dipilih lewat bottom sheet (radio). <select> asli
+  // tetap menjadi sumber nilai (id, value, event 'change' tidak berubah).
+  enhanceSelectWithSheet_(jenisSelect, function (o) {
+    var info = JENIS_PEKERJAAN_BADGE[o.value];
+    return info ? info.icon : 'description';
+  });
+  enhanceSelectWithSheet_(floorSelect, function () { return 'building'; });
+}
+
+function enhanceSelectWithSheet_(selectEl, iconFor) {
+  var wrap = selectEl.closest('.select-field-wrap');
+  if (!wrap || wrap._sheetBound) return;
+  wrap._sheetBound = true;
+  wrap.classList.add('sheet-select');
+  var hit = document.createElement('button');
+  hit.type = 'button';
+  hit.className = 'select-sheet-hit';
+  hit.setAttribute('aria-label', 'Pilih ' + (selectEl.id === 'form-jenis' ? 'jenis' : 'lantai'));
+  wrap.appendChild(hit);
+  hit.addEventListener('click', function () {
+    if (selectEl.disabled) return;
+    var items = [];
+    for (var i = 0; i < selectEl.options.length; i++) {
+      (function (o) {
+        if (!o.value) return; // placeholder "Pilih lantai" tidak ditampilkan sebagai opsi
+        items.push({
+          icon: iconFor(o),
+          label: String(o.textContent).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }),
+          radio: true,
+          selected: o.value === selectEl.value,
+          onClick: function () {
+            selectEl.value = o.value;
+            selectEl.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+        });
+      })(selectEl.options[i]);
+    }
+    openBottomSheet(items);
+  });
+}
+
+/** Overlay "Mengirim data ke server" (form Buat & Penyelesaian). */
+function showSendingOverlay_(text) {
+  var ov = document.getElementById('sending-overlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'sending-overlay';
+    ov.innerHTML = '<div class="sending-card"><div class="sending-title">Mengirim data ke server</div>' +
+      '<div class="sending-bar"><div class="sending-bar-fill"></div></div><div class="sending-sub" id="sending-sub"></div></div>';
+    document.body.appendChild(ov);
+  }
+  document.getElementById('sending-sub').textContent = text || 'Mengunggah laporan & melampirkan foto...';
+  ov.classList.add('show');
+}
+function hideSendingOverlay_() {
+  var ov = document.getElementById('sending-overlay');
+  if (ov) ov.classList.remove('show');
 }
 
 
@@ -316,6 +374,7 @@ function updateFormProgress() {
  * tidak ada perbedaan perlakuan data per index.
  */
 var PHOTO_SLOT_CAPTIONS_ = ['Foto Kondisi Awal', 'Foto Hasil / Sesudah', 'Foto Detail Tambahan'];
+var SELESAI_PHOTO_CAPTIONS_UNUSED_ = 0;
 
 function renderPhotoSlots() {
   var container = document.getElementById('photo-slots');
@@ -353,7 +412,7 @@ function renderPhotoSlots() {
       }(i));
       slot.appendChild(removeBtn);
     } else {
-      slot.innerHTML = '<span class="plus-icon">+</span><span class="slot-caption">' + (PHOTO_SLOT_CAPTIONS_[i] || '') + '</span>';
+      slot.innerHTML = '<span class="slot-ico">' + mdIcon('photoCamera', 24) + '</span><span class="slot-caption">' + (PHOTO_SLOT_CAPTIONS_[i] || '') + '</span>';
       slot.addEventListener('click', function (idx) {
         return function () {
           activePhotoSlotIndex = idx;
@@ -504,9 +563,11 @@ var performedAtEl = document.getElementById('form-performed-at');
   var session = loadSession();
   var submitBtn = document.getElementById('btn-submit-report');
   beginAction(submitBtn, 'Menyimpan...');
+  showSendingOverlay_('Mengunggah laporan & melampirkan foto...');
   google.script.run
     .withSuccessHandler(function (response) {
       endAction(submitBtn);
+      hideSendingOverlay_();
       if (!response.success) {
         errorEl.textContent = response.error;
         showSnackbar(response.error, 'error');
@@ -526,6 +587,7 @@ var performedAtEl = document.getElementById('form-performed-at');
     })
     .withFailureHandler(function () {
       endAction(submitBtn);
+      hideSendingOverlay_();
       errorEl.textContent = 'Gagal terhubung ke server. Coba lagi.';
       showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error');
     })
@@ -631,7 +693,7 @@ function renderSelesaiPhotoSlots_() {
       })(i));
       slot.appendChild(rm);
     } else {
-      slot.innerHTML = '<span class="plus-icon">+</span><span class="slot-caption">' + SELESAI_PHOTO_CAPTIONS_[i] + '</span>';
+      slot.innerHTML = '<span class="slot-ico">' + mdIcon('photoCamera', 24) + '</span><span class="slot-caption">' + SELESAI_PHOTO_CAPTIONS_[i] + '</span>';
       slot.addEventListener('click', open);
     }
     container.appendChild(slot);
@@ -731,9 +793,11 @@ function submitSelesaiForm_() {
   var session = loadSession();
   var submitBtn = document.getElementById('btn-selesai-submit');
   beginAction(submitBtn, 'Mengirim...');
+  showSendingOverlay_('Mengunggah penuntasan & melampirkan foto...');
   google.script.run
     .withSuccessHandler(function (response) {
       endAction(submitBtn);
+      hideSendingOverlay_();
       if (!response.success) {
         errorEl.textContent = response.error;
         showSnackbar(response.error, 'error');
@@ -746,6 +810,7 @@ function submitSelesaiForm_() {
     })
     .withFailureHandler(function () {
       endAction(submitBtn);
+      hideSendingOverlay_();
       errorEl.textContent = 'Gagal terhubung ke server. Coba lagi.';
       showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error');
     })

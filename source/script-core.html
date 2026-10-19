@@ -97,7 +97,9 @@ function openBottomSheet(items) {
   (items || []).forEach(function (item) {
     var btn = document.createElement('button');
     btn.className = 'bottom-sheet-item' + (item.danger ? ' danger' : '');
-    btn.innerHTML = '<span class="bs-icon">' + mdIcon(item.icon, 20) + '</span><span>' + item.label + '</span>';
+    btn.innerHTML = '<span class="bs-icon">' + mdIcon(item.icon, 20) + '</span><span class="bs-label">' + item.label + '</span>' +
+      (item.radio ? '<span class="bs-radio' + (item.selected ? ' selected' : '') + '"></span>' : '');
+    if (item.selected) btn.classList.add('selected');
     btn.addEventListener('click', function () {
       closeBottomSheet();
       if (item.onClick) item.onClick();

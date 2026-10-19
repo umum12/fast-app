@@ -2411,3 +2411,48 @@ header.app-header .app-logo svg { height: 34px; width: auto; display: block; }
 .akun-row-label { white-space:nowrap; }
 #app-build-label { font-size:12.5px; }
 #push-hint-text { font-size:12.5px; line-height:1.45; }
+
+/* ===== Menu Buat (modern) ===== */
+.form-jenis-lantai-row { flex-direction: column; gap: 14px; }
+.form-jenis-lantai-col { width: 100%; flex: none; }
+#buat-form-card, #selesai-detail-card, #selesai-form-card { border-radius: 20px; padding: 18px; }
+#buat-form-card .form-label, #selesai-form-card .form-label { font-size: 13px; font-weight: 600; color: var(--color-text-muted); margin-bottom: 6px; display: block; }
+#buat-form-card .select-field-wrap { border-radius: 12px; min-height: 48px; padding: 0 12px; }
+#buat-form-card .form-input, #selesai-form-card .form-input { border-radius: 12px; }
+#buat-header-icon { border-radius: 14px; }
+#btn-cancel-report-form, #btn-selesai-back { width: 38px; height: 38px; border-radius: 50%; background: #f1f3f4; }
+#btn-cancel-report-form:active, #btn-selesai-back:active { background: #e2e8f0; }
+
+/* pemilih bottom sheet (Jenis, Lantai) */
+.select-field-wrap.sheet-select { cursor: pointer; }
+.select-field-wrap.sheet-select select { pointer-events: none; }
+.select-sheet-hit { position: absolute; inset: 0; width: 100%; background: transparent; border: none; cursor: pointer; border-radius: 12px; -webkit-tap-highlight-color: transparent; }
+#bottom-sheet-body { max-height: 60vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.bottom-sheet-item .bs-label { flex: 1; }
+.bs-radio { width: 20px; height: 20px; border: 2px solid #9aa0a6; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.bottom-sheet-item.selected .bs-radio { border-color: var(--color-primary); }
+.bs-radio.selected::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--color-primary); }
+.bottom-sheet-item.selected { color: var(--color-primary); }
+
+/* Waktu Laporan sebagai kotak */
+#form-performed-at-group .performed-at-collapsed { border: 1.5px solid var(--md-outline); border-radius: 12px; padding: 12px 14px; background: #fff; }
+
+/* slot foto */
+.photo-slot-v2 { border-radius: 14px; }
+.photo-slot-v2 .slot-ico { color: var(--color-primary); display: inline-flex; }
+
+/* banner progres */
+#form-progress-box { display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 12px; }
+
+/* tombol simpan */
+#btn-submit-report, #btn-selesai-submit { min-height: 50px; box-shadow: 0 4px 12px rgba(37,99,235,.25); }
+
+/* overlay mengirim data */
+#sending-overlay { position: fixed; inset: 0; z-index: 2500; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,.4); backdrop-filter: blur(3px); }
+#sending-overlay.show { display: flex; }
+.sending-card { background: #fff; width: 90%; max-width: 360px; border-radius: 24px; padding: 24px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,.15); }
+.sending-title { font-size: 17px; font-weight: 700; }
+.sending-bar { height: 6px; background: #f1f3f4; border-radius: 3px; overflow: hidden; margin: 16px 0; }
+.sending-bar-fill { height: 100%; width: 40%; background: var(--color-primary); border-radius: 3px; animation: sending-slide 1.4s infinite ease-in-out; }
+@keyframes sending-slide { 0% { margin-left: -40%; } 100% { margin-left: 100%; } }
+.sending-sub { font-size: 13px; color: var(--color-text-muted); font-weight: 500; }
