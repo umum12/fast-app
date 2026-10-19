@@ -125,9 +125,14 @@ document.getElementById('confirm-modal-confirm').addEventListener('click', funct
 // items: [{ icon, label, danger (opsional), onClick }]
 // ============================================================
 
-function openBottomSheet(items) {
+function openBottomSheet(items, opts) {
   var body = document.getElementById('bottom-sheet-body');
   body.innerHTML = '';
+  var overlay = document.getElementById('bottom-sheet-overlay');
+  var center = !!(opts && opts.center);
+  overlay.classList.toggle('center', center);
+  var titleEl = document.getElementById('bottom-sheet-title');
+  if (titleEl) { titleEl.textContent = (opts && opts.title) || ''; titleEl.style.display = center && opts.title ? 'block' : 'none'; }
   (items || []).forEach(function (item) {
     var btn = document.createElement('button');
     btn.className = 'bottom-sheet-item' + (item.danger ? ' danger' : '');

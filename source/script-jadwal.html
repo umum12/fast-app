@@ -522,9 +522,9 @@ function openJadwalDetail_(entry) {
     html += '<hr class="jk-detail-hr"><p class="jk-detail-label">Keterangan</p>' +
       '<div style="font-size:14px; white-space:pre-wrap;">' + escapeHtmlJk_(entry.catatan) + '</div>';
   }
-  html += '<hr class="jk-detail-hr"><p class="jk-detail-label">Dibuat oleh</p>' + buildJadwalPersonChip_(entry.createdBy, entry.createdAt);
+  html += '<hr class="jk-detail-hr"><p class="jk-detail-label">Dibuat oleh</p>' + buildJadwalPersonChip_(entry.createdByName || entry.createdBy, entry.createdAt);
   if (entry.updatedBy) {
-    html += '<hr class="jk-detail-hr"><p class="jk-detail-label">Terakhir diubah</p>' + buildJadwalPersonChip_(entry.updatedBy, entry.updatedAt);
+    html += '<hr class="jk-detail-hr"><p class="jk-detail-label">Terakhir diubah</p>' + buildJadwalPersonChip_(entry.updatedByName || entry.updatedBy, entry.updatedAt);
   }
   html += '</div>';
   body.innerHTML = html;
@@ -567,8 +567,8 @@ function escapeHtmlJk_(t) {
 /** Baris kecil "Dibuat oleh"/"Terakhir diubah". */
 function buildJadwalPersonChip_(userCode, isoTimestamp) {
   return '<div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">' +
-    '<span class="avatar-circle" style="width:32px; height:32px; background:var(--md-surface-container); color:var(--color-text-muted);">' + userCode + '</span>' +
-    '<div><div style="font-weight:700; font-size:13px;">' + userCode + '</div><div class="md-body-sm">' + formatJadwalTimestamp_(isoTimestamp) + '</div></div>' +
+    '<span class="avatar-circle" style="width:32px; height:32px; background:var(--md-surface-container); color:var(--color-text-muted);">' + escapeHtmlJk_(String(userCode).charAt(0).toUpperCase()) + '</span>' +
+    '<div><div style="font-weight:700; font-size:13px;">' + escapeHtmlJk_(userCode) + '</div><div class="md-body-sm">' + formatJadwalTimestamp_(isoTimestamp) + '</div></div>' +
   '</div>';
 }
 

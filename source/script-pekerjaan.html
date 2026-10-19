@@ -113,7 +113,7 @@ function enhanceSelectWithSheet_(selectEl, iconFor) {
         });
       })(selectEl.options[i]);
     }
-    openBottomSheet(items);
+    openBottomSheet(items, { center: true, title: selectEl.id === 'form-jenis' ? 'Pilih Jenis' : 'Pilih Lantai' });
   });
 }
 
@@ -1365,13 +1365,13 @@ function openPekerjaanDetail(p) {
       '<span class="badge-pill ' + jenisInfo.cls + '"><span class="dot"></span>' + jenisInfo.label + '</span>' +
       '<span class="badge ' + statusCls + '">' + p.statusLabel + '</span>' +
     '</div>' +
-    (p.subject ? '<div style="font-weight:700;font-size:15px;margin-bottom:6px;">' + p.subject + '</div>' : '') +
-    '<div class="activity-detail-desc">' + p.description + '</div>' +
     detailRowWithIcon_('account', 'Dibuat oleh', p.createdByName) +
-        detailRowWithIcon_('calendar', 'Waktu Dibuat', formatDetailDateTime_(p.createdAt)) +
+    detailRowWithIcon_('calendar', 'Waktu Dibuat', formatDetailDateTime_(p.createdAt)) +
     performedAtHtml +
     detailRowWithIcon_('location', 'Lokasi', p.zoneCode ? (p.floorName + ' \u00b7 ' + p.zoneCode) : p.floorName) +
     (p.handledBy ? detailRowWithIcon_('account', 'Ditangani oleh', p.handledByName) : '') +
+    (p.subject ? '<div class="detail-subject">' + p.subject + '</div>' : '') +
+    '<div class="activity-detail-desc">' + p.description + '</div>' +
     completionNotesHtml +
     initialPhotosHtml +
     completionPhotosHtml;
