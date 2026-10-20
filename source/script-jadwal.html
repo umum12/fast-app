@@ -1373,6 +1373,18 @@ function truncateText_(text, maxLen) {
   return str.length > maxLen ? str.substring(0, maxLen) + '...' : str;
 }
 
+/** "17/07/2026 10:30" -> "Kamis, 17 Juli 2026 | 10:30". */
+function formatDateTimeFull_(ddmmyyyyHHmm) {
+  if (!ddmmyyyyHHmm) return '';
+  var parts = String(ddmmyyyyHHmm).split(' ');
+  var dp = (parts[0] || '').split('/');
+  if (dp.length !== 3) return ddmmyyyyHHmm;
+  var d = new Date(parseInt(dp[2], 10), parseInt(dp[1], 10) - 1, parseInt(dp[0], 10));
+  if (isNaN(d.getTime())) return ddmmyyyyHHmm;
+  var out = INDO_DAY_NAMES_[d.getDay()] + ', ' + String(d.getDate()).padStart(2, '0') + ' ' + INDO_MONTH_LONG_[d.getMonth()] + ' ' + d.getFullYear();
+  return parts[1] ? out + ' | ' + parts[1].substring(0, 5) : out;
+}
+
 /** "17/07/2026 10:30" -> "Kam, 17 Jul 2026". */
 function formatAktivitasDateShort_(ddmmyyyyHHmm) {
   if (!ddmmyyyyHHmm) return '';
@@ -1395,6 +1407,7 @@ function buildPekerjaanListCard_(p) {
 
   var officer = p.handledByName || p.createdByName;
   var photos = pilihFotoKartu_(p);
+  var floorText = p.zoneCode ? (p.floorName + ' · ' + p.zoneCode) : (p.floorName || '');
 
   var card = document.createElement('div');
   card.className = 'list-card list-card-row';
@@ -1404,27 +1417,18 @@ function buildPekerjaanListCard_(p) {
 
   var badgeRow = document.createElement('div');
   badgeRow.className = 'op-card-top';
-      badgeRow.innerHTML =
+  badgeRow.innerHTML =
     '<span class="badge-pill ' + jenisInfo.cls + '"><span class="dot"></span>' + jenisInfo.label + '</span>' +
-    '<span class="badge ' + statusCls + '">' + p.statusLabel + '</span>' +
-    (p.commentCount > 0 ? '<span class="badge badge-neutral">\uD83D\uDCAC ' + p.commentCount + '</span>' : '');
-
-
-
+    '<span class="badge badge-status-pulse ' + statusCls + '"><span class="dot pulse"></span>' + p.statusLabel + '</span>';
   main.appendChild(badgeRow);
 
-
-// PATCH — untuk arah Mandiri, utamakan performedAt (tujuan field ini:
-  // mencerminkan kapan pekerjaan BENAR-BENAR dilakukan).
+  // Arah Mandiri: utamakan performedAt (kapan pekerjaan BENAR-BENAR dilakukan).
   var displayDate = (p.arah === 'mandiri' && p.performedAt) ? p.performedAt : (p.completedAt || p.startedAt || p.createdAt);
 
   var dateRow = document.createElement('div');
-  dateRow.style.cssText = 'display:flex; align-items:center; gap:6px; flex-wrap:wrap;';
+  dateRow.className = 'list-card-date-line';
   dateRow.innerHTML =
-    '<span class="list-card-date"><span class="icon-slot">' + mdIcon('calendar', 16) + '</span><span>' + formatAktivitasDateShort_(displayDate) + '</span></span>' +
-
-    '<span style="color:var(--color-text-faint);">|</span>' +
-    '<span style="font-size:13px; color:var(--color-text-muted);">' + (p.zoneCode ? (p.floorName + ' \u00b7 ' + p.zoneCode) : p.floorName) + '</span>';
+    '<span class="list-card-date"><span class="icon-slot">' + mdIcon('calendar', 16) + '</span><span>' + formatDateTimeFull_(displayDate) + '</span></span>';
   main.appendChild(dateRow);
 
   var personRow = document.createElement('div');
@@ -1437,7 +1441,9 @@ function buildPekerjaanListCard_(p) {
   personRow.appendChild(avatar);
   var personText = document.createElement('div');
   personText.className = 'list-card-person-text';
-  personText.innerHTML = '<div class="name">' + officer + '</div><div class="subtext">' + truncateText_(p.completionNotes || p.description, 12) + '</div>';
+  personText.innerHTML = '<div class="name-line"><span class="name">' + officer + '</span>' +
+    (floorText ? '<span class="name-floor">' + mdIcon('location', 12) + floorText + '</span>' : '') + '</div>' +
+    '<div class="subtext">' + truncateText_(p.completionNotes || p.description, 12) + '</div>';
   personRow.appendChild(personText);
   main.appendChild(personRow);
 
@@ -1446,30 +1452,30 @@ function buildPekerjaanListCard_(p) {
   var side = document.createElement('div');
   side.className = 'list-card-row-side';
 
+  var thumbSide = document.createElement('div');
+  thumbSide.className = photos.length > 0 ? 'op-card-thumb-side' : 'op-card-thumb-side no-photo';
   if (photos.length > 0) {
-    var thumbSide = document.createElement('div');
-    thumbSide.className = 'op-card-thumb-side';
     var img = document.createElement('img');
     img.src = photos[0].thumbUrl || photos[0].url;
     img.alt = 'Foto dokumentasi';
     thumbSide.appendChild(img);
-    if (photos.length > 1) {
-      var overlay = document.createElement('span');
-      overlay.className = 'thumb-count-overlay';
-      overlay.textContent = '+' + (photos.length - 1);
-      thumbSide.appendChild(overlay);
-    }
     thumbSide.addEventListener('click', function (e) {
       e.stopPropagation();
       openPhotoViewer(photos.map(function (photo) { return photo.url; }), 0);
     });
-    side.appendChild(thumbSide);
   } else {
-    var placeholder = document.createElement('div');
-    placeholder.className = 'no-photo-placeholder';
-    placeholder.innerHTML = mdIcon('photo', 18) + '<span>Tidak ada foto</span>';
-    side.appendChild(placeholder);
+    thumbSide.innerHTML = '<div class="no-photo-inner">' + mdIcon('photo', 18) + '<span>Tidak ada foto</span></div>';
   }
+  var chips = '';
+  if (p.commentCount > 0) chips += '<span class="thumb-chip">' + mdIcon('chatBubble', 11) + p.commentCount + '</span>';
+  if (photos.length > 0) chips += '<span class="thumb-chip">' + mdIcon('photo', 11) + photos.length + '</span>';
+  if (chips) {
+    var chipWrap = document.createElement('div');
+    chipWrap.className = 'thumb-chips';
+    chipWrap.innerHTML = chips;
+    thumbSide.appendChild(chipWrap);
+  }
+  side.appendChild(thumbSide);
 
   var chevron = document.createElement('span');
   chevron.className = 'list-card-chevron';

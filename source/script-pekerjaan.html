@@ -1364,7 +1364,7 @@ function formatDetailDateTime_(ddmmyyyyHHmm) {
   if (dp.length !== 3) return ddmmyyyyHHmm;
   var d = new Date(parseInt(dp[2], 10), parseInt(dp[1], 10) - 1, parseInt(dp[0], 10));
   if (isNaN(d.getTime())) return ddmmyyyyHHmm;
-  return INDO_DAY_NAMES_[d.getDay()] + ', ' + dp[0] + '/' + dp[1] + '/' + String(dp[2]).slice(-2) + ' \u2022 ' + (parts[1] || '');
+  return formatDateTimeFull_(ddmmyyyyHHmm);
 }
 
 
@@ -1403,15 +1403,16 @@ function openPekerjaanDetail(p) {
   body.innerHTML =
     '<div class="op-card-top" style="margin-bottom:10px;">' +
       '<span class="badge-pill ' + jenisInfo.cls + '"><span class="dot"></span>' + jenisInfo.label + '</span>' +
-      '<span class="badge ' + statusCls + '">' + p.statusLabel + '</span>' +
+      '<span class="badge badge-status-pulse ' + statusCls + '"><span class="dot pulse"></span>' + p.statusLabel + '</span>' +
     '</div>' +
+    '<div class="detail-id-row"><span class="detail-id-label">ID Laporan</span><span class="selesai-id">' + (p.pekerjaanId || '-') + '</span></div>' +
     detailRowWithIcon_('account', 'Dibuat oleh', p.createdByName) +
     detailRowWithIcon_('calendar', 'Waktu Dibuat', formatDetailDateTime_(p.createdAt)) +
     performedAtHtml +
     detailRowWithIcon_('location', 'Lokasi', p.zoneCode ? (p.floorName + ' \u00b7 ' + p.zoneCode) : p.floorName) +
     (p.handledBy ? detailRowWithIcon_('account', 'Ditangani oleh', p.handledByName) : '') +
-    (p.subject ? '<div class="detail-subject">' + p.subject + '</div>' : '') +
-    '<div class="activity-detail-desc">' + p.description + '</div>' +
+    (p.subject ? '<div class="detail-block detail-block-subject"><div class="detail-block-label">' + mdIcon('bookmark', 14) + 'Subjek</div><div class="detail-subject">' + p.subject + '</div></div>' : '') +
+    '<div class="detail-block detail-block-desc"><div class="detail-block-label">' + mdIcon('description', 14) + 'Keterangan</div><div class="activity-detail-desc">' + p.description + '</div></div>' +
     completionNotesHtml +
     initialPhotosHtml +
     completionPhotosHtml;
