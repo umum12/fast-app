@@ -1179,130 +1179,34 @@ function createOpCardV2(cfg) {
  * fungsi yang hilang, murni dipindah ke satu pintu yang konsisten.
  */
 function buildPekerjaanInboxCard_(p) {
-  var jenisInfo = JENIS_PEKERJAAN_BADGE[p.jenis] || { label: p.jenis, cls: 'badge-neutral', icon: 'description' };
-  var statusCls = STATUS_PEKERJAAN_BADGE_CLASS[p.status] || 'badge-neutral';
+  // Same card style as Riwayat/Aktivitas, plus one dynamic full-width action button.
+  return buildPekerjaanListCard_(p, { actions: true });
+}
 
-  var officer = p.handledByName || p.createdByName;
-
-  var photos = p.initialPhotos;
-
-  var card = document.createElement('div');
-  card.className = 'list-card list-card-row';
-
-  var main = document.createElement('div');
-  main.className = 'list-card-row-main';
-
-  var badgeRow = document.createElement('div');
-  badgeRow.className = 'op-card-top';
-  var badgeHtml =
-    '<span class="badge-pill ' + jenisInfo.cls + '"><span class="dot"></span>' + jenisInfo.label + '</span>' +
-    '<span class="badge ' + statusCls + '">' + p.statusLabel + '</span>';
-  if (p.assignmentMode === 'direct') {
-    badgeHtml += '<span class="badge badge-info">Direct \u2192 ' + p.targetUserCode + '</span>';
-  }
-
-    if (p.commentCount > 0) {
-    badgeHtml += '<span class="badge badge-neutral">\uD83D\uDCAC ' + p.commentCount + '</span>';
-  }
-
-  
-  badgeRow.innerHTML = badgeHtml;
-  main.appendChild(badgeRow);
-
-  var dateRow = document.createElement('div');
-  dateRow.style.cssText = 'display:flex; align-items:center; gap:6px; flex-wrap:wrap;';
-  dateRow.innerHTML =
-    '<span class="list-card-date"><span class="icon-slot">' + mdIcon('calendar', 16) + '</span><span>' + formatAktivitasDateShort_(p.createdAt) + '</span></span>' +
-    '<span style="color:var(--color-text-faint);">|</span>' +
-    '<span style="font-size:13px; color:var(--color-text-muted);">' + (p.zoneCode ? (p.floorName + ' \u00b7 ' + p.zoneCode) : p.floorName) + '</span>';
-  main.appendChild(dateRow);
-
-  var personRow = document.createElement('div');
-  personRow.className = 'list-card-person-row';
-  var avatar = document.createElement('span');
-  avatar.className = 'avatar-circle';
-  avatar.style.background = 'var(--status-info-bg)';
-  avatar.style.color = 'var(--status-info-fg)';
-  avatar.innerHTML = mdIcon('account', 18);
-  personRow.appendChild(avatar);
-  var personText = document.createElement('div');
-  personText.className = 'list-card-person-text';
-  personText.innerHTML = '<div class="name">' + officer + '</div><div class="subtext">' + truncateText_(p.completionNotes || p.description, 12) + '</div>';
-  personRow.appendChild(personText);
-  main.appendChild(personRow);
-
-
-  // PATCH — Lepas dipindah ke Detail (lihat openPekerjaanDetail).
-  // Kartu inbox sekarang hanya punya 1 tombol aksi:
-  // - canAmbil -> "Ambil Pekerjaan", transform in-place jadi
-  //   "Buat Laporan" setelah sukses (lihat doAmbilPekerjaanInline_).
-  // - canLepas (sudah diambil, milik user ini) -> langsung "Buat
-  //   Laporan" di kartu (shortcut tercepat untuk kasus paling umum:
-  //   FS sedang kerjakan lalu lapor), Lepas tetap tersedia via Detail.
-  if (p.canAmbil || p.canLepas) {
-    var actionsRow = document.createElement('div');
-    actionsRow.className = 'list-card-actions-row';
-
-    if (p.canAmbil) {
-      var ambilBtn = document.createElement('button');
-      ambilBtn.className = 'btn-card-action action-primary';
-      ambilBtn.dataset.pekerjaanId = p.pekerjaanId;
-      ambilBtn.innerHTML = mdIcon('add', 15) + '<span>Ambil Pekerjaan</span>';
-      ambilBtn.addEventListener('click', function (e) {
-        e.stopPropagation();
-        doAmbilPekerjaanInline_(ambilBtn, p);
-      });
-      actionsRow.appendChild(ambilBtn);
-    } else if (p.canLepas) {
-      var laporBtn = document.createElement('button');
-      laporBtn.className = 'btn-card-action action-positive';
-      laporBtn.innerHTML = mdIcon('description', 15) + '<span>Buat Laporan</span>';
-      laporBtn.addEventListener('click', function (e) { e.stopPropagation(); openBuatLaporanForPekerjaan(p); });
-      actionsRow.appendChild(laporBtn);
-    }
-
-    main.appendChild(actionsRow);
-  }
-
-  card.appendChild(main);
-
-  var side = document.createElement('div');
-  side.className = 'list-card-row-side';
-
-  if (photos && photos.length > 0) {
-    var thumbSide = document.createElement('div');
-    thumbSide.className = 'op-card-thumb-side';
-    var img = document.createElement('img');
-    img.src = photos[0].thumbUrl || photos[0].url;
-    img.alt = 'Foto dokumentasi';
-    thumbSide.appendChild(img);
-    if (photos.length > 1) {
-      var overlay = document.createElement('span');
-      overlay.className = 'thumb-count-overlay';
-      overlay.textContent = '+' + (photos.length - 1);
-      thumbSide.appendChild(overlay);
-    }
-    thumbSide.addEventListener('click', function (e) {
-      e.stopPropagation();
-      openPhotoViewer(photos.map(function (photo) { return photo.url; }), 0);
-    });
-    side.appendChild(thumbSide);
+/**
+ * One full-width button driven by backend flags:
+ * canAmbil -> "Ambil Pekerjaan"; canSelesaikan (taken) -> "Buat Laporan".
+ * After Ambil the card is rebuilt from fresh data (doAmbilPekerjaanInline_);
+ * after Lepas the inbox reloads, so the button returns to "Ambil Pekerjaan".
+ */
+function buildPekerjaanActionRow_(p) {
+  if (!p.canAmbil && !p.canSelesaikan) return null;
+  var actionsRow = document.createElement('div');
+  actionsRow.className = 'list-card-actions-row';
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  if (p.canAmbil) {
+    btn.className = 'btn-card-action action-primary action-full';
+    btn.dataset.pekerjaanId = p.pekerjaanId;
+    btn.innerHTML = mdIcon('personCheck', 18) + '<span>Ambil Pekerjaan</span>';
+    btn.addEventListener('click', function (e) { e.stopPropagation(); doAmbilPekerjaanInline_(btn, p); });
   } else {
-    var placeholder = document.createElement('div');
-    placeholder.className = 'no-photo-placeholder';
-    placeholder.innerHTML = mdIcon('photo', 18) + '<span>Tidak ada foto</span>';
-    side.appendChild(placeholder);
+    btn.className = 'btn-card-action action-positive action-full';
+    btn.innerHTML = mdIcon('description', 18) + '<span>Buat Laporan</span>';
+    btn.addEventListener('click', function (e) { e.stopPropagation(); openBuatLaporanForPekerjaan(p); });
   }
-
-  var chevron = document.createElement('span');
-  chevron.className = 'list-card-chevron';
-  chevron.innerHTML = mdIcon('chevronRight', 18);
-  side.appendChild(chevron);
-
-  card.appendChild(side);
-
-  card.addEventListener('click', function () { openPekerjaanDetail(p); });
-  return card;
+  actionsRow.appendChild(btn);
+  return actionsRow;
 }
 
 
@@ -1368,7 +1272,8 @@ function formatDetailDateTime_(ddmmyyyyHHmm) {
 }
 
 
-function openPekerjaanDetail(p) {
+function openPekerjaanDetail(p, opts) {
+  opts = opts || {};
   var jenisInfo = JENIS_PEKERJAAN_BADGE[p.jenis] || { label: p.jenis, cls: 'badge-neutral' };
   var statusCls = STATUS_PEKERJAAN_BADGE_CLASS[p.status] || 'badge-neutral';
   var body = document.getElementById('activity-detail-body');
@@ -1430,6 +1335,30 @@ function openPekerjaanDetail(p) {
   });
 
     
+  // Same primary action as the card (Ambil Pekerjaan / Buat Laporan), driven by the same flags.
+  if (opts.actions && (p.canAmbil || p.canSelesaikan)) {
+    var primaryWrap = document.createElement('div');
+    primaryWrap.className = 'list-card-actions-row detail-primary-action';
+    primaryWrap.style.marginTop = '16px';
+    var primaryBtn = document.createElement('button');
+    primaryBtn.type = 'button';
+    if (p.canAmbil) {
+      primaryBtn.className = 'btn-card-action action-primary action-full';
+      primaryBtn.innerHTML = mdIcon('personCheck', 18) + '<span>Ambil Pekerjaan</span>';
+      primaryBtn.addEventListener('click', function () {
+        closeActivityDetail();
+        var cardBtn = document.querySelector('#pekerjaan-list .btn-card-action[data-pekerjaan-id="' + p.pekerjaanId + '"]');
+        if (cardBtn) cardBtn.click(); else loadPekerjaanInbox(true);
+      });
+    } else {
+      primaryBtn.className = 'btn-card-action action-positive action-full';
+      primaryBtn.innerHTML = mdIcon('description', 18) + '<span>Buat Laporan</span>';
+      primaryBtn.addEventListener('click', function () { closeActivityDetail(); openBuatLaporanForPekerjaan(p); });
+    }
+    primaryWrap.appendChild(primaryBtn);
+    body.appendChild(primaryWrap);
+  }
+
           if (p.canLepas || p.canUbah || p.canHapus || p.canUbahPenuntasan || p.canBatalkanPenuntasan) {
     var actionsWrap = document.createElement('div');
     actionsWrap.style.marginTop = '20px';

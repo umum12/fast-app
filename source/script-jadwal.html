@@ -1401,11 +1401,12 @@ function formatAktivitasDateShort_(ddmmyyyyHHmm) {
  * keterangan, thumbnail/placeholder+chevron) — SATU fungsi dipakai
  * BERSAMA oleh Aktivitas dan Riwayat.
  */
-function buildPekerjaanListCard_(p) {
+function buildPekerjaanListCard_(p, opts) {
+  opts = opts || {};
   var jenisInfo = JENIS_PEKERJAAN_BADGE[p.jenis] || { label: p.jenis, cls: 'badge-neutral', icon: 'description' };
   var statusCls = STATUS_PEKERJAAN_BADGE_CLASS[p.status] || 'badge-neutral';
 
-  var officer = p.handledByName || p.createdByName;
+  var officer = (p.status === 'TERBUKA') ? p.createdByName : (p.handledByName || p.createdByName);
   var photos = pilihFotoKartu_(p);
   var floorText = p.zoneCode ? (p.floorName + ' · ' + p.zoneCode) : (p.floorName || '');
 
@@ -1419,7 +1420,8 @@ function buildPekerjaanListCard_(p) {
   badgeRow.className = 'op-card-top';
   badgeRow.innerHTML =
     '<span class="badge-pill ' + jenisInfo.cls + '"><span class="dot"></span>' + jenisInfo.label + '</span>' +
-    '<span class="badge badge-status-pulse ' + statusCls + '"><span class="dot pulse"></span>' + p.statusLabel + '</span>';
+    '<span class="badge badge-status-pulse ' + statusCls + '"><span class="dot pulse"></span>' + p.statusLabel + '</span>' +
+    (p.assignmentMode === 'direct' && p.targetUserCode ? '<span class="badge badge-info">Direct \u2192 ' + (p.targetUserName || p.targetUserCode) + '</span>' : '');
   main.appendChild(badgeRow);
 
   // Arah Mandiri: utamakan performedAt (kapan pekerjaan BENAR-BENAR dilakukan).
@@ -1446,6 +1448,11 @@ function buildPekerjaanListCard_(p) {
     '<div class="subtext">' + truncateText_(p.completionNotes || p.description, 12) + '</div>';
   personRow.appendChild(personText);
   main.appendChild(personRow);
+
+  if (opts.actions && typeof buildPekerjaanActionRow_ === 'function') {
+    var actionsRow = buildPekerjaanActionRow_(p);
+    if (actionsRow) main.appendChild(actionsRow);
+  }
 
   card.appendChild(main);
 
@@ -1484,7 +1491,7 @@ function buildPekerjaanListCard_(p) {
 
   card.appendChild(side);
 
-  card.addEventListener('click', function () { openPekerjaanDetail(p); });
+  card.addEventListener('click', function () { openPekerjaanDetail(p, { actions: !!opts.actions }); });
   return card;
 }
 
