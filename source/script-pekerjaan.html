@@ -1003,9 +1003,15 @@ function renderListSkeleton_(containerId, cardCount, message) {
       '<div class="skeleton-block skeleton-thumb"></div>' +
     '</div>';
 
-  var html = '';
+  // Radar loader (ringan, CSS-only) + skeleton card; hilang otomatis saat list dirender.
+  var html =
+    '<div class="loader-radar-card">' +
+      '<div class="loader-radar"><span class="lr-ring r1"></span><span class="lr-ring r2"></span>' +
+        '<span class="lr-sweep"></span><span class="lr-core">' + mdIcon('sensors', 24) + '</span></div>' +
+      '<div class="loader-radar-text"><div class="lr-title">' + (message || 'Memuat data...') + '</div>' +
+        '<div class="lr-sub">Mengambil data terbaru dari server</div></div>' +
+    '</div>';
   for (var i = 0; i < (cardCount || 3); i++) html += cardHtml;
-  html += '<div class="skeleton-caption"><span class="spinner-sm"></span><span>' + (message || 'Memuat data...') + '</span></div>';
   el.innerHTML = html;
 }
 

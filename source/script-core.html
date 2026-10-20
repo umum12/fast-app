@@ -201,6 +201,48 @@ function clearSession() {
 // UI HELPERS (Patch 7.2 — MD3 loading & feedback)
 // ============================================================
 
+// ============================================================
+// SPLASH SCREEN (loading awal: login & masuk kembali)
+// ============================================================
+var splashTimer_ = null, splashPct_ = 0, splashStep_ = 0, splashShownAt_ = 0;
+var SPLASH_STEPS_ = ['Menghubungkan ke server...', 'Memverifikasi akses petugas...', 'Menyiapkan dasbor & data...'];
+
+function showSplash_() {
+  var el = document.getElementById('splash-screen');
+  if (!el) return;
+  clearInterval(splashTimer_);
+  splashPct_ = 8; splashStep_ = 0; splashShownAt_ = Date.now();
+  el.classList.remove('hide');
+  el.classList.add('show');
+  setSplashProgress_(splashPct_, SPLASH_STEPS_[0]);
+  // Merayap menuju 90% selagi menunggu server; selesai ditentukan hideSplash_().
+  splashTimer_ = setInterval(function () {
+    splashPct_ += (90 - splashPct_) * 0.12;
+    var step = splashPct_ > 62 ? 2 : (splashPct_ > 28 ? 1 : 0);
+    setSplashProgress_(splashPct_, step !== splashStep_ ? SPLASH_STEPS_[(splashStep_ = step)] : null);
+  }, 300);
+}
+
+function setSplashProgress_(pct, text) {
+  var bar = document.getElementById('splash-bar');
+  if (bar) bar.style.width = Math.min(100, pct) + '%';
+  var t = document.getElementById('splash-text');
+  if (t && text) t.textContent = text;
+}
+
+function hideSplash_(ok) {
+  var el = document.getElementById('splash-screen');
+  if (!el || !el.classList.contains('show')) return;
+  clearInterval(splashTimer_);
+  if (ok) setSplashProgress_(100, 'Siap digunakan');
+  // Tampil minimal ~500 ms supaya tidak berkedip, lalu hilang otomatis.
+  var wait = Math.max(ok ? 250 : 0, 500 - (Date.now() - splashShownAt_));
+  setTimeout(function () {
+    el.classList.add('hide');
+    setTimeout(function () { el.classList.remove('show', 'hide'); }, 350);
+  }, wait);
+}
+
 function showSpinner() {
   document.getElementById('global-spinner').style.display = 'flex';
   var bar = document.getElementById('linear-progress');
@@ -634,13 +676,14 @@ function renderApp(bootstrap, session) {
 // Dipakai HANYA untuk resume sesi dari localStorage (tanpa form login) —
 // login baru langsung dapat payload bootstrap penuh, lihat handleLogin().
 function attemptBootstrap(session) {
-  showSpinner();
+  showSplash_();
   google.script.run
     .withSuccessHandler(function (response) {
-      hideSpinner();
       if (response.success) {
         renderApp(response.data, session);
+        hideSplash_(true);
       } else {
+        hideSplash_(false);
         // Sesi tidak valid lagi (mis. user dinonaktifkan) — Final A3.
         clearSession();
         document.getElementById('screen-app').style.display = 'none';
@@ -649,7 +692,7 @@ function attemptBootstrap(session) {
       }
     })
     .withFailureHandler(function (error) {
-      hideSpinner();
+      hideSplash_(false);
       showSnackbar('Gagal terhubung ke server. Periksa koneksi internet Anda.', 'error');
     })
     .getBootstrapData(session.accessCode);
@@ -674,11 +717,11 @@ function handleLogin() {
     return;
   }
 
-  showSpinner();
+  showSplash_();
   google.script.run
     .withSuccessHandler(function (response) {
-      hideSpinner();
       if (!response.success) {
+        hideSplash_(false);
         errorEl.textContent = response.error;
         return;
       }
@@ -692,9 +735,10 @@ function handleLogin() {
       };
       saveSession(session);
       renderApp(response.data, session);
+      hideSplash_(true);
     })
     .withFailureHandler(function (error) {
-      hideSpinner();
+      hideSplash_(false);
       errorEl.textContent = 'Gagal terhubung ke server. Coba lagi.';
     })
     .loginByAccessCode(code);
