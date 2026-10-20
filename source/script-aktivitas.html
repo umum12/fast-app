@@ -20,41 +20,18 @@ var ACTIVITY_TABS = [
  */
 function renderActivityTabs() {
   var btn = document.getElementById('btn-activity-filter');
-  var menu = document.getElementById('activity-filter-menu');
-  if (!btn || !menu) return;
-
+  if (!btn) return;
   var current = ACTIVITY_TABS.filter(function (t) { return t.key === currentActivityFilter; })[0] || ACTIVITY_TABS[0];
-  var isOpen = menu.style.display === 'block';
-  btn.innerHTML = '<span>Filter: ' + current.label + '</span>' + mdIcon(isOpen ? 'chevronUp' : 'chevronDown', 16);
-
-  menu.innerHTML = '';
-  ACTIVITY_TABS.forEach(function (tab) {
-    var opt = document.createElement('button');
-    opt.type = 'button';
-    opt.className = 'activity-filter-option' + (tab.key === currentActivityFilter ? ' active' : '');
-    opt.innerHTML = '<span class="opt-dot"></span><span>' + tab.label + '</span>';
-    opt.addEventListener('click', function (e) {
-      e.stopPropagation();
-      currentActivityFilter = tab.key;
-      menu.style.display = 'none';
-      renderActivityTabs();
-      renderAktivitasFiltered();
-    });
-    menu.appendChild(opt);
-  });
-
+  btn.innerHTML = '<span>Filter: ' + current.label + '</span>' + mdIcon('chevronDown', 16);
   if (!btn.dataset.bound) {
     btn.dataset.bound = '1';
     btn.addEventListener('click', function (e) {
       e.stopPropagation();
-      menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-      renderActivityTabs();
-    });
-    document.addEventListener('click', function () {
-      if (menu.style.display === 'block') {
-        menu.style.display = 'none';
+      openFilterPicker_('Pilih Filter Aktivitas', ACTIVITY_TABS, currentActivityFilter, function (key) {
+        currentActivityFilter = key;
         renderActivityTabs();
-      }
+        renderAktivitasFiltered();
+      });
     });
   }
 }

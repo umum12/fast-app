@@ -796,6 +796,7 @@ function renderDashboardStats(stats) {
     var box = document.createElement('div');
     box.className = 'stat-box';
 
+    box.dataset.stat = s.key;
     var value = document.createElement('div');
     value.className = 'stat-value';
     value.textContent = stats[s.key] != null ? stats[s.key] : 0;

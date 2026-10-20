@@ -83,6 +83,21 @@ function attachFormBuatListenersOnce_() {
     return info ? info.icon : 'description';
   });
   enhanceSelectWithSheet_(floorSelect, function () { return 'building'; });
+
+  var modeSel = document.getElementById('form-assignment-mode');
+  var targetSel = document.getElementById('form-target-user');
+  var syncModeIcon = function () {
+    var ic = document.getElementById('form-mode-icon');
+    if (ic && modeSel) ic.innerHTML = mdIcon(modeSel.value === 'direct' ? 'personCheck' : 'sensors', 18);
+  };
+  var tIc = document.getElementById('form-target-icon');
+  if (tIc) tIc.innerHTML = mdIcon('personCheck', 18);
+  if (modeSel) {
+    syncModeIcon();
+    modeSel.addEventListener('change', syncModeIcon);
+    enhanceSelectWithSheet_(modeSel, function (o) { return o.value === 'direct' ? 'personCheck' : 'sensors'; });
+  }
+  if (targetSel) enhanceSelectWithSheet_(targetSel, function () { return 'account'; });
 }
 
 function enhanceSelectWithSheet_(selectEl, iconFor) {
@@ -93,7 +108,9 @@ function enhanceSelectWithSheet_(selectEl, iconFor) {
   var hit = document.createElement('button');
   hit.type = 'button';
   hit.className = 'select-sheet-hit';
-  hit.setAttribute('aria-label', 'Pilih ' + (selectEl.id === 'form-jenis' ? 'jenis' : 'lantai'));
+  var SHEET_TITLES_ = { 'form-jenis': 'Pilih Jenis', 'form-floor': 'Pilih Lantai', 'form-assignment-mode': 'Pilih Mode Penugasan', 'form-target-user': 'Pilih Petugas Penerima' };
+  var sheetTitle = SHEET_TITLES_[selectEl.id] || 'Pilih';
+  hit.setAttribute('aria-label', sheetTitle);
   wrap.appendChild(hit);
   hit.addEventListener('click', function () {
     if (selectEl.disabled) return;
@@ -113,7 +130,7 @@ function enhanceSelectWithSheet_(selectEl, iconFor) {
         });
       })(selectEl.options[i]);
     }
-    openBottomSheet(items, { center: true, title: selectEl.id === 'form-jenis' ? 'Pilih Jenis' : 'Pilih Lantai' });
+    openBottomSheet(items, { center: true, title: sheetTitle });
   });
 }
 
@@ -123,7 +140,7 @@ function showSendingOverlay_(text) {
   if (!ov) {
     ov = document.createElement('div');
     ov.id = 'sending-overlay';
-    ov.innerHTML = '<div class="sending-card"><div class="sending-title">Mengirim data ke server</div>' +
+    ov.innerHTML = '<div class="sending-card"><div class="sending-ring"></div><div class="sending-title">Mengirim data ke server</div>' +
       '<div class="sending-bar"><div class="sending-bar-fill"></div></div><div class="sending-sub" id="sending-sub"></div></div>';
     document.body.appendChild(ov);
   }
@@ -316,7 +333,7 @@ function initPekerjaanForm() {
     (appBootstrap.master.fsUsers || []).forEach(function (u) {
       var opt = document.createElement('option');
       opt.value = u.userCode;
-      opt.textContent = u.displayName + ' (' + u.userCode + ')';
+      opt.textContent = u.displayName;
       targetSelect.appendChild(opt);
     });
   }
@@ -440,10 +457,31 @@ function renderPhotoSlots() {
  */
 function openPhotoSourceSheet(targetInputId) {
   var inputId = targetInputId || 'photo-file-input';
-  openBottomSheet([
-    { icon: 'photoCamera', label: 'Ambil Foto', onClick: function () { triggerPhotoFileInput_(true, inputId); } },
-    { icon: 'photo', label: 'Pilih dari Galeri', onClick: function () { triggerPhotoFileInput_(false, inputId); } }
-  ]);
+  var ov = document.getElementById('photo-source-overlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'photo-source-overlay';
+    ov.className = 'jk-overlay';
+    ov.innerHTML =
+      '<div class="jk-modal ps-modal" role="dialog" aria-modal="true">' +
+        '<div class="jk-modal-header"><h3 class="ps-title"><span class="ps-title-ico"></span>Pilih Sumber Foto</h3>' +
+        '<button class="jk-close" type="button" data-ps-close aria-label="Tutup"></button></div>' +
+        '<div class="ps-grid">' +
+          '<button type="button" class="ps-tile ps-camera" data-src="camera"><span class="ps-tile-ico"></span><span>Ambil Foto</span></button>' +
+          '<button type="button" class="ps-tile ps-gallery" data-src="gallery"><span class="ps-tile-ico"></span><span>Pilih Galeri</span></button>' +
+        '</div></div>';
+    document.body.appendChild(ov);
+    ov.querySelector('.ps-title-ico').innerHTML = mdIcon('addAPhoto', 18);
+    ov.querySelector('[data-ps-close]').innerHTML = mdIcon('close', 16);
+    ov.querySelector('.ps-camera .ps-tile-ico').innerHTML = mdIcon('photoCamera', 26);
+    ov.querySelector('.ps-gallery .ps-tile-ico').innerHTML = mdIcon('photoLibrary', 26);
+    ov.addEventListener('click', function (e) {
+      if (e.target === ov || e.target.closest('[data-ps-close]')) ov.classList.remove('show');
+    });
+  }
+  ov.querySelector('.ps-camera').onclick = function () { ov.classList.remove('show'); triggerPhotoFileInput_(true, inputId); };
+  ov.querySelector('.ps-gallery').onclick = function () { ov.classList.remove('show'); triggerPhotoFileInput_(false, inputId); };
+  ov.classList.add('show');
 }
 
 function triggerPhotoFileInput_(useCamera, targetInputId) {
@@ -1948,43 +1986,28 @@ function initPekerjaanInboxPage() {
 /** Dropdown filter status. Pola & CSS sama dengan filter Aktivitas. */
 function renderPekerjaanFilter_() {
   var btn = document.getElementById('btn-pekerjaan-filter');
-  var menu = document.getElementById('pekerjaan-filter-menu');
-  if (!btn || !menu) return;
-
+  if (!btn) return;
   var current = PEKERJAAN_FILTERS.filter(function (f) { return f.key === currentPekerjaanFilter; })[0] || PEKERJAAN_FILTERS[0];
-  var isOpen = menu.style.display === 'block';
-  btn.innerHTML = '<span>' + current.label + '</span>' + mdIcon(isOpen ? 'chevronUp' : 'chevronDown', 16);
-
-  menu.innerHTML = '';
-  PEKERJAAN_FILTERS.forEach(function (f) {
-    var opt = document.createElement('button');
-    opt.type = 'button';
-    opt.className = 'activity-filter-option' + (f.key === currentPekerjaanFilter ? ' active' : '');
-    opt.innerHTML = '<span class="opt-dot"></span><span>' + f.label + '</span>';
-    opt.addEventListener('click', function (e) {
-      e.stopPropagation();
-      currentPekerjaanFilter = f.key;
-      menu.style.display = 'none';
-      renderPekerjaanFilter_();
-      renderPekerjaanInboxList(pageDataCache.pekerjaanInbox || []);
-    });
-    menu.appendChild(opt);
-  });
-
+  btn.innerHTML = '<span>' + current.label + '</span>' + mdIcon('chevronDown', 16);
   if (!btn.dataset.bound) {
     btn.dataset.bound = '1';
     btn.addEventListener('click', function (e) {
       e.stopPropagation();
-      menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-      renderPekerjaanFilter_();
-    });
-    document.addEventListener('click', function () {
-      if (menu.style.display === 'block') {
-        menu.style.display = 'none';
+      openFilterPicker_('Pilih Filter Pekerjaan', PEKERJAAN_FILTERS, currentPekerjaanFilter, function (key) {
+        currentPekerjaanFilter = key;
         renderPekerjaanFilter_();
-      }
+        renderPekerjaanInboxList(pageDataCache.pekerjaanInbox || []);
+      });
     });
   }
+}
+
+/** Pemilih filter bergaya dialog tengah (radio) — dipakai Pekerjaan & Aktivitas. */
+function openFilterPicker_(title, options, currentKey, onPick) {
+  openBottomSheet(options.map(function (o) {
+    return { icon: 'list', label: String(o.label).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }),
+      radio: true, selected: o.key === currentKey, onClick: function () { onPick(o.key); } };
+  }), { center: true, title: title });
 }
 
 
