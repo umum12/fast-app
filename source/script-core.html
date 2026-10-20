@@ -339,92 +339,116 @@ document.getElementById('btn-open-akun').addEventListener('click', function () {
 });
 
 // ============================================================
-// MATERIAL SYMBOLS — inline SVG (Patch 6.1.5)
+// GOOGLE MATERIAL SYMBOLS (CDN Google Fonts, subset ikon yang dipakai)
 // ============================================================
-// Dibuat manual meniru gaya "Material Symbols Outlined" — BUKAN memuat font
-// dari Google Fonts CDN, agar aplikasi tetap tidak punya dependency jaringan
-// eksternal (konsisten dengan keputusan ikon nav di Patch 6.06).
-var MD_ICONS = {
-  stats: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
-  save: '<path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7z"/><path d="M17 21v-8H7v8M7 3v5h8"/>',
-  edit: '<path d="m17 3 4 4L7 21H3v-4z"/>',
-  delete: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/>',
-  calendar: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/>',
-  description: '<path d="M8 3h6l4 4v14a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v4h4M9 12h6M9 16h6"/>',
-  photoCamera: '<path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="14" r="3.5"/>',
-  refresh: '<path d="M20 12a8 8 0 1 1-2.6-5.9"/><path d="M20 4v5h-5"/>',
-  visibility: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
-  search: '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
-  tune: '<path d="M4 6h10M18 6h2M4 12h2M8 12h12M4 18h14M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="6" cy="12" r="2"/><circle cx="18" cy="18" r="2"/>',
-  add: '<path d="M12 5v14M5 12h14"/>',
-  close: '<path d="M6 6l12 12M18 6 6 18"/>',
-  arrowBack: '<path d="M19 12H5M12 19l-7-7 7-7"/>',
-  dashboard: '<rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="5" rx="1.5"/><rect x="13" y="10" width="8" height="11" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/>',
-  task: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M9 3v4M15 3v4M4 10h16"/><path d="m8.5 14 2 2 4-4"/>',
-  photo: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="m21 15-5-5L5 20"/>',
-  statistics: '<path d="M5 21V10M12 21V4M19 21v-7"/>',
-  settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51 1Z"/>',
-  notification: '<path d="M6 8a6 6 0 1 1 12 0c0 4 1.5 6 1.5 6h-15S6 12 6 8Z"/><path d="M9.5 21a2.5 2.5 0 0 0 5 0"/>',
-  reminder: '<circle cx="12" cy="13" r="7"/><path d="M12 10v3.5l2.5 1.5M9 3h6"/>',
-  account: '<circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 5-6 8-6s6.5 2 8 6"/>',
-  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/>',
-  login: '<path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l-5-5 5-5M5 12h12"/>',
-  upload: '<path d="M12 20V6M6 12l6-6 6 6"/><path d="M4 20h16"/>',
-  send: '<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7Z"/>',
-  download: '<path d="M12 4v14M6 12l6 6 6-6"/><path d="M4 20h16"/>',
-  history: '<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5M12 8v5l3 2"/>',
-  sunny: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
-  moon: '<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/>',
-  checkCircle: '<circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.5 2.5L16 9"/>',
-  activity: '<path d="M3 12h4l2-7 4 14 2-7h6"/>',
-  inbox: '<path d="M4 12h4l1.5 3h5L16 12h4"/><path d="M4 12 5.5 5a1 1 0 0 1 1-.8h11a1 1 0 0 1 1 .8L20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/>',
-  broom: '<path d="M20 4 10 14"/><path d="M8.5 15.5 4 20l1.5-4.5L9 12l3 3-3.5 .5Z"/><path d="M13 9l3-3 3 3-3 3Z"/>',
-  wrench: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2-2Z"/>',
-  warning: '<path d="M12 2 1 21h22L12 2Z"/><path d="M12 9v5M12 17h.01"/>',
-  calendarCheck: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/><path d="m9 15 2 2 4-4"/>',
-  location: '<path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12Z"/><circle cx="12" cy="9" r="2.5"/>',
-  moreHoriz: '<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>',
-  moreVert: '<circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/>',
-  lightbulb: '<path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2.3h6c0-1.1.4-1.8 1-2.3A7 7 0 0 0 12 2Z"/>',
-  building: '<rect x="5" y="3" width="14" height="18" rx="1"/><path d="M9 7h1M14 7h1M9 11h1M14 11h1M9 15h1M14 15h1"/><path d="M10 21v-3h4v3"/>',
-  key: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9M16 7l3 3M14 9l2 2"/>',
-  shield: '<path d="M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6l-8-3Z"/><path d="m9 12 2 2 4-4"/>',
-  database: '<ellipse cx="12" cy="6" rx="8" ry="3"/><path d="M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/>',
-  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>',
-  apps: '<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><rect x="14" y="14" width="6" height="6" rx="1"/>',
-  layers: '<path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/>',
-  build: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.7 2.7-2.4-.6-.6-2.4 2.7-2.7Z"/>',
-  sysUpdate: '<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M12 7v7M9 11l3 3 3-3"/>',
-  bellRing: '<path d="M6 8a6 6 0 1 1 12 0c0 4 1.5 6 1.5 6h-15S6 12 6 8Z"/><path d="M10 18a2 2 0 0 0 4 0M3 8c.4-2 1.4-3.6 2.8-4.8M21 8c-.4-2-1.4-3.6-2.8-4.8"/>',
-  bellOff: '<path d="M9 5a6 6 0 0 1 9 3c0 3 .9 4.9 1.5 5.8M6 8c0 4-1.5 6-1.5 6H15M10 18a2 2 0 0 0 4 0M3 3l18 18"/>',
-  postAdd: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M12 11v6M9 14h6"/>',
-  schedule: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
-  addAPhoto: '<path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><path d="M12 11v6M9 14h6"/>',
-  taskAlt: '<path d="M21 12a9 9 0 1 1-4-7.5"/><path d="m8 12 3 3 10-10"/>',
-  accountCircle: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.5c1.5-2 3.4-3 5.5-3s4 1 5.5 3"/>',
-  badge: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M6 17c.6-1.5 1.8-2.2 3-2.2s2.4.7 3 2.2M15 9h3M15 13h3"/>',
-  adminPanel: '<path d="M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6l-8-3Z"/><circle cx="12" cy="10" r="2"/><path d="M8.5 16c.8-1.4 2-2 3.5-2s2.7.6 3.5 2"/>',
-  integration: '<path d="m8 8-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14"/>',
-  buildCircle: '<circle cx="12" cy="12" r="9"/><path d="M14.5 8.5a2.6 2.6 0 0 0-3 3.4L8 15.4 9 16.5l3.5-3.5a2.6 2.6 0 0 0 3.4-3l-1.6 1.6-1.4-.4-.4-1.4 1.6-1.3Z"/>',
-  chevronDown: '<path d="m6 9 6 6 6-6"/>',
-  chevronUp: '<path d="m6 15 6-6 6 6"/>',
-  chevronRight: '<path d="m9 6 6 6-6 6"/>'
+// Aplikasi wajib online, jadi tidak ada SVG cadangan. Ikon disembunyikan sampai
+// font siap (html.icons-ready) supaya nama ikon tidak sempat tampil sebagai teks.
+// Menambah ikon baru: tambahkan ke MD_SYMBOLS DAN ke daftar icon_names (urut abjad)
+// pada <link> Material Symbols di index.html.
+var MD_SYMBOLS = {
+  stats: 'bar_chart',
+  save: 'save',
+  edit: 'edit',
+  delete: 'delete',
+  calendar: 'calendar_today',
+  description: 'description',
+  photoCamera: 'photo_camera',
+  refresh: 'refresh',
+  visibility: 'visibility',
+  search: 'search',
+  tune: 'tune',
+  add: 'add',
+  close: 'close',
+  arrowBack: 'arrow_back',
+  dashboard: 'dashboard',
+  task: 'task',
+  photo: 'image',
+  statistics: 'monitoring',
+  settings: 'settings',
+  notification: 'notifications',
+  reminder: 'alarm',
+  account: 'person',
+  logout: 'logout',
+  login: 'login',
+  upload: 'upload',
+  send: 'send',
+  download: 'download',
+  history: 'history',
+  sunny: 'light_mode',
+  moon: 'dark_mode',
+  checkCircle: 'check_circle',
+  activity: 'monitoring',
+  inbox: 'inbox',
+  broom: 'cleaning_services',
+  wrench: 'build',
+  warning: 'warning',
+  calendarCheck: 'event_available',
+  location: 'location_on',
+  moreHoriz: 'more_horiz',
+  moreVert: 'more_vert',
+  lightbulb: 'lightbulb',
+  building: 'apartment',
+  key: 'key',
+  shield: 'shield',
+  database: 'database',
+  info: 'info',
+  apps: 'apps',
+  layers: 'layers',
+  build: 'build',
+  sysUpdate: 'system_update',
+  bellRing: 'notifications_active',
+  bellOff: 'notifications_off',
+  postAdd: 'post_add',
+  schedule: 'schedule',
+  addAPhoto: 'add_a_photo',
+  taskAlt: 'task_alt',
+  accountCircle: 'account_circle',
+  badge: 'badge',
+  adminPanel: 'admin_panel_settings',
+  integration: 'integration_instructions',
+  buildCircle: 'build_circle',
+  chevronDown: 'keyboard_arrow_down',
+  chevronUp: 'keyboard_arrow_up',
+  chevronRight: 'chevron_right',
+  terminal: 'terminal'
 };
 
 function mdIcon(name, size) {
   var s = size || 20;
-  return '<svg width="' + s + '" height="' + s + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-    'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + (MD_ICONS[name] || '') + '</svg>';
+  var sym = MD_SYMBOLS[name] || name;
+  return '<span class="material-symbols-outlined" aria-hidden="true" style="font-size:' + s + 'px">' + sym + '</span>';
+}
+
+function mdSymbol_(sym, size) {
+  return '<span class="material-symbols-outlined" aria-hidden="true" style="font-size:' + (size || 22) + 'px">' + sym + '</span>';
 }
 
 var NAV_ICONS = {
-  beranda: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9"/></svg>',
-  pekerjaan: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M9 3v4M15 3v4M4 10h16"/><path d="m8.5 14 2 2 4-4"/></svg>',
-  buat: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>',
-  jadwal: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16M9 14h.01M12 14h.01M15 14h.01M9 17h.01M12 17h.01"/></svg>',
-  akun: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c1.5-4 5-6 8-6s6.5 2 8 6"/></svg>',
-  aktivitas: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-7 4 14 2-7h6"/></svg>'
+  beranda: mdSymbol_('home', 24),
+  pekerjaan: mdSymbol_('assignment_turned_in', 24),
+  buat: mdSymbol_('add_circle', 24),
+  jadwal: mdSymbol_('calendar_month', 24),
+  akun: mdSymbol_('account_circle', 24),
+  aktivitas: mdSymbol_('monitoring', 24)
 };
+
+(function () {
+  function ready() { document.documentElement.classList.add('icons-ready'); }
+  function iconFontLoaded() {
+    var ok = false;
+    document.fonts.forEach(function (f) {
+      if (String(f.family).replace(/["']/g, '') === 'Material Symbols Outlined' && f.status === 'loaded') ok = true;
+    });
+    return ok;
+  }
+  try {
+    var check = function () { if (iconFontLoaded()) ready(); };
+    document.fonts.addEventListener('loadingdone', check);
+    document.fonts.load('24px "Material Symbols Outlined"', 'home').then(check, function () {});
+    document.fonts.ready.then(check);
+  } catch (e) { ready(); }
+})();
+
 
 function renderNav(navItems) {
   var bottomContainer = document.getElementById('bottom-nav-container');

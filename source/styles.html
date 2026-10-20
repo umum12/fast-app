@@ -77,7 +77,7 @@ html, body {
   min-height: 100%;
   background: var(--color-bg);
   color: var(--color-text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+  font-family: "Roboto", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
   overflow-x: clip;
   -webkit-tap-highlight-color: transparent;
 }
@@ -2388,7 +2388,7 @@ header.app-header .app-logo svg { height: 34px; width: auto; display: block; }
 .akun-row-label { display:inline-flex; align-items:center; gap:10px; color:var(--color-text-muted); font-weight:500; }
 .akun-row-label .akun-ico { color:var(--color-text-faint); }
 .akun-row-value { font-weight:600; text-align:right; word-break:break-word; }
-.akun-code { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-weight:700; letter-spacing:.06em; background:var(--md-surface-container, #eef1f6); padding:3px 10px; border-radius:8px; }
+.akun-code { font-family:'Roboto Mono', ui-monospace, SFMono-Regular, Menlo, monospace; font-weight:700; letter-spacing:.06em; background:var(--md-surface-container, #eef1f6); padding:3px 10px; border-radius:8px; }
 
 .akun-banner { margin:0 0 12px; padding:10px 14px; border-radius:12px; font-size:13.5px; line-height:1.45; font-weight:500; background:#f1f3f4; color:var(--color-text-muted); }
 .akun-banner[data-tone="ok"] { background:#e6f4ea; color:#137333; }
@@ -2562,3 +2562,42 @@ header.app-header .app-logo svg { height: 34px; width: auto; display: block; }
 .jk-creator { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 13px; font-weight: 600; }
 .jk-creator small { font-size: 11px; font-weight: 400; color: var(--color-text-faint, #94a3b8); }
 #jadwal-piket-summary.jadwal-summary-box { background: none; border: 0; padding: 0; }
+
+/* ===== Google Material Symbols (CDN) ===== */
+.material-symbols-outlined {
+  font-family: 'Material Symbols Outlined';
+  font-weight: normal; font-style: normal; font-size: 20px; line-height: 1;
+  letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap;
+  word-wrap: normal; direction: ltr; -webkit-font-smoothing: antialiased; user-select: none; flex-shrink: 0;
+  font-variation-settings: 'FILL' 1, 'wght' 500, 'GRAD' 0, 'opsz' 24;
+  visibility: hidden; vertical-align: middle;
+}
+html.icons-ready .material-symbols-outlined { visibility: visible; }
+nav.bottom-nav .nav-item:not(.active) .material-symbols-outlined,
+aside.sidebar .nav-item:not(.active) .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 500, 'GRAD' 0, 'opsz' 24; }
+.search-input-wrap .material-symbols-outlined { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--color-text-faint); pointer-events: none; }
+.mono, .telemetry, .jk-table .mono { font-family: 'Roboto Mono', monospace; }
+
+/* ===== About / Akun: gaya Material 3 (contoh about-md-cdn-google.html) ===== */
+section[data-page="akun"] .card { border-radius: 28px; border: 1px solid #E2E8F0; box-shadow: 0px 1px 3px 1px rgba(0,0,0,.08), 0px 1px 2px 0px rgba(0,0,0,.12); }
+.akun-hero-top { background: linear-gradient(135deg, #0B57D0 0%, #003EA1 100%); padding: 24px 20px; }
+.akun-avatar { width: 64px; height: 64px; border-radius: 24px; font-size: 30px; font-weight: 700; backdrop-filter: blur(8px); }
+.akun-name { font-size: 24px; font-weight: 700; letter-spacing: -.4px; }
+.akun-role-chip { border-radius: 8px; border: 1px solid rgba(255,255,255,.25); background: rgba(255,255,255,.18); font-weight: 500; padding: 4px 12px 4px 8px; }
+.akun-card-icon { width: 44px; height: 44px; border-radius: 16px; background: #C2E7FF; color: #001D33; }
+.akun-card-head h2 { font-size: 18px; font-weight: 700; }
+.akun-code { background: #D3E3FD; color: #041E49; border-radius: 8px; padding: 6px 12px; font-size: 13px; }
+.akun-banner { border-radius: 16px; padding: 14px 16px; font-size: 13.5px; border: 1px solid #E2E8F0; }
+.akun-banner[data-tone="ok"] { background: #C4EDD0; color: #00210B; border-color: #A3E635; }
+.akun-banner[data-tone="warn"] { background: #FFDAD6; color: #410002; border-color: #FCA5A5; }
+.akun-details { border-radius: 16px; background: #fff; }
+.akun-details summary { display: flex; align-items: center; gap: 8px; background: #F1F5F9; font-family: 'Roboto Mono', monospace; font-size: 12px; font-weight: 700; color: #1E293B; padding: 12px 16px; }
+.akun-details summary > span:last-of-type { flex: 1; }
+.akun-details summary::after { float: none; }
+.akun-table { font-family: 'Roboto Mono', monospace; font-size: 12px; }
+.akun-table th { text-transform: uppercase; font-weight: 700; padding: 10px 14px; background: #F8FAFC; }
+.akun-table td { padding: 12px 14px; }
+.akun-actions > button { border-radius: 16px; font-weight: 700; letter-spacing: .5px; }
+.btn-success { background: #146C2E; }
+.btn-danger-solid { background: #BA1A1A; }
+#app-build-label { font-family: 'Roboto Mono', monospace; font-weight: 700; }
