@@ -483,17 +483,29 @@
       </div>
       <div class="form-group">
         <label class="form-label" for="jadwal-form-date">Tanggal</label>
-        <input id="jadwal-form-date" class="form-input" type="date">
+        <div class="jk-date" id="jk-date-wrap">
+          <span class="jk-date-text" id="jk-date-text">Pilih tanggal</span>
+          <span class="jk-arrow" id="jk-date-ico"></span>
+          <input id="jadwal-form-date" class="jk-date-input" type="date">
+        </div>
         <div class="field-error-msg" id="jadwal-err-date"></div>
       </div>
       <div class="form-group">
         <label class="form-label">Jenis</label>
-        <button class="jk-select" id="jk-open-jenis" type="button"><span id="jk-jenis-label">Pilih jenis</span><span class="jk-arrow" data-ico="chevronDown"></span></button>
+        <div class="jk-kubu">
+          <button type="button" class="jk-kubu-btn active" id="jk-kubu-piket" data-kubu="piket">PIKET</button>
+          <button type="button" class="jk-kubu-btn" id="jk-kubu-absen" data-kubu="absen">ABSEN</button>
+        </div>
+        <button class="jk-select" id="jk-open-jenis" type="button"><span id="jk-jenis-label">Pilih jenis</span><span class="jk-arrow"></span></button>
         <select id="jadwal-form-jenis" hidden></select>
       </div>
       <div class="form-group">
         <label class="form-label">Petugas</label>
-        <button class="jk-select" id="jk-open-user" type="button"><span id="jk-user-label" class="is-placeholder">Pilih petugas</span><span class="jk-arrow" data-ico="chevronDown"></span></button>
+        <div class="jk-kubu">
+          <button type="button" class="jk-kubu-btn active" id="jk-kubu-saya" data-kubu="saya">SAYA SENDIRI</button>
+          <button type="button" class="jk-kubu-btn" id="jk-kubu-lain" data-kubu="lain">PETUGAS LAIN</button>
+        </div>
+        <button class="jk-select" id="jk-open-user" type="button"><span id="jk-user-label" class="is-placeholder">Pilih petugas</span><span class="jk-arrow" id="jk-user-arrow"></span></button>
         <select id="jadwal-form-user" hidden>
           <option value="">Pilih petugas</option>
         </select>
