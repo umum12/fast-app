@@ -502,6 +502,7 @@ function renderJadwalTable_(list, counts) {
 
   if (!list || list.length === 0) {
     container.style.display = 'none';
+    var cb0 = document.getElementById('jk-counts'); if (cb0) cb0.style.display = 'none';
     if (!emptyEl) {
       emptyEl = document.createElement('div');
       emptyEl.id = 'jadwal-piket-empty';
@@ -516,14 +517,19 @@ function renderJadwalTable_(list, counts) {
   container.style.display = '';
   if (emptyEl) emptyEl.style.display = 'none';
 
-  var bar = document.createElement('div');
-  bar.className = 'jk-summary-bar';
+  var countsBar = document.getElementById('jk-counts');
+  if (!countsBar) {
+    countsBar = document.createElement('div');
+    countsBar.id = 'jk-counts';
+    countsBar.className = 'jk-counts';
+    container.parentNode.insertBefore(countsBar, container);
+  }
   counts = counts || { piket: 0, absen: 0, libur: 0 };
-  bar.innerHTML =
-    '<span><i class="jk-sdot" style="background:var(--status-info-fg)"></i>' + counts.piket + ' Piket</span><span>\u2022</span>' +
-    '<span><i class="jk-sdot" style="background:var(--status-alert-fg)"></i>' + counts.absen + ' Absen</span><span>\u2022</span>' +
-    '<span><i class="jk-sdot" style="background:var(--status-completed-fg)"></i>' + counts.libur + ' Libur</span>';
-  container.appendChild(bar);
+  countsBar.style.display = '';
+  countsBar.innerHTML =
+    '<div class="jk-count"><span class="jk-count-ico piket">' + mdIcon('shield', 20) + '</span><span class="jk-count-txt">' + counts.piket + ' Piket</span></div>' +
+    '<span class="jk-count-sep">\u2022</span>' +
+    '<div class="jk-count"><span class="jk-count-txt">' + (counts.absen + counts.libur) + ' Kehadiran</span><span class="jk-count-ico hadir">' + mdIcon('personCheck', 20) + '</span></div>';
 
   var today = todayDateStr_();
   var table = document.createElement('table');
@@ -1135,7 +1141,15 @@ function openContentForm_(entry) {
   document.getElementById('content-form-error').textContent = '';
   document.getElementById('content-link-input-row').style.display = 'none';
   document.getElementById('content-form-panel').style.display = 'block';
-  document.getElementById('content-form-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  var cfPanel = document.getElementById('content-form-panel');
+  cfPanel.scrollTop = 0;
+  if (!document.getElementById('content-form-x')) {
+    var x = document.createElement('button');
+    x.type = 'button'; x.id = 'content-form-x'; x.className = 'jk-close cf-close'; x.setAttribute('aria-label', 'Tutup');
+    x.innerHTML = mdIcon('close', 16);
+    x.addEventListener('click', function () { var b = document.getElementById('btn-cancel-content-form'); if (b) b.click(); });
+    cfPanel.insertBefore(x, cfPanel.firstChild);
+  }
 }
 
 function closeContentForm_() {
@@ -1251,33 +1265,44 @@ function loadContentAktif(force) {
     .getContentAktif(session.accessCode);
 }
 
+var contentCarouselTimer_ = null;
+
+/** Beranda: pengumuman tayang ditampilkan sebagai carousel (geser, panah, titik, autoplay 5 dtk). */
 function renderContentBanner_(list) {
   var container = document.getElementById('content-banner-container');
+  if (contentCarouselTimer_) { clearInterval(contentCarouselTimer_); contentCarouselTimer_ = null; }
   container.innerHTML = '';
 
-  (list || []).filter(function (c) { return c.status === 'tayang'; }).forEach(function (c) {
-    var card = document.createElement('div');
-    card.className = 'reminder-card' + (c.contentType === 'warning' ? ' sticky' : '');
+  var items = (list || []).filter(function (c) { return c.status === 'tayang'; });
+  if (items.length === 0) return;
 
-    var badgeRow = document.createElement('div');
-    badgeRow.className = 'op-card-top';
-    badgeRow.style.marginBottom = '4px';
-    var typeInfo = CONTENT_TYPE_BADGE[c.contentType] || { cls: 'badge-neutral' };
+  var wrap = document.createElement('div');
+  wrap.className = 'cc-wrap';
+  var viewport = document.createElement('div');
+  viewport.className = 'cc-viewport';
+  var track = document.createElement('div');
+  track.className = 'cc-track';
+
+  items.forEach(function (c) {
+    var typeInfo = CONTENT_TYPE_BADGE[c.contentType] || { cls: 'badge-neutral', icon: 'description' };
+    var slide = document.createElement('div');
+    slide.className = 'cc-slide' + (c.contentType === 'warning' ? ' is-warning' : '');
+
     var badge = document.createElement('span');
-    badge.className = 'badge ' + typeInfo.cls;
-    badge.textContent = c.contentTypeLabel;
-    badgeRow.appendChild(badge);
-    card.appendChild(badgeRow);
+    badge.className = 'badge ' + typeInfo.cls + ' cc-badge';
+    badge.innerHTML = mdIcon(typeInfo.icon || 'description', 14) + '<span></span>';
+    badge.lastChild.textContent = c.contentTypeLabel;
+    slide.appendChild(badge);
 
     var title = document.createElement('div');
-    title.className = 'reminder-title';
+    title.className = 'cc-title';
     title.textContent = c.title;
-    card.appendChild(title);
+    slide.appendChild(title);
 
     var msg = document.createElement('div');
-    msg.className = 'reminder-message';
+    msg.className = 'cc-message reminder-message';
     msg.innerHTML = sanitizeRichContentHtml_(c.content);
-    card.appendChild(msg);
+    slide.appendChild(msg);
 
     if (c.imageUrl) {
       var img = document.createElement('img');
@@ -1285,9 +1310,8 @@ function renderContentBanner_(list) {
       img.src = c.imageUrl;
       img.alt = c.title;
       img.addEventListener('click', function () { openPhotoViewer([c.imageUrl], 0); });
-      card.appendChild(img);
+      slide.appendChild(img);
     }
-
     if (c.pdfUrl) {
       var link = document.createElement('a');
       link.className = 'content-card-pdf-link';
@@ -1295,11 +1319,61 @@ function renderContentBanner_(list) {
       link.target = '_blank';
       link.rel = 'noopener';
       link.innerHTML = mdIcon('description', 14) + '<span>Buka PDF</span>';
-      card.appendChild(link);
+      slide.appendChild(link);
     }
-
-    container.appendChild(card);
+    track.appendChild(slide);
   });
+  viewport.appendChild(track);
+  wrap.appendChild(viewport);
+
+  var n = items.length, idx = 0;
+  if (n > 1) {
+    var prev = document.createElement('button');
+    prev.type = 'button'; prev.className = 'cc-nav cc-prev'; prev.setAttribute('aria-label', 'Sebelumnya');
+    prev.innerHTML = mdIcon('chevronLeft', 18);
+    var next = document.createElement('button');
+    next.type = 'button'; next.className = 'cc-nav cc-next'; next.setAttribute('aria-label', 'Berikutnya');
+    next.innerHTML = mdIcon('chevronRight', 18);
+    wrap.appendChild(prev); wrap.appendChild(next);
+
+    var dots = document.createElement('div');
+    dots.className = 'cc-dots';
+    items.forEach(function (_, i) {
+      var d = document.createElement('button');
+      d.type = 'button'; d.setAttribute('aria-label', 'Slide ' + (i + 1));
+      d.addEventListener('click', function () { go(i, true); });
+      dots.appendChild(d);
+    });
+    wrap.appendChild(dots);
+
+    var go = function (i, user) {
+      idx = (i + n) % n;
+      track.style.transform = 'translateX(-' + (idx * 100) + '%)';
+      Array.prototype.forEach.call(dots.children, function (d, k) { d.className = k === idx ? 'active' : ''; });
+      if (user) restart();
+    };
+    var restart = function () {
+      if (contentCarouselTimer_) clearInterval(contentCarouselTimer_);
+      contentCarouselTimer_ = setInterval(function () {
+        if (!document.body.contains(wrap)) { clearInterval(contentCarouselTimer_); contentCarouselTimer_ = null; return; }
+        go(idx + 1);
+      }, 5000);
+    };
+    prev.addEventListener('click', function () { go(idx - 1, true); });
+    next.addEventListener('click', function () { go(idx + 1, true); });
+
+    // Geser (swipe) di layar sentuh
+    var sx = null;
+    viewport.addEventListener('touchstart', function (e) { sx = e.touches[0].clientX; }, { passive: true });
+    viewport.addEventListener('touchend', function (e) {
+      if (sx === null) return;
+      var dx = e.changedTouches[0].clientX - sx; sx = null;
+      if (Math.abs(dx) > 40) go(idx + (dx < 0 ? 1 : -1), true);
+    });
+    go(0);
+    restart();
+  }
+  container.appendChild(wrap);
 }
 
 function renderContentManagementList_(list) {
@@ -1311,51 +1385,70 @@ function renderContentManagementList_(list) {
     return;
   }
 
-  list.forEach(function (c) {
-    var row = document.createElement('div');
-    row.className = 'op-card';
+  var wrap = document.createElement('div');
+  wrap.className = 'cm-table-wrap';
+  var table = document.createElement('table');
+  table.className = 'cm-table';
+  table.innerHTML = '<thead><tr><th>Jenis &amp; Judul</th><th>Status</th><th class="cm-period">Periode</th><th>Aksi</th></tr></thead>';
+  var tbody = document.createElement('tbody');
 
-    var top = document.createElement('div');
-    top.className = 'op-card-top';
+  list.forEach(function (c) {
+    var tr = document.createElement('tr');
     var typeInfo = CONTENT_TYPE_BADGE[c.contentType] || { cls: 'badge-neutral' };
+
+    var tdTitle = document.createElement('td');
+    tdTitle.className = 'cm-col-title';
     var typeBadge = document.createElement('span');
     typeBadge.className = 'badge ' + typeInfo.cls;
     typeBadge.textContent = c.contentTypeLabel;
-    top.appendChild(typeBadge);
-    var statusBadge = document.createElement('span');
-    statusBadge.className = 'badge ' + (CONTENT_STATUS_BADGE_CLASS[c.status] || 'badge-neutral');
-    statusBadge.textContent = c.statusLabel;
-    top.appendChild(statusBadge);
-    var meta = document.createElement('span');
-    meta.className = 'op-card-meta';
-    meta.textContent = c.startDate + ' \u2013 ' + c.endDate;
-    top.appendChild(meta);
-    row.appendChild(top);
+    tdTitle.appendChild(typeBadge);
+    var t = document.createElement('div');
+    t.className = 'cm-title';
+    t.textContent = c.title;
+    tdTitle.appendChild(t);
+    var pin = document.createElement('div');
+    pin.className = 'cm-period-inline';
+    pin.textContent = c.startDate + ' \u2013 ' + c.endDate;
+    tdTitle.appendChild(pin);
+    tr.appendChild(tdTitle);
 
-    var title = document.createElement('div');
-    title.className = 'op-card-title';
-    title.textContent = c.title;
-    row.appendChild(title);
+    var tdStatus = document.createElement('td');
+    var st = document.createElement('span');
+    st.className = 'cm-status cm-' + c.status;
+    st.innerHTML = '<span class="dot' + (c.status === 'tayang' ? ' pulse' : '') + '"></span>';
+    var stText = document.createElement('span');
+    stText.textContent = c.statusLabel;
+    st.appendChild(stText);
+    tdStatus.appendChild(st);
+    tr.appendChild(tdStatus);
 
-    var actionsRow = document.createElement('div');
-    actionsRow.className = 'op-card-actions';
-    actionsRow.style.marginTop = '8px';
+    var tdPeriod = document.createElement('td');
+    tdPeriod.className = 'cm-period';
+    tdPeriod.textContent = c.startDate + ' – ' + c.endDate;
+    tr.appendChild(tdPeriod);
 
+    var tdAct = document.createElement('td');
+    var actions = document.createElement('div');
+    actions.className = 'cm-actions';
     var editBtn = document.createElement('button');
-    editBtn.className = 'btn-card-action action-neutral';
-    editBtn.innerHTML = mdIcon('edit', 14) + '<span>Ubah</span>';
+    editBtn.type = 'button';
+    editBtn.className = 'cm-btn';
+    editBtn.innerHTML = mdIcon('edit', 14) + '<span class="cm-lbl">Ubah</span>';
     editBtn.addEventListener('click', function () { openContentForm_(c); });
-    actionsRow.appendChild(editBtn);
-
     var deleteBtn = document.createElement('button');
-    deleteBtn.className = 'btn-card-action action-outline-danger';
-    deleteBtn.innerHTML = mdIcon('delete', 14) + '<span>Hapus</span>';
+    deleteBtn.type = 'button';
+    deleteBtn.className = 'cm-btn cm-danger';
+    deleteBtn.innerHTML = mdIcon('delete', 14) + '<span class="cm-lbl">Hapus</span>';
     deleteBtn.addEventListener('click', function () { confirmHapusContent_(c.contentId); });
-    actionsRow.appendChild(deleteBtn);
+    actions.appendChild(editBtn); actions.appendChild(deleteBtn);
+    tdAct.appendChild(actions);
+    tr.appendChild(tdAct);
 
-    row.appendChild(actionsRow);
-    container.appendChild(row);
+    tbody.appendChild(tr);
   });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  container.appendChild(wrap);
 }
 
 // ============================================================
