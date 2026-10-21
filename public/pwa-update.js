@@ -57,6 +57,7 @@
     }
     var btn = el('btn-check-update');
     if (btn) {
+      btn.style.display = '';
       btn.disabled = state === 'checking';
       var btnText = state === 'available' ? 'Perbarui Sekarang' : (state === 'checking' ? 'Memeriksa...' : 'Periksa Pembaruan');
       var btnLbl = el('btn-check-update-label');
