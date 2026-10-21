@@ -6,7 +6,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,500,0..1,0&icon_names=account_circle,add,add_a_photo,add_circle,admin_panel_settings,alarm,apartment,apps,arrow_back,assignment_turned_in,badge,bar_chart,bookmark,build,build_circle,calendar_month,calendar_today,chat_bubble,check_circle,chevron_left,chevron_right,cleaning_services,close,cloud_upload,dark_mode,dashboard,database,delete,description,download,edit,event_available,history,home,image,inbox,info,integration_instructions,key,keyboard_arrow_down,keyboard_arrow_up,layers,light_mode,lightbulb,list,location_on,login,logout,monitoring,more_horiz,more_vert,notifications,notifications_active,notifications_off,person,person_add,person_check,person_remove,photo_camera,photo_library,post_add,refresh,save,schedule,search,send,sensors,settings,shield,sync,system_update,task,task_alt,terminal,tune,upload,verified_user,visibility,warning&display=block" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,500,0..1,0&icon_names=account_circle,add,add_a_photo,add_circle,admin_panel_settings,alarm,apartment,apps,arrow_back,assignment_turned_in,badge,bar_chart,bookmark,build,build_circle,calculate,calendar_month,calendar_today,chat_bubble,check_circle,chevron_left,chevron_right,cleaning_services,close,cloud_upload,dark_mode,dashboard,database,delete,description,download,edit,edit_calendar,edit_note,event_available,event_busy,group,handshake,history,home,image,inbox,info,integration_instructions,inventory_2,key,keyboard_arrow_down,keyboard_arrow_up,landscape,layers,light_mode,lightbulb,list,location_on,lock,login,logout,monitoring,more_horiz,more_vert,notifications,notifications_active,notifications_off,person,person_add,person_check,person_remove,person_search,photo_camera,photo_library,post_add,refresh,save,schedule,search,send,sensors,settings,shield,sync,system_update,task,task_alt,terminal,trophy,tune,upload,verified_user,visibility,warning,work&display=block" rel="stylesheet">
 <title>Facility Support</title>
 <style>
 <?!= include('styles'); ?>
@@ -489,13 +489,13 @@
 
   <!-- Jadwal Kolaborasi: modal tengah (form, detail, pemilih) -->
   <div class="jk-overlay" id="jk-form-overlay">
-    <div class="jk-modal" role="dialog" aria-modal="true" aria-labelledby="jadwal-form-heading">
+    <div class="jk-modal jk-form-modal" role="dialog" aria-modal="true" aria-labelledby="jadwal-form-heading">
       <div class="jk-modal-header">
-        <h3 id="jadwal-form-heading">Tambah Jadwal</h3>
+        <div class="jk-head-left"><span class="jk-head-ico" data-ico="editCalendar"></span><h3 id="jadwal-form-heading">Tambah Jadwal</h3></div>
         <button class="jk-close" type="button" data-jk-close aria-label="Tutup"></button>
       </div>
       <div class="form-group">
-        <label class="form-label" for="jadwal-form-date">Tanggal</label>
+        <label class="form-label jk-label" for="jadwal-form-date">Tanggal</label>
         <div class="jk-date" id="jk-date-wrap">
           <span class="jk-date-text" id="jk-date-text">Pilih tanggal</span>
           <span class="jk-arrow" id="jk-date-ico"></span>
@@ -504,29 +504,29 @@
         <div class="field-error-msg" id="jadwal-err-date"></div>
       </div>
       <div class="form-group">
-        <label class="form-label">Jenis</label>
+        <label class="form-label jk-label">Jenis</label>
         <div class="jk-kubu">
-          <button type="button" class="jk-kubu-btn active" id="jk-kubu-piket" data-kubu="piket">PIKET</button>
-          <button type="button" class="jk-kubu-btn" id="jk-kubu-absen" data-kubu="absen">ABSEN</button>
+          <button type="button" class="jk-kubu-btn k-piket active" id="jk-kubu-piket" data-kubu="piket"><span class="jk-ico" data-ico="shield"></span><span>PIKET</span></button>
+          <button type="button" class="jk-kubu-btn k-absen" id="jk-kubu-absen" data-kubu="absen"><span class="jk-ico" data-ico="eventBusy"></span><span>KETIDAKHADIRAN</span></button>
         </div>
-        <button class="jk-select" id="jk-open-jenis" type="button"><span id="jk-jenis-label">Pilih jenis</span><span class="jk-arrow"></span></button>
+        <button class="jk-select" id="jk-open-jenis" type="button" data-kubu="piket"><span class="jk-sel-left"><span class="jk-sel-ico ico-piket" data-ico="eventAvailable"></span><span class="jk-sel-ico ico-absen" data-ico="eventBusy"></span><span id="jk-jenis-label">Pilih jenis</span></span><span class="jk-arrow"></span></button>
         <select id="jadwal-form-jenis" hidden></select>
       </div>
       <div class="form-group">
-        <label class="form-label">Petugas</label>
+        <label class="form-label jk-label">Petugas</label>
         <div class="jk-kubu">
-          <button type="button" class="jk-kubu-btn active" id="jk-kubu-saya" data-kubu="saya">SAYA SENDIRI</button>
-          <button type="button" class="jk-kubu-btn" id="jk-kubu-lain" data-kubu="lain">PETUGAS LAIN</button>
+          <button type="button" class="jk-kubu-btn k-saya active" id="jk-kubu-saya" data-kubu="saya"><span class="jk-ico" data-ico="account"></span><span>SAYA SENDIRI</span></button>
+          <button type="button" class="jk-kubu-btn k-lain" id="jk-kubu-lain" data-kubu="lain"><span class="jk-ico" data-ico="group"></span><span>PETUGAS LAIN</span></button>
         </div>
-        <button class="jk-select" id="jk-open-user" type="button"><span id="jk-user-label" class="is-placeholder">Pilih petugas</span><span class="jk-arrow" id="jk-user-arrow"></span></button>
+        <button class="jk-select" id="jk-open-user" type="button"><span class="jk-sel-left"><span class="jk-sel-ico ico-self" data-ico="account"></span><span class="jk-sel-ico ico-other" data-ico="personSearch"></span><span id="jk-user-label" class="is-placeholder">Pilih petugas</span></span><span class="jk-arrow" id="jk-user-arrow"></span><span class="jk-lock" data-ico="lock"></span></button>
         <select id="jadwal-form-user" hidden>
           <option value="">Pilih petugas</option>
         </select>
         <div class="field-error-msg" id="jadwal-err-user"></div>
       </div>
       <div class="form-group">
-        <label class="form-label" for="jadwal-form-notes">Catatan (opsional)</label>
-        <input id="jadwal-form-notes" class="form-input" type="text" maxlength="200" placeholder="Tambahkan catatan...">
+        <label class="form-label jk-label" for="jadwal-form-notes">Catatan (opsional)</label>
+        <div class="jk-notes-wrap"><span class="jk-notes-ico" data-ico="editNote"></span><input id="jadwal-form-notes" class="form-input" type="text" maxlength="200" placeholder="Tambahkan catatan..."></div>
       </div>
       <div class="form-error" id="jadwal-form-error"></div>
       <div class="jk-footer">

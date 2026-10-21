@@ -251,7 +251,7 @@ function jkSyncLabels_() {
   var ul = document.getElementById('jk-user-label');
   jl.textContent = js.selectedIndex >= 0 && js.options[js.selectedIndex] ? js.options[js.selectedIndex].textContent : 'Pilih jenis';
   var hasUser = !!us.value;
-  ul.textContent = hasUser ? us.options[us.selectedIndex].textContent : 'Pilih petugas';
+  ul.textContent = hasUser ? us.options[us.selectedIndex].textContent + (jkKubuPetugas === 'saya' ? ' (Saya)' : '') : 'Pilih petugas';
   ul.classList.toggle('is-placeholder', !hasUser);
   var d = document.getElementById('jadwal-form-date').value;
   var dt = document.getElementById('jk-date-text');
@@ -262,7 +262,10 @@ function jkSyncLabels_() {
   document.getElementById('jk-kubu-absen').classList.toggle('active', jkKubuJenis === 'absen');
   document.getElementById('jk-kubu-saya').classList.toggle('active', jkKubuPetugas === 'saya');
   document.getElementById('jk-kubu-lain').classList.toggle('active', jkKubuPetugas === 'lain');
-  document.getElementById('jk-open-user').classList.toggle('is-locked', jkKubuPetugas === 'saya');
+  var ou = document.getElementById('jk-open-user');
+  ou.classList.toggle('is-locked', jkKubuPetugas === 'saya');
+  ou.dataset.kubu = jkKubuPetugas;
+  document.getElementById('jk-open-jenis').dataset.kubu = jkKubuJenis;
 }
 
 function jkSetKubuJenis_(k) {
@@ -285,9 +288,11 @@ function jkSetKubuPetugas_(k) {
 /** Pemilih bergaya modal tengah; select asli tetap menjadi sumber nilai. */
 function jkOpenPicker_(selectId, title) {
   var sel = document.getElementById(selectId);
+  if (selectId === 'jadwal-form-jenis') title = jkKubuJenis === 'piket' ? 'PILIH JADWAL PIKET' : 'PILIH JADWAL KETIDAKHADIRAN';
   document.getElementById('jk-picker-title').textContent = title;
   var list = document.getElementById('jk-picker-list');
   list.innerHTML = '';
+  list.className = 'jk-picker-list' + (selectId === 'jadwal-form-jenis' && jkKubuJenis === 'absen' ? ' theme-rose' : '');
   Array.prototype.forEach.call(sel.options, function (opt) {
     if (!opt.value) return;
     if (selectId === 'jadwal-form-jenis' && jkKubuOfJenis_(opt.value) !== jkKubuJenis) return;
