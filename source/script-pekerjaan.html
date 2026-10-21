@@ -1195,7 +1195,8 @@ function buildPekerjaanInboxCard_(p) {
  * After Ambil the card is rebuilt from fresh data (doAmbilPekerjaanInline_);
  * after Lepas the inbox reloads, so the button returns to "Ambil Pekerjaan".
  */
-function buildPekerjaanActionRow_(p) {
+function buildPekerjaanActionRow_(p, opts) {
+  opts = opts || {};
   if (!p.canAmbil && !p.canSelesaikan) return null;
   var actionsRow = document.createElement('div');
   actionsRow.className = 'list-card-actions-row';
@@ -1204,10 +1205,10 @@ function buildPekerjaanActionRow_(p) {
   if (p.canAmbil) {
     btn.className = 'btn-card-action action-primary action-full';
     btn.dataset.pekerjaanId = p.pekerjaanId;
-    btn.innerHTML = mdIcon('personCheck', 18) + '<span>Ambil Pekerjaan</span>';
+    btn.innerHTML = mdIcon('personAdd', 18) + '<span>Ambil Pekerjaan</span>';
     btn.addEventListener('click', function (e) { e.stopPropagation(); doAmbilPekerjaanInline_(btn, p); });
   } else {
-    btn.className = 'btn-card-action action-positive action-full';
+    btn.className = 'btn-card-action action-positive action-full' + (opts.pulse ? ' pulse-success' : '');
     btn.innerHTML = mdIcon('description', 18) + '<span>Buat Laporan</span>';
     btn.addEventListener('click', function (e) { e.stopPropagation(); openBuatLaporanForPekerjaan(p); });
   }
@@ -1350,7 +1351,7 @@ function openPekerjaanDetail(p, opts) {
     primaryBtn.type = 'button';
     if (p.canAmbil) {
       primaryBtn.className = 'btn-card-action action-primary action-full';
-      primaryBtn.innerHTML = mdIcon('personCheck', 18) + '<span>Ambil Pekerjaan</span>';
+      primaryBtn.innerHTML = mdIcon('personAdd', 18) + '<span>Ambil Pekerjaan</span>';
       primaryBtn.addEventListener('click', function () {
         closeActivityDetail();
         var cardBtn = document.querySelector('#pekerjaan-list .btn-card-action[data-pekerjaan-id="' + p.pekerjaanId + '"]');
@@ -2090,57 +2091,97 @@ function attachCardProgress_(cardEl) {
 function doAmbilPekerjaanInline_(buttonEl, p) {
   var session = loadSession();
   var cardEl = buttonEl.closest('.list-card');
-  var progress = attachCardProgress_(cardEl);
+  var listEl = document.getElementById('pekerjaan-list');
   var toastDetail = 'Tugas "' + truncateText_(p.subject || p.description, 40) + '" kini ada di tangan Anda. Tekan Buat Laporan setelah selesai.';
+  if (buttonEl.dataset.busy === '1') return;
+  buttonEl.dataset.busy = '1';
 
+  // --- UI: mode fokus (card aktif disorot, card lain diburamkan) + progres di bawah tombol ---
+  if (listEl) listEl.classList.add('focus-mode');
+  cardEl.classList.add('active-focus-card');
+  var originalHtml = buttonEl.innerHTML;
+  buttonEl.disabled = true;
+  buttonEl.classList.add('is-loading');
+  buttonEl.innerHTML = '<span>Mengambil</span><span class="dot-flashing"></span>';
+
+  var prog = document.createElement('div');
+  prog.className = 'take-progress';
+  prog.innerHTML = '<div class="take-progress-bar"><div class="take-progress-fill"></div></div>' +
+    '<div class="take-progress-meta"><span class="take-progress-text"></span><span class="take-progress-pct">0%</span></div>';
+  buttonEl.parentNode.appendChild(prog);
+  var fill = prog.querySelector('.take-progress-fill');
+  var txt = prog.querySelector('.take-progress-text');
+  var pct = prog.querySelector('.take-progress-pct');
+  var cur = 0, creep = null;
+  function setP(v, t) { cur = v; fill.style.width = v + '%'; pct.textContent = Math.round(v) + '%'; if (t) txt.textContent = t; }
+  function stopCreep() { if (creep) { clearInterval(creep); creep = null; } }
+  function endFocus() {
+    stopCreep();
+    if (listEl) listEl.classList.remove('focus-mode');
+    if (cardEl) cardEl.classList.remove('active-focus-card');
+  }
+  function restoreButton() {
+    delete buttonEl.dataset.busy;
+    buttonEl.disabled = false;
+    buttonEl.classList.remove('is-loading');
+    buttonEl.innerHTML = originalHtml;
+    if (prog.parentNode) prog.parentNode.removeChild(prog);
+    endFocus();
+  }
   function toastSuccess() { showSnackbar('Pekerjaan berhasil diambil', 'success', toastDetail); }
 
-  progress.set(10);
-  beginAction(buttonEl, 'Mengambil...');
+  setP(10, 'Mengecek data penugasan...');
+  // Merayap pelan selagi menunggu server (maks 60%); fase berikutnya mengikuti respons asli.
+  creep = setInterval(function () {
+    if (cur < 60) setP(cur + (60 - cur) * 0.12, cur < 30 ? 'Memverifikasi hak akses & lokasi...' : 'Mengunci status tugas...');
+  }, 250);
+
   google.script.run
     .withSuccessHandler(function (response) {
-      var bar = document.getElementById('linear-progress');
-      if (bar) bar.classList.remove('show');
-
       if (!response.success) {
-        progress.remove();
-        if (document.body.contains(buttonEl)) endAction(buttonEl);
+        restoreButton();
         showSnackbar(response.error, 'error');
         return;
       }
+      stopCreep();
       invalidateAllPekerjaanCaches_();
-      progress.set(55);
+      setP(75, 'Mengunci status tugas...');
 
       google.script.run
         .withSuccessHandler(function (listResponse) {
           if (!listResponse.success || !document.body.contains(cardEl)) {
+            endFocus();
             toastSuccess();
             loadPekerjaanInbox(true);
             return;
           }
-          progress.set(100);
+          setP(90, 'Menyiapkan lembar kerja...');
           var freshP = listResponse.data.pekerjaan.find(function (row) { return row.pekerjaanId === p.pekerjaanId; });
           setTimeout(function () {
-            if (!document.body.contains(cardEl)) { toastSuccess(); loadPekerjaanInbox(true); return; }
-            if (!freshP) {
-              cardEl.remove();
-            } else {
-              cardEl.replaceWith(buildPekerjaanInboxCard_(freshP));
-            }
-            toastSuccess();
-          }, 300);
+            setP(100, 'Penugasan berhasil diambil!');
+            setTimeout(function () {
+              if (!document.body.contains(cardEl)) { endFocus(); toastSuccess(); loadPekerjaanInbox(true); return; }
+              if (!freshP) {
+                cardEl.remove();
+                endFocus();
+              } else {
+                var fresh = buildPekerjaanListCard_(freshP, { actions: true, pulse: true });
+                cardEl.replaceWith(fresh);
+                endFocus();
+              }
+              toastSuccess();
+            }, 450);
+          }, 250);
         })
         .withFailureHandler(function () {
+          endFocus();
           toastSuccess();
           loadPekerjaanInbox(true);
         })
         .getPekerjaanList(session.accessCode, { view: 'inbox' });
     })
     .withFailureHandler(function () {
-      var bar = document.getElementById('linear-progress');
-      if (bar) bar.classList.remove('show');
-      progress.remove();
-      if (document.body.contains(buttonEl)) endAction(buttonEl);
+      restoreButton();
       showSnackbar('Gagal mengambil pekerjaan. Coba lagi.', 'error');
     })
     .ambilPekerjaan(session.accessCode, p.pekerjaanId);

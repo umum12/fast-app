@@ -2831,3 +2831,30 @@ nav.bottom-nav .nav-item.nav-fab.active .nav-fab-circle { background: var(--colo
   .cm-period-inline { display: block; }
 }
 @media (max-width: 480px) { .cm-actions { flex-direction: column; } }
+
+/* ===== Ambil Pekerjaan: fokus + progres (card-tugas-untuk-anda) ===== */
+#pekerjaan-list { position: relative; }
+#pekerjaan-list .list-card { transition: transform .3s cubic-bezier(.4,0,.2,1), box-shadow .3s, filter .4s, opacity .4s; }
+#pekerjaan-list.focus-mode .list-card:not(.active-focus-card) { filter: blur(5px) grayscale(20%); opacity: .5; pointer-events: none; user-select: none; }
+#pekerjaan-list .list-card.active-focus-card { position: relative; z-index: 5; transform: scale(1.02); box-shadow: 0 20px 25px -5px rgba(0,0,0,.12), 0 10px 10px -5px rgba(0,0,0,.05); }
+.btn-card-action.action-primary.action-full { background: #2563eb; color: #fff; box-shadow: 0 4px 12px rgba(37,99,235,.25); }
+.btn-card-action.action-positive.action-full { box-shadow: 0 4px 12px rgba(22,163,74,.25); }
+.btn-card-action.action-full.is-loading { background: #60a5fa; box-shadow: none; cursor: not-allowed; gap: 12px; }
+.btn-card-action.pulse-success { animation: successPulse 1s ease-out; }
+@keyframes successPulse { 0% { box-shadow: 0 0 0 0 rgba(22,163,74,.6); } 70% { box-shadow: 0 0 0 12px rgba(22,163,74,0); } 100% { box-shadow: 0 0 0 0 rgba(22,163,74,0); } }
+.dot-flashing { display: inline-block; position: relative; width: 6px; height: 6px; margin-left: 12px; border-radius: 5px; background: #fff; animation: dotFlashing 1s infinite linear alternate; animation-delay: .5s; }
+.dot-flashing::before, .dot-flashing::after { content: ''; display: inline-block; position: absolute; top: 0; width: 6px; height: 6px; border-radius: 5px; background: #fff; }
+.dot-flashing::before { left: -10px; animation: dotFlashing 1s infinite alternate; animation-delay: 0s; }
+.dot-flashing::after { left: 10px; animation: dotFlashing 1s infinite alternate; animation-delay: 1s; }
+@keyframes dotFlashing { 0% { background: #fff; } 50%, 100% { background: rgba(255,255,255,.3); } }
+.list-card-actions-row { flex-direction: column; }
+.take-progress { width: 100%; padding-top: 8px; }
+.take-progress-bar { height: 8px; border-radius: 999px; background: #f1f5f9; border: 1px solid #e2e8f0; padding: 1px; overflow: hidden; }
+.take-progress-fill { height: 100%; width: 0; border-radius: 999px; background: #2563eb; transition: width .3s ease-out; }
+.take-progress-meta { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 11px; font-weight: 500; color: #64748b; padding: 0 2px; }
+.take-progress-pct { font-weight: 800; color: #2563eb; font-family: 'Roboto Mono', monospace; }
+@media (prefers-reduced-motion: reduce) { .dot-flashing, .dot-flashing::before, .dot-flashing::after, .btn-card-action.pulse-success { animation: none; } #pekerjaan-list .list-card.active-focus-card { transform: none; } }
+.list-card-date-line .list-card-date { flex-wrap: nowrap; align-items: flex-start; }
+.list-card-date-line .list-card-date .icon-slot { margin-top: 1px; }
+.list-card.list-card-row.has-actions { flex-wrap: wrap; }
+.list-card.has-actions > .list-card-actions-row { flex: 0 0 100%; width: 100%; margin-top: 4px; }

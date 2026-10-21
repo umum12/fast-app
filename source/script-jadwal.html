@@ -1542,9 +1542,10 @@ function buildPekerjaanListCard_(p, opts) {
   personRow.appendChild(personText);
   main.appendChild(personRow);
 
+  var pendingActions = null;
   if (opts.actions && typeof buildPekerjaanActionRow_ === 'function') {
-    var actionsRow = buildPekerjaanActionRow_(p);
-    if (actionsRow) main.appendChild(actionsRow);
+    var actionsRow = buildPekerjaanActionRow_(p, opts);
+    if (actionsRow) pendingActions = actionsRow;
   }
 
   card.appendChild(main);
@@ -1583,6 +1584,7 @@ function buildPekerjaanListCard_(p, opts) {
   side.appendChild(chevron);
 
   card.appendChild(side);
+  if (pendingActions) { card.classList.add('has-actions'); card.appendChild(pendingActions); }
 
   card.addEventListener('click', function () { openPekerjaanDetail(p, { actions: !!opts.actions }); });
   return card;
