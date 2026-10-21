@@ -2715,3 +2715,50 @@ nav.bottom-nav .nav-item.nav-fab.active .nav-fab-circle { background: var(--colo
 @media (prefers-reduced-motion: reduce) {
   .splash-ring, .lr-ring, .lr-sweep, .skeleton-card { animation: none !important; }
 }
+
+/* ===== Akun: profil, About, Data (mockup new-card-*) ===== */
+.akun-hero-top { position: relative; padding-right: 64px; }
+.akun-hero-top .akun-logout-icon { position: absolute; top: 12px; right: 12px; width: 44px; height: 44px; min-height: 0; margin: 0; padding: 0; border-radius: 50%; background: transparent; border: none; box-shadow: none; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .2s; }
+.akun-hero-top .akun-logout-icon:hover { background: rgba(255,255,255,.2); }
+.akun-hero-top .akun-logout-icon:active { background: rgba(255,255,255,.3); }
+.akun-hero { padding-bottom: 6px; }
+.akun-hero .akun-row { margin-left: 16px; margin-right: 16px; border-bottom: none; }
+.akun-role-chip { background: rgba(16,185,129,.22) !important; border: 1px solid rgba(110,231,183,.5) !important; color: #6ee7b7; border-radius: 999px !important; font-weight: 600 !important; }
+.akun-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.akun-icon-sky { background: #e0f2fe !important; color: #0284c7 !important; }
+.akun-icon-info { background: #dbeafe !important; color: #1d4ed8 !important; border-radius: 50% !important; width: 38px !important; height: 38px !important; }
+.akun-pill-btn { border-radius: 999px !important; min-height: 46px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; width: 100%; }
+#btn-reload-app-data { border: 1.5px solid #cbd5e1; color: var(--color-text); background: #fff; }
+#btn-reload-app-data .sync-ico { display: inline-flex; transition: transform .4s ease; }
+#btn-reload-app-data:hover .sync-ico, #btn-reload-app-data:active .sync-ico { transform: rotate(180deg); }
+.about-actions { display: flex; gap: 10px; margin-top: 16px; }
+.about-actions .akun-pill-btn { flex: 1; width: auto; }
+.about-actions .about-more { flex: 0 0 auto; padding: 0 20px; }
+.about-actions #btn-check-update[style*="display: none"] + .about-more { flex: 1; }
+
+.about-modal { max-width: 640px; padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+.about-modal .jk-modal-header { margin: 0; padding: 18px 22px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+.about-body { padding: 22px; overflow-y: auto; line-height: 1.6; color: #334155; font-size: 14px; }
+.about-title { margin: 0 0 2px; font-size: 24px; font-weight: 800; color: #0f172a; letter-spacing: -.5px; }
+.about-subtitle { font-size: 13px; font-weight: 700; color: #2563eb; letter-spacing: 1px; margin-bottom: 6px; }
+.about-tagline { font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: 1px; padding-bottom: 12px; margin-bottom: 16px; border-bottom: 2px solid #e2e8f0; }
+.about-body h4 { margin: 22px 0 10px; font-size: 13px; font-weight: 700; letter-spacing: .5px; color: #0f172a; }
+.about-body p { margin: 0 0 12px; color: #475569; }
+.about-body ul { margin: 0 0 16px; padding-left: 20px; font-size: 13.5px; }
+.about-body li { margin-bottom: 6px; }
+.about-maturity { background: #fef2f2; border-left: 4px solid #dc2626; border-radius: 12px; padding: 14px 16px; margin: 20px 0; }
+.about-maturity h4, .about-maturity p { color: #dc2626 !important; }
+.about-maturity h4 { margin-top: 0; }
+.about-maturity p:last-child { margin-bottom: 0; }
+.about-highlight { background: #f1f5f9; border-radius: 8px; padding: 14px; text-align: center; font-size: 12px; font-weight: 600; letter-spacing: .5px; margin: 20px 0 12px; }
+.about-quote { text-align: center; font-size: 11px; font-weight: 700; color: #64748b; letter-spacing: .5px; margin-top: 4px; }
+
+.reload-title { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 17px; }
+.reload-title.run { color: var(--color-text); }
+.reload-title.run .spin-ico { display: inline-flex; color: var(--color-primary); animation: splashSpin 1s linear infinite; }
+.reload-title.done { color: #059669; }
+.reload-title.error { color: var(--color-danger); }
+.reload-bar-fill { background: linear-gradient(90deg, #2563eb, #38bdf8); }
+.reload-percent { margin: 10px auto 0; width: fit-content; font-family: 'Roboto Mono', monospace; font-size: 11px; font-weight: 600; color: #2563eb; background: #eff6ff; padding: 2px 8px; border-radius: 6px; text-align: center; }
+.reload-percent:empty { display: none; }
+@media (prefers-reduced-motion: reduce) { .reload-title.run .spin-ico { animation: none; } }

@@ -454,6 +454,8 @@ var MD_SYMBOLS = {
   chevronRight: 'chevron_right',
   terminal: 'terminal',
   cloudUpload: 'cloud_upload',
+  verifiedUser: 'verified_user',
+  sync: 'sync',
   personRemove: 'person_remove',
   personCheck: 'person_check',
   sensors: 'sensors',
@@ -816,6 +818,19 @@ document.getElementById('btn-login').addEventListener('click', handleLogin);
 document.getElementById('input-access-code').addEventListener('keydown', function (e) {
   if (e.key === 'Enter') handleLogin();
 });
+(function setupAkunExtras_() {
+  var lo = document.getElementById('btn-logout');
+  if (lo) lo.innerHTML = mdIcon('logout', 24);
+  var ov = document.getElementById('about-overlay');
+  var more = document.getElementById('btn-about-more');
+  var closeB = document.getElementById('btn-about-close');
+  if (closeB) closeB.innerHTML = mdIcon('close', 16);
+  if (!ov || !more) return;
+  more.addEventListener('click', function () { ov.classList.add('show'); });
+  closeB.addEventListener('click', function () { ov.classList.remove('show'); });
+  ov.addEventListener('click', function (e) { if (e.target === ov) ov.classList.remove('show'); });
+})();
+
 document.getElementById('btn-logout').addEventListener('click', function () {
   showConfirmModal('Keluar dari aplikasi? Anda perlu memasukkan kode akses lagi untuk masuk kembali.', function () {
     handleLogout();
@@ -837,11 +852,23 @@ document.getElementById('btn-logout').addEventListener('click', function () {
  */
 var reloadRunning = false;
 
+function setReloadTitle_(state) {
+  var t = document.getElementById('reload-title');
+  if (!t) return;
+  if (state === 'done') t.innerHTML = mdIcon('checkCircle', 18) + '<span>Data Tersinkron</span>';
+  else if (state === 'error') t.innerHTML = mdIcon('close', 18) + '<span>Sinkronisasi Gagal</span>';
+  else t.innerHTML = '<span class="spin-ico">' + mdIcon('sync', 18) + '</span><span>Menyinkronkan Data</span>';
+  t.className = 'reload-title ' + (state || 'run');
+}
+
 function setReloadProgress_(done, total, text, isError) {
   var fill = document.getElementById('reload-bar-fill');
   fill.style.width = Math.round((done / total) * 100) + '%';
   fill.classList.toggle('error', !!isError);
   document.getElementById('reload-step-text').textContent = text;
+  var pct = document.getElementById('reload-percent');
+  if (pct) pct.textContent = isError ? '' : Math.round((done / total) * 100) + '%';
+  setReloadTitle_(isError ? 'error' : (done >= total ? 'done' : 'run'));
 }
 
 function closeReloadOverlay_() {
@@ -909,7 +936,7 @@ function runReloadAppData_() {
 
 var btnReloadAppData = document.getElementById('btn-reload-app-data');
 if (btnReloadAppData) {
-  btnReloadAppData.innerHTML = mdIcon('refresh', 18) + '<span>Muat Ulang Data</span>';
+  btnReloadAppData.innerHTML = '<span class="sync-ico">' + mdIcon('refresh', 18) + '</span><span>Muat Ulang Data</span>';
   btnReloadAppData.addEventListener('click', runReloadAppData_);
 }
 var btnReloadRetry = document.getElementById('btn-reload-retry');
