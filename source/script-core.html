@@ -691,6 +691,7 @@ function attemptBootstrap(session) {
   google.script.run
     .withSuccessHandler(function (response) {
       if (response.success) {
+        if (response.data.bundle) { applyStartupBundle_(response.data.bundle); response.data.bundle = null; }
         renderApp(response.data, session);
         hideSplash_(true);
       } else {
@@ -706,7 +707,7 @@ function attemptBootstrap(session) {
       hideSplash_(false);
       showSnackbar('Gagal terhubung ke server. Periksa koneksi internet Anda.', 'error');
     })
-    .getBootstrapData(session.accessCode);
+    .getBootstrapData(session.accessCode, true);
 }
 
 /**
@@ -745,6 +746,7 @@ function handleLogin() {
         uiState: {}
       };
       saveSession(session);
+      if (response.data.bundle) { applyStartupBundle_(response.data.bundle); response.data.bundle = null; }
       renderApp(response.data, session);
       hideSplash_(true);
     })
@@ -752,7 +754,7 @@ function handleLogin() {
       hideSplash_(false);
       errorEl.textContent = 'Gagal terhubung ke server. Coba lagi.';
     })
-    .loginByAccessCode(code);
+    .loginByAccessCode(code, true);
 }
 
 
@@ -892,19 +894,15 @@ function runReloadAppData_() {
   reloadRunning = true;
   var ac = session.accessCode;
 
+  // Satu request (paket startup) menggantikan 4 request terpisah sebelumnya.
   var steps = [
-    { label: 'Memuat data akun & master...',
-      run: function (ok, fail) { google.script.run.withSuccessHandler(ok).withFailureHandler(fail).getBootstrapData(ac); },
-      apply: function (d) { appBootstrap = d; } },
-    { label: 'Memuat pekerjaan...',
-      run: function (ok, fail) { google.script.run.withSuccessHandler(ok).withFailureHandler(fail).getPekerjaanList(ac, { view: 'inbox' }); },
-      apply: function (d) { pageDataCache.pekerjaanInbox = d.pekerjaan; persistSet_('inbox', d.pekerjaan); } },
-    { label: 'Memuat riwayat & aktivitas...',
-      run: function (ok, fail) { google.script.run.withSuccessHandler(ok).withFailureHandler(fail).getPekerjaanList(ac, { view: 'aktivitas', limit: FEED_PAGE_SIZE_, offset: 0 }); },
-      apply: function (d) { pageDataCache.pekerjaanAktivitasByKey[feedKey_('', '')] = { list: d.pekerjaan, total: d.total, hasMore: d.hasMore, t: Date.now() }; persistSet_('aktivitas', { list: d.pekerjaan, total: d.total, hasMore: d.hasMore }); } },
-    { label: 'Memuat beranda & statistik...',
-      run: function (ok, fail) { google.script.run.withSuccessHandler(ok).withFailureHandler(fail).getHomeBootstrap(ac); },
-      apply: function (d) { pageDataCache.dashboard = d.dashboard; pageDataCache.content = d.content; persistSet_('dashboard', d.dashboard); persistSet_('content', d.content); } }
+    { label: 'Memuat data aplikasi...',
+      run: function (ok, fail) { google.script.run.withSuccessHandler(ok).withFailureHandler(fail).getBootstrapData(ac, true); },
+      apply: function (d) {
+        var bundle = d.bundle; d.bundle = null;
+        appBootstrap = d;
+        applyStartupBundle_(bundle);
+      } }
   ];
   var total = steps.length + 1; // +1 = reset cache lokal
 

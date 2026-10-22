@@ -1028,6 +1028,7 @@ function resetAllPageDataCache_() {
   pageDataCache.pekerjaanAktivitasByKey = {};
   pageDataCache.jadwalAktif = null;
   persistClearAll_();
+  komentarCache_ = {};
   prefetchDone_ = false;
 }
 
@@ -1806,36 +1807,60 @@ function openPenuntasanEditForm_(p) {
 // KOMENTAR pada Detail Pekerjaan
 // ============================================================
 
+// Cache komentar per pekerjaan (memori, sesi berjalan): detail yang pernah dibuka
+// langsung menampilkan komentar terakhir, lalu diperbarui diam-diam dari server.
+var komentarCache_ = {};
+
 function renderKomentarSection_(p, body) {
   var section = document.createElement('div');
   section.className = 'komentar-section';
   section.innerHTML =
     '<div class="komentar-head"><span class="title">Komentar</span>' +
     '<button class="btn-icon" type="button" id="btn-komentar-refresh" aria-label="Muat ulang komentar">' + mdIcon('refresh', 18) + '</button></div>' +
-    '<div id="komentar-list"><div class="inline-loading"><span class="spinner-sm"></span>Memuat komentar...</div></div>' +
+    '<div id="komentar-list"></div>' +
     '<div id="komentar-form-wrap"></div>';
   body.appendChild(section);
 
   document.getElementById('btn-komentar-refresh').addEventListener('click', function () { loadKomentar_(p); });
-  loadKomentar_(p);
+
+  var cached = komentarCache_[p.pekerjaanId];
+  var isDemo = !!(appBootstrap && appBootstrap.currentUser && appBootstrap.currentUser.role === 'demo');
+  if (cached) {
+    // Pernah dibuka: tampil seketika dari cache.
+    renderKomentarList_(p, cached.list);
+    renderKomentarForm_(p, cached.canKirim);
+  } else if (!p.commentCount) {
+    // Server sudah memberi tahu jumlah komentar = 0: tidak perlu spinner.
+    renderKomentarList_(p, []);
+    renderKomentarForm_(p, !isDemo);
+  } else {
+    document.getElementById('komentar-list').innerHTML = '<div class="inline-loading"><span class="spinner-sm"></span>Memuat komentar...</div>';
+  }
+  // Cache < 30 dtk: cukup, hemat request. Selain itu verifikasi ke server tanpa menghapus tampilan yang ada.
+  if (!(cached && cached.t && (Date.now() - cached.t) < 30000)) loadKomentar_(p);
 }
 
 function loadKomentar_(p) {
   var session = loadSession();
   var listEl = document.getElementById('komentar-list');
   if (!listEl) return;
+  var hadCache = !!komentarCache_[p.pekerjaanId] || !p.commentCount;
   google.script.run
     .withSuccessHandler(function (response) {
       listEl = document.getElementById('komentar-list');
       if (!listEl) return; // Detail sudah ditutup
-      if (!response.success) { listEl.innerHTML = '<div class="komentar-empty">' + response.error + '</div>'; return; }
+      if (!response.success) { if (!hadCache) listEl.innerHTML = '<div class="komentar-empty">' + response.error + '</div>'; return; }
+      var prev = komentarCache_[p.pekerjaanId];
+      komentarCache_[p.pekerjaanId] = { list: response.data.komentar, canKirim: response.data.canKirim, t: Date.now() };
       p.commentCount = response.data.komentar.length;
-      renderKomentarList_(p, response.data.komentar);
+      // Tidak berubah -> jangan gambar ulang (tanpa kedip; teks yang sedang diedit aman).
+      var unchanged = prev && sameFeedList_(prev.list, response.data.komentar) && listEl.children.length > 0 && !listEl.querySelector('.inline-loading');
+      if (!unchanged) renderKomentarList_(p, response.data.komentar);
       renderKomentarForm_(p, response.data.canKirim);
     })
     .withFailureHandler(function () {
       var el = document.getElementById('komentar-list');
-      if (el) el.innerHTML = '<div class="komentar-empty">Gagal memuat komentar.</div>';
+      if (el && !hadCache) el.innerHTML = '<div class="komentar-empty">Gagal memuat komentar.</div>';
     })
     .getKomentarList(session.accessCode, p.pekerjaanId);
 }
@@ -2171,6 +2196,40 @@ function loadPekerjaanInbox(force) {
       if (bar3) bar3.classList.remove('show');
     })
     .getPekerjaanList(session.accessCode, { view: 'inbox' });
+}
+
+// ------------------------------------------------------------
+// PAKET STARTUP — payload bootstrap kini membawa data halaman awal (Beranda,
+// jadwal, inbox, Aktivitas & Riwayat halaman 1) dalam SATU request. Diterapkan
+// ke cache sebelum halaman digambar, sehingga pemuat halaman tidak perlu
+// memanggil server lagi (dan prefetch otomatis dilewati).
+// ------------------------------------------------------------
+function applyStartupBundle_(bundle) {
+  if (!bundle) return;
+  var now = Date.now();
+  if (bundle.home) {
+    pageDataCache.dashboard = bundle.home.dashboard;
+    pageDataCache.content = bundle.home.content;
+    persistSet_('dashboard', bundle.home.dashboard);
+    persistSet_('content', bundle.home.content);
+  }
+  if (bundle.jadwal) pageDataCache.jadwalAktif = bundle.jadwal;
+  if (bundle.inbox) {
+    pageDataCache.pekerjaanInbox = bundle.inbox.pekerjaan;
+    persistSet_('inbox', bundle.inbox.pekerjaan);
+    if (bundle.inbox.version) pekerjaanKnownVersion_ = bundle.inbox.version;
+  }
+  if (bundle.aktivitas) {
+    var ea = { list: bundle.aktivitas.pekerjaan, total: bundle.aktivitas.total, hasMore: bundle.aktivitas.hasMore, t: now };
+    pageDataCache.pekerjaanAktivitasByKey[feedKey_('', '')] = ea;
+    persistSet_('aktivitas', { list: ea.list, total: ea.total, hasMore: ea.hasMore });
+  }
+  if (bundle.riwayat) {
+    var er = { list: bundle.riwayat.pekerjaan, total: bundle.riwayat.total, hasMore: bundle.riwayat.hasMore, t: now };
+    pageDataCache.pekerjaanRiwayatByKey[''] = er;
+    persistSet_('riwayat', { list: er.list, total: er.total, hasMore: er.hasMore });
+  }
+  prefetchDone_ = true; // data awal sudah lengkap -> tidak perlu prefetch terpisah
 }
 
 // ------------------------------------------------------------
