@@ -898,13 +898,13 @@ function runReloadAppData_() {
       apply: function (d) { appBootstrap = d; } },
     { label: 'Memuat pekerjaan...',
       run: function (ok, fail) { google.script.run.withSuccessHandler(ok).withFailureHandler(fail).getPekerjaanList(ac, { view: 'inbox' }); },
-      apply: function (d) { pageDataCache.pekerjaanInbox = d.pekerjaan; } },
+      apply: function (d) { pageDataCache.pekerjaanInbox = d.pekerjaan; persistSet_('inbox', d.pekerjaan); } },
     { label: 'Memuat riwayat & aktivitas...',
       run: function (ok, fail) { google.script.run.withSuccessHandler(ok).withFailureHandler(fail).getPekerjaanList(ac, { view: 'aktivitas', limit: FEED_PAGE_SIZE_, offset: 0 }); },
-      apply: function (d) { pageDataCache.pekerjaanAktivitasByKey[feedKey_('', '')] = { list: d.pekerjaan, total: d.total, hasMore: d.hasMore }; } },
+      apply: function (d) { pageDataCache.pekerjaanAktivitasByKey[feedKey_('', '')] = { list: d.pekerjaan, total: d.total, hasMore: d.hasMore, t: Date.now() }; persistSet_('aktivitas', { list: d.pekerjaan, total: d.total, hasMore: d.hasMore }); } },
     { label: 'Memuat beranda & statistik...',
       run: function (ok, fail) { google.script.run.withSuccessHandler(ok).withFailureHandler(fail).getHomeBootstrap(ac); },
-      apply: function (d) { pageDataCache.dashboard = d.dashboard; pageDataCache.content = d.content; } }
+      apply: function (d) { pageDataCache.dashboard = d.dashboard; pageDataCache.content = d.content; persistSet_('dashboard', d.dashboard); persistSet_('content', d.content); } }
   ];
   var total = steps.length + 1; // +1 = reset cache lokal
 

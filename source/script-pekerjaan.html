@@ -942,6 +942,64 @@ var pageDataCache = {
   jadwalAktif: null              // [...] Jadwal Piket & Libur Pengganti (Patch 10.x)
 };
 
+// ------------------------------------------------------------
+// CACHE PERSISTEN (localStorage) — "tampil dulu, perbarui di belakang"
+// Data terakhir per pengguna disimpan agar halaman langsung terisi saat
+// dibuka (mis. setelah aplikasi ditutup). Data TETAP selalu diperbarui dari
+// server sesudah tampil — aplikasi tetap wajib online. Kunci memuat kode
+// pengguna; semua dihapus saat logout. Kadaluarsa 12 jam.
+// ------------------------------------------------------------
+var PERSIST_PREFIX_ = 'fa_cache:v1:';
+var PERSIST_MAX_AGE_MS_ = 12 * 60 * 60 * 1000;
+var FEED_FRESH_MS_ = 60 * 1000; // data memori < 60 dtk dianggap segar (tanpa refetch)
+
+function persistKey_(name) {
+  var s = (typeof loadSession === 'function') ? loadSession() : null;
+  return (s && s.accessCode) ? PERSIST_PREFIX_ + String(s.accessCode).trim().toUpperCase() + ':' + name : null;
+}
+
+function persistGet_(name) {
+  try {
+    var k = persistKey_(name);
+    if (!k) return null;
+    var raw = localStorage.getItem(k);
+    if (!raw) return null;
+    var o = JSON.parse(raw);
+    if (!o || !o.t || (Date.now() - o.t) > PERSIST_MAX_AGE_MS_) { localStorage.removeItem(k); return null; }
+    return o.v;
+  } catch (e) { return null; }
+}
+
+function persistSet_(name, value) {
+  try {
+    var k = persistKey_(name);
+    if (!k) return;
+    localStorage.setItem(k, JSON.stringify({ t: Date.now(), v: value }));
+  } catch (e) {
+    persistClearAll_(); // kuota penuh/terblokir: bersihkan, jangan ganggu aplikasi
+  }
+}
+
+function persistRemove_(names) {
+  try { (names || []).forEach(function (n) { var k = persistKey_(n); if (k) localStorage.removeItem(k); }); } catch (e) { /* abaikan */ }
+}
+
+function persistClearAll_() {
+  try {
+    var del = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var key = localStorage.key(i);
+      if (key && key.indexOf(PERSIST_PREFIX_) === 0) del.push(key);
+    }
+    del.forEach(function (key) { localStorage.removeItem(key); });
+  } catch (e) { /* abaikan */ }
+}
+
+/** Dua daftar dianggap sama bila isinya identik — untuk melewati render ulang (tanpa kedip / reset scroll). */
+function sameFeedList_(a, b) {
+  try { return JSON.stringify(a) === JSON.stringify(b); } catch (e) { return false; }
+}
+
 /** Seluruh cache Pekerjaan basi setelah mutasi apa pun (Create/Ambil/
  * Lepas/Selesaikan/Hapus) — pola event-driven cache Patch 8.0. */
 function invalidateAllPekerjaanCaches_() {
@@ -950,6 +1008,7 @@ function invalidateAllPekerjaanCaches_() {
   pageDataCache.pekerjaanAktivitas = null;
   pageDataCache.pekerjaanAktivitasByKey = {};
   pageDataCache.dashboard = null;
+  persistRemove_(['inbox', 'aktivitas', 'riwayat', 'dashboard']);
 }
 
 /**
@@ -968,6 +1027,8 @@ function resetAllPageDataCache_() {
   pageDataCache.pekerjaanAktivitas = null;
   pageDataCache.pekerjaanAktivitasByKey = {};
   pageDataCache.jadwalAktif = null;
+  persistClearAll_();
+  prefetchDone_ = false;
 }
 
 // ============================================================
@@ -1981,6 +2042,7 @@ function checkPekerjaanVersion_() {
       pekerjaanKnownVersion_ = v;
       pageDataCache.pekerjaanAktivitasByKey = {};
       pageDataCache.pekerjaanRiwayatByKey = {};
+      persistRemove_(['inbox', 'aktivitas', 'riwayat']);
       if (currentPage === 'pekerjaan') loadPekerjaanInbox(true);
     })
     .withFailureHandler(function () { /* diam — coba lagi pada siklus berikut */ })
@@ -1989,6 +2051,7 @@ function checkPekerjaanVersion_() {
 
 function startPekerjaanAutoRefresh() {
   stopPekerjaanAutoRefresh();
+  checkPekerjaanVersion_(); // segera: data hasil prefetch/cache mungkin sudah berubah
   pekerjaanAutoRefreshTimer = setInterval(function () {
     if (currentPage === 'pekerjaan' && document.visibilityState === 'visible') {
       checkPekerjaanVersion_();
@@ -2061,15 +2124,24 @@ function loadPekerjaanInbox(force) {
   if (!session) return;
 
   var cached = pageDataCache.pekerjaanInbox;
+  var stale = false;
+  if (!cached && !force) {
+    // Salinan tersimpan dari kunjungan sebelumnya: tampilkan dulu, lalu perbarui dari server.
+    var persisted = persistGet_('inbox');
+    if (persisted) { cached = persisted; stale = true; }
+  }
 
-  if (cached && !force) {
+  if (cached && !force && !stale) {
     renderPekerjaanInboxList(cached);
     return;
   }
 
-  if (!cached) {
-  
-        renderListSkeleton_('pekerjaan-list', 3, 'Memuat data pekerjaan...');
+  if (stale) {
+    renderPekerjaanInboxList(cached);
+    var barStale = document.getElementById('linear-progress');
+    if (barStale) barStale.classList.add('show'); // indikator "memperbarui"
+  } else if (!cached) {
+    renderListSkeleton_('pekerjaan-list', 3, 'Memuat data pekerjaan...');
   }
 
   google.script.run
@@ -2082,14 +2154,14 @@ function loadPekerjaanInbox(force) {
         return;
       }
       pageDataCache.pekerjaanInbox = response.data.pekerjaan;
+      persistSet_('inbox', response.data.pekerjaan);
       if (response.data.version) pekerjaanKnownVersion_ = response.data.version;
-      renderPekerjaanInboxList(response.data.pekerjaan);
+      if (!(stale && sameFeedList_(cached, response.data.pekerjaan))) {
+        renderPekerjaanInboxList(response.data.pekerjaan);
+      }
       // PATCH — Jaring pengaman: SELALU matikan bar setelah render
       // selesai, apa pun yang memicu loadPekerjaanInbox(true) (Ambil,
-      // Lepas, pull-to-refresh, auto-refresh 60 detik, dll). Mencegah
-      // bar "menggantung" akibat tumpang-tindih pemanggilan
-      // beginAction/endAction dari aksi-aksi yang terjadi berurutan
-      // cepat.
+      // Lepas, pull-to-refresh, polling versi, dll).
       var bar2 = document.getElementById('linear-progress');
       if (bar2) bar2.classList.remove('show');
     })
@@ -2099,6 +2171,49 @@ function loadPekerjaanInbox(force) {
       if (bar3) bar3.classList.remove('show');
     })
     .getPekerjaanList(session.accessCode, { view: 'inbox' });
+}
+
+// ------------------------------------------------------------
+// PREFETCH — setelah Beranda tampil, halaman 1 Pekerjaan/Aktivitas/Riwayat
+// diambil di latar belakang agar tab langsung terisi saat dibuka. Hanya sekali
+// per sesi, hanya saat tab terlihat, tidak menimpa data yang sudah ada.
+// ------------------------------------------------------------
+var prefetchDone_ = false;
+
+function prefetchTabs_() {
+  if (prefetchDone_) return;
+  prefetchDone_ = true;
+  setTimeout(function () {
+    var session = loadSession();
+    if (!session || document.visibilityState !== 'visible') { prefetchDone_ = false; return; }
+
+    if (!pageDataCache.pekerjaanInbox) {
+      google.script.run.withSuccessHandler(function (r) {
+        if (!r || !r.success || pageDataCache.pekerjaanInbox) return;
+        pageDataCache.pekerjaanInbox = r.data.pekerjaan;
+        persistSet_('inbox', r.data.pekerjaan);
+        if (r.data.version) pekerjaanKnownVersion_ = r.data.version;
+      }).withFailureHandler(function () {}).getPekerjaanList(session.accessCode, { view: 'inbox' });
+    }
+
+    var defKey = feedKey_('', '');
+    if (!pageDataCache.pekerjaanAktivitasByKey[defKey]) {
+      fetchFeedPage_({ view: 'aktivitas', limit: FEED_PAGE_SIZE_, offset: 0 }, function (d) {
+        if (pageDataCache.pekerjaanAktivitasByKey[defKey]) return;
+        pageDataCache.pekerjaanAktivitasByKey[defKey] = { list: d.pekerjaan, total: d.total, hasMore: d.hasMore, t: Date.now() };
+        persistSet_('aktivitas', { list: d.pekerjaan, total: d.total, hasMore: d.hasMore });
+      }, function () {});
+    }
+
+    var rwKey = '';
+    if (!pageDataCache.pekerjaanRiwayatByKey[rwKey]) {
+      fetchFeedPage_({ view: 'riwayat', q: '', limit: FEED_PAGE_SIZE_, offset: 0 }, function (d) {
+        if (pageDataCache.pekerjaanRiwayatByKey[rwKey]) return;
+        pageDataCache.pekerjaanRiwayatByKey[rwKey] = { list: d.pekerjaan, total: d.total, hasMore: d.hasMore, t: Date.now() };
+        persistSet_('riwayat', { list: d.pekerjaan, total: d.total, hasMore: d.hasMore });
+      }, function () {});
+    }
+  }, 800);
 }
 
 function renderPekerjaanInboxList(list) {
@@ -2341,7 +2456,6 @@ function executeLepasPekerjaan(pekerjaanId) {
 
 
 </script>
-
 
 
 

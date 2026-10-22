@@ -30,25 +30,44 @@ function loadRiwayatPekerjaan(force) {
 
   var q = currentRiwayatQuery_();
   var cacheKey = q.toLowerCase();
+  var container = document.getElementById('my-reports-list');
   var cached = pageDataCache.pekerjaanRiwayatByKey[cacheKey];
 
-  if (cached && !force) { renderRiwayatFeed_(cached, q, cacheKey); return; }
-  if (cached) renderRiwayatFeed_(cached, q, cacheKey);
-  else renderListSkeleton_('my-reports-list', 3, q ? 'Mencari riwayat...' : 'Memuat riwayat pekerjaan...');
+  if (!cached && !force && cacheKey === '') {
+    var pc = persistGet_('riwayat');
+    if (pc) {
+      cached = { list: pc.list, total: pc.total, hasMore: pc.hasMore, t: 0 };
+      pageDataCache.pekerjaanRiwayatByKey[cacheKey] = cached;
+    }
+  }
+
+  var fresh = cached && (Date.now() - (cached.t || 0)) < FEED_FRESH_MS_;
+  if (cached && !force && fresh) { renderRiwayatFeed_(cached, q, cacheKey); return; }
+
+  var alreadyShown = cached && container.dataset.feedKey === cacheKey;
+  if (cached && !alreadyShown) renderRiwayatFeed_(cached, q, cacheKey);
+  else if (!cached) renderListSkeleton_('my-reports-list', 3, q ? 'Mencari riwayat...' : 'Memuat riwayat pekerjaan...');
 
   var seq = ++riwayatReqSeq_;
   fetchFeedPage_({ view: 'riwayat', q: q, limit: FEED_PAGE_SIZE_, offset: 0 }, function (data) {
     if (seq !== riwayatReqSeq_) return;
-    var entry = { list: data.pekerjaan, total: data.total, hasMore: data.hasMore };
+    if (cacheKey === '') persistSet_('riwayat', { list: data.pekerjaan, total: data.total, hasMore: data.hasMore });
+    if (cached && container.dataset.feedKey === cacheKey &&
+        sameFeedList_(cached.list.slice(0, data.pekerjaan.length), data.pekerjaan) && cached.total === data.total) {
+      cached.t = Date.now();
+      return;
+    }
+    var entry = { list: data.pekerjaan, total: data.total, hasMore: data.hasMore, t: Date.now() };
     pageDataCache.pekerjaanRiwayatByKey[cacheKey] = entry;
     renderRiwayatFeed_(entry, q, cacheKey);
   }, function (err) {
     if (seq !== riwayatReqSeq_ || cached) return;
-    document.getElementById('my-reports-list').innerHTML = '<p>' + (err || 'Gagal memuat riwayat.') + '</p>';
+    container.innerHTML = '<p>' + (err || 'Gagal memuat riwayat.') + '</p>';
   });
 }
 
 function renderRiwayatFeed_(entry, q, cacheKey) {
+  document.getElementById('my-reports-list').dataset.feedKey = cacheKey;
   var empty = q
     ? '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('description', 26) + '</div>Tidak ada riwayat yang cocok.</div>'
     : '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('description', 26) + '</div>Belum ada riwayat pekerjaan.<br>' +
@@ -726,7 +745,17 @@ function loadHomeBootstrap(force) {
   if (pageDataCache.dashboard && pageDataCache.content) {
     renderContentBanner_(pageDataCache.content);
     if (appBootstrap.currentUser.role === 'admin') renderContentManagementList_(pageDataCache.content);
+    if (typeof prefetchTabs_ === 'function') prefetchTabs_();
     return;
+  }
+
+  // Salinan tersimpan: banner langsung tampil, lalu diperbarui dari server.
+  var pcContent = !force ? persistGet_('content') : null;
+  var shownStale = false;
+  if (pcContent) {
+    shownStale = true;
+    renderContentBanner_(pcContent);
+    if (appBootstrap.currentUser.role === 'admin') renderContentManagementList_(pcContent);
   }
 
   google.script.run
@@ -734,8 +763,13 @@ function loadHomeBootstrap(force) {
       if (!response.success) return;
       pageDataCache.dashboard = response.data.dashboard;
       pageDataCache.content = response.data.content;
-      renderContentBanner_(response.data.content);
-      if (appBootstrap.currentUser.role === 'admin') renderContentManagementList_(response.data.content);
+      persistSet_('content', response.data.content);
+      persistSet_('dashboard', response.data.dashboard);
+      if (!(shownStale && sameFeedList_(pcContent, response.data.content))) {
+        renderContentBanner_(response.data.content);
+        if (appBootstrap.currentUser.role === 'admin') renderContentManagementList_(response.data.content);
+      }
+      if (typeof prefetchTabs_ === 'function') prefetchTabs_();
     })
     .withFailureHandler(function () {})
     .getHomeBootstrap(session.accessCode);
@@ -759,13 +793,18 @@ function fetchDashboardData_(onData) {
     return;
   }
 
+  // Salinan tersimpan: angka langsung tampil, lalu diperbarui dari server.
+  var pcDash = persistGet_('dashboard');
+  if (pcDash && pcDash.stats) onData(pcDash);
+
   google.script.run
     .withSuccessHandler(function (response) {
-      if (!response.success) { onData(null); return; }
+      if (!response.success) { if (!pcDash) onData(null); return; }
       pageDataCache.dashboard = response.data;
+      persistSet_('dashboard', response.data);
       onData(response.data);
     })
-    .withFailureHandler(function () { onData(null); })
+    .withFailureHandler(function () { if (!pcDash) onData(null); })
     .getDashboard(session.accessCode);
 }
 
@@ -1189,7 +1228,7 @@ function submitContentForm_() {
       if (!response.success) { errorEl.textContent = response.error; showSnackbar(response.error, 'error'); return; }
       showSnackbar(editId ? 'Konten berhasil diubah.' : 'Konten berhasil ditambahkan.', 'success');
       closeContentForm_();
-      pageDataCache.content = null;
+      pageDataCache.content = null; persistRemove_(['content']);
       loadContentAktif(true);
     })
     .withFailureHandler(function () {
@@ -1218,7 +1257,7 @@ function doHapusContent_(contentId) {
       endAction(null);
       if (!response.success) { showSnackbar(response.error, 'error'); return; }
       showSnackbar('Konten berhasil dihapus.', 'success');
-      pageDataCache.content = null;
+      pageDataCache.content = null; persistRemove_(['content']);
       loadContentAktif(true);
     })
     .withFailureHandler(function () {
@@ -1243,6 +1282,7 @@ function loadContentAktif(force) {
     .withSuccessHandler(function (response) {
       if (!response.success) return;
       pageDataCache.content = response.data.content;
+      persistSet_('content', response.data.content);
       renderContentBanner_(response.data.content);
       if (appBootstrap.currentUser.role === 'admin') renderContentManagementList_(response.data.content);
     })

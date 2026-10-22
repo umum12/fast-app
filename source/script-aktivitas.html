@@ -51,17 +51,37 @@ function loadPekerjaanAktivitas(force) {
   renderActivityTabs();
 
   var prm = currentAktivitasParams_();
-  var cached = pageDataCache.pekerjaanAktivitasByKey[prm.key];
   var container = document.getElementById('activity-feed-list');
+  var isDefault = prm.key === feedKey_('', '');
+  var cached = pageDataCache.pekerjaanAktivitasByKey[prm.key];
 
-  if (cached && !force) { renderAktivitasFeed_(cached, prm); return; }
-  if (cached) renderAktivitasFeed_(cached, prm);
-  else renderListSkeleton_('activity-feed-list', 3, prm.q ? 'Mencari aktivitas...' : 'Memuat aktivitas tim...');
+  if (!cached && !force && isDefault) {
+    // Salinan tersimpan: tampilkan dulu (t:0 = dianggap basi, tetap diperbarui dari server).
+    var pc = persistGet_('aktivitas');
+    if (pc) {
+      cached = { list: pc.list, total: pc.total, hasMore: pc.hasMore, t: 0 };
+      pageDataCache.pekerjaanAktivitasByKey[prm.key] = cached;
+    }
+  }
+
+  var fresh = cached && (Date.now() - (cached.t || 0)) < FEED_FRESH_MS_;
+  if (cached && !force && fresh) { renderAktivitasFeed_(cached, prm); return; }
+
+  var alreadyShown = cached && container.dataset.feedKey === prm.key;
+  if (cached && !alreadyShown) renderAktivitasFeed_(cached, prm);
+  else if (!cached) renderListSkeleton_('activity-feed-list', 3, prm.q ? 'Mencari aktivitas...' : 'Memuat aktivitas tim...');
 
   var seq = ++aktivitasReqSeq_;
   fetchFeedPage_({ view: 'aktivitas', arah: prm.arah, q: prm.q, limit: FEED_PAGE_SIZE_, offset: 0 }, function (data) {
     if (seq !== aktivitasReqSeq_) return; // filter/pencarian sudah berganti
-    var entry = { list: data.pekerjaan, total: data.total, hasMore: data.hasMore };
+    if (isDefault) persistSet_('aktivitas', { list: data.pekerjaan, total: data.total, hasMore: data.hasMore });
+    // Tidak berubah -> cukup tandai segar, tanpa gambar ulang (tanpa kedip, scroll tetap).
+    if (cached && container.dataset.feedKey === prm.key &&
+        sameFeedList_(cached.list.slice(0, data.pekerjaan.length), data.pekerjaan) && cached.total === data.total) {
+      cached.t = Date.now();
+      return;
+    }
+    var entry = { list: data.pekerjaan, total: data.total, hasMore: data.hasMore, t: Date.now() };
     pageDataCache.pekerjaanAktivitasByKey[prm.key] = entry;
     renderAktivitasFeed_(entry, prm);
   }, function (err) {
@@ -71,6 +91,7 @@ function loadPekerjaanAktivitas(force) {
 }
 
 function renderAktivitasFeed_(entry, prm) {
+  document.getElementById('activity-feed-list').dataset.feedKey = prm.key;
   renderFeedList_(document.getElementById('activity-feed-list'), entry,
     '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('inbox', 26) + '</div>' + (prm.q ? 'Tidak ada aktivitas yang cocok.' : 'Belum ada aktivitas.') + '</div>',
     function (done, fail) {
