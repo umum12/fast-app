@@ -900,8 +900,8 @@ function runReloadAppData_() {
       run: function (ok, fail) { google.script.run.withSuccessHandler(ok).withFailureHandler(fail).getPekerjaanList(ac, { view: 'inbox' }); },
       apply: function (d) { pageDataCache.pekerjaanInbox = d.pekerjaan; } },
     { label: 'Memuat riwayat & aktivitas...',
-      run: function (ok, fail) { google.script.run.withSuccessHandler(ok).withFailureHandler(fail).getPekerjaanList(ac, { view: 'aktivitas' }); },
-      apply: function (d) { pageDataCache.pekerjaanAktivitas = d.pekerjaan; } },
+      run: function (ok, fail) { google.script.run.withSuccessHandler(ok).withFailureHandler(fail).getPekerjaanList(ac, { view: 'aktivitas', limit: FEED_PAGE_SIZE_, offset: 0 }); },
+      apply: function (d) { pageDataCache.pekerjaanAktivitasByKey[feedKey_('', '')] = { list: d.pekerjaan, total: d.total, hasMore: d.hasMore }; } },
     { label: 'Memuat beranda & statistik...',
       run: function (ok, fail) { google.script.run.withSuccessHandler(ok).withFailureHandler(fail).getHomeBootstrap(ac); },
       apply: function (d) { pageDataCache.dashboard = d.dashboard; pageDataCache.content = d.content; } }
@@ -920,27 +920,33 @@ function runReloadAppData_() {
     document.getElementById('reload-actions').style.display = 'flex';
   }
 
-  function runStep(i) {
-    if (i >= steps.length) {
-      setReloadProgress_(total, total, 'Selesai', false);
-      setTimeout(function () {
-        closeReloadOverlay_();
-        if (typeof goToPage === 'function') goToPage(currentPage);
-        showSnackbar('Data berhasil diperbarui.', 'success');
-      }, 400);
-      return;
-    }
-    setReloadProgress_(i + 1, total, steps[i].label, false);
-    steps[i].run(function (response) {
-      if (!response || !response.success) { fail((response && response.error) || 'Gagal memuat data.'); return; }
-      steps[i].apply(response.data);
-      runStep(i + 1);
+  // Keempat permintaan dijalankan PARALEL (saling independen) — waktu total
+  // ~ permintaan terlama, bukan jumlah keempatnya.
+  var finished = 1;
+  var failed = false;
+  function finishAll() {
+    setReloadProgress_(total, total, 'Selesai', false);
+    setTimeout(function () {
+      closeReloadOverlay_();
+      if (typeof goToPage === 'function') goToPage(currentPage);
+      showSnackbar('Data berhasil diperbarui.', 'success');
+    }, 400);
+  }
+  setReloadProgress_(1, total, 'Memuat data...', false);
+  steps.forEach(function (step) {
+    step.run(function (response) {
+      if (failed) return;
+      if (!response || !response.success) { failed = true; fail((response && response.error) || 'Gagal memuat data.'); return; }
+      step.apply(response.data);
+      finished++;
+      if (finished >= total) finishAll();
+      else setReloadProgress_(finished, total, 'Memuat data (' + (finished - 1) + '/' + (total - 1) + ')...', false);
     }, function () {
+      if (failed) return;
+      failed = true;
       fail('Gagal terhubung ke server. Periksa koneksi Anda.');
     });
-  }
-
-  runStep(0);
+  });
 }
 
 var btnReloadAppData = document.getElementById('btn-reload-app-data');

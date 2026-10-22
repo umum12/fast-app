@@ -935,9 +935,10 @@ document.getElementById('btn-lihat-riwayat-setelah-submit').addEventListener('cl
 var pageDataCache = {
   dashboard: null,               // { stats } (Patch 10.x — reminders dihapus)
   pekerjaanInbox: null,          // [...] daftar inbox (Menu Pekerjaan)
-  pekerjaanRiwayatByKey: {},     // { '<filters JSON>': [...] }
+  pekerjaanRiwayatByKey: {},     // { 'q': {list,total,hasMore} } riwayat pribadi, dimuat bertahap
   content: null,                 // [...] Content Management aktif (Patch 10.x)
-  pekerjaanAktivitas: null,      // [...] timeline seluruh tim
+  pekerjaanAktivitas: null,      // (tidak dipakai lagi — lihat pekerjaanAktivitasByKey)
+  pekerjaanAktivitasByKey: {},   // { 'arah|q': {list,total,hasMore} } timeline tim, dimuat bertahap
   jadwalAktif: null              // [...] Jadwal Piket & Libur Pengganti (Patch 10.x)
 };
 
@@ -947,6 +948,7 @@ function invalidateAllPekerjaanCaches_() {
   pageDataCache.pekerjaanInbox = null;
   pageDataCache.pekerjaanRiwayatByKey = {};
   pageDataCache.pekerjaanAktivitas = null;
+  pageDataCache.pekerjaanAktivitasByKey = {};
   pageDataCache.dashboard = null;
 }
 
@@ -964,7 +966,90 @@ function resetAllPageDataCache_() {
   pageDataCache.pekerjaanRiwayatByKey = {};
   pageDataCache.content = null;
   pageDataCache.pekerjaanAktivitas = null;
+  pageDataCache.pekerjaanAktivitasByKey = {};
   pageDataCache.jadwalAktif = null;
+}
+
+// ============================================================
+// FEED BERTAHAP (Aktivitas & Riwayat) — PERFORMA
+// Server mengirim PAGE_SIZE_ item per permintaan; "Muat lagi" (atau scroll
+// mendekati akhir) mengambil halaman berikutnya. Filter & pencarian dijalankan
+// di server supaya hasilnya akurat atas SELURUH data, bukan hanya yang termuat.
+// ============================================================
+
+var FEED_PAGE_SIZE_ = 20;
+
+function feedKey_(arah, q) { return (arah || 'all') + '|' + (q || ''); }
+
+/**
+ * Menggambar feed + tombol "Muat lagi".
+ * entry = { list, total, hasMore }; fetchMore(done, fail) mengambil halaman berikut,
+ * menambahkannya ke entry.list, lalu memanggil done(itemBaru).
+ */
+function renderFeedList_(container, entry, emptyHtml, fetchMore) {
+  container.innerHTML = '';
+  if (!entry.list || entry.list.length === 0) { container.innerHTML = emptyHtml; return; }
+  var frag = document.createDocumentFragment();
+  entry.list.forEach(function (p) { frag.appendChild(buildPekerjaanListCard_(p)); });
+  container.appendChild(frag);
+  appendFeedMore_(container, entry, fetchMore);
+}
+
+function appendFeedMore_(container, entry, fetchMore) {
+  var old = container.querySelector('.feed-more');
+  if (old) old.parentNode.removeChild(old);
+  if (!entry.hasMore) return;
+
+  var wrap = document.createElement('div');
+  wrap.className = 'feed-more';
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'feed-more-btn';
+  var remaining = Math.max(0, (entry.total || 0) - entry.list.length);
+  btn.textContent = 'Muat lagi' + (remaining ? ' (' + remaining + ' lagi)' : '');
+  wrap.appendChild(btn);
+  container.appendChild(wrap);
+
+  var busy = false;
+  var observer = null;
+  function run() {
+    if (busy) return;
+    busy = true;
+    btn.disabled = true;
+    btn.textContent = 'Memuat...';
+    fetchMore(function (items) {
+      if (observer) observer.disconnect();
+      if (!wrap.parentNode) return; // daftar sudah digambar ulang
+      var frag = document.createDocumentFragment();
+      (items || []).forEach(function (p) { frag.appendChild(buildPekerjaanListCard_(p)); });
+      container.insertBefore(frag, wrap);
+      appendFeedMore_(container, entry, fetchMore);
+    }, function () {
+      busy = false;
+      btn.disabled = false;
+      btn.textContent = 'Gagal memuat. Ketuk untuk coba lagi';
+    });
+  }
+  btn.addEventListener('click', run);
+  if ('IntersectionObserver' in window) {
+    observer = new IntersectionObserver(function (entries) {
+      if (entries[0] && entries[0].isIntersecting) run();
+    }, { rootMargin: '300px' });
+    observer.observe(wrap);
+  }
+}
+
+/** Satu halaman getPekerjaanList (view aktivitas/riwayat). ok(data) / fail(). */
+function fetchFeedPage_(params, ok, fail) {
+  var session = loadSession();
+  if (!session) return;
+  google.script.run
+    .withSuccessHandler(function (response) {
+      if (!response || !response.success) { fail(response && response.error); return; }
+      ok(response.data);
+    })
+    .withFailureHandler(function () { fail(); })
+    .getPekerjaanList(session.accessCode, params);
 }
 
 function renderSkeleton(containerId, lineCount) {
@@ -1869,7 +1954,7 @@ function detailRowWithIcon_(iconName, label, value) {
 // MENU PEKERJAAN — Halaman Inbox (Tahap 4 Cutover, pengganti Task lama)
 // ============================================================
 
-var PEKERJAAN_AUTO_REFRESH_MS = 60000;
+var PEKERJAAN_AUTO_REFRESH_MS = 30000; // aman: pemeriksaan versi sangat ringan
 var pekerjaanAutoRefreshTimer = null;
 
 function stopPekerjaanAutoRefresh() {
@@ -1879,18 +1964,41 @@ function stopPekerjaanAutoRefresh() {
   }
 }
 
+// Polling RINGAN: hanya menanyakan token versi (murah di server). Daftar penuh
+// diambil HANYA bila token berubah (ada yang menulis data). Cache Aktivitas &
+// Riwayat ikut dianggap basi supaya kunjungan berikutnya mengambil data baru.
+var pekerjaanKnownVersion_ = null;
+
+function checkPekerjaanVersion_() {
+  var session = loadSession();
+  if (!session || typeof google === 'undefined') return;
+  google.script.run
+    .withSuccessHandler(function (response) {
+      if (!response || !response.success) return;
+      var v = response.data.version;
+      if (pekerjaanKnownVersion_ === null) { pekerjaanKnownVersion_ = v; return; }
+      if (v === pekerjaanKnownVersion_) return;
+      pekerjaanKnownVersion_ = v;
+      pageDataCache.pekerjaanAktivitasByKey = {};
+      pageDataCache.pekerjaanRiwayatByKey = {};
+      if (currentPage === 'pekerjaan') loadPekerjaanInbox(true);
+    })
+    .withFailureHandler(function () { /* diam — coba lagi pada siklus berikut */ })
+    .getPekerjaanVersion(session.accessCode);
+}
+
 function startPekerjaanAutoRefresh() {
   stopPekerjaanAutoRefresh();
   pekerjaanAutoRefreshTimer = setInterval(function () {
     if (currentPage === 'pekerjaan' && document.visibilityState === 'visible') {
-      loadPekerjaanInbox(true);
+      checkPekerjaanVersion_();
     }
   }, PEKERJAAN_AUTO_REFRESH_MS);
 }
 
 document.addEventListener('visibilitychange', function () {
   if (document.visibilityState === 'visible' && currentPage === 'pekerjaan') {
-    loadPekerjaanInbox(true);
+    checkPekerjaanVersion_();
   }
 });
 
@@ -1974,6 +2082,7 @@ function loadPekerjaanInbox(force) {
         return;
       }
       pageDataCache.pekerjaanInbox = response.data.pekerjaan;
+      if (response.data.version) pekerjaanKnownVersion_ = response.data.version;
       renderPekerjaanInboxList(response.data.pekerjaan);
       // PATCH — Jaring pengaman: SELALU matikan bar setelah render
       // selesai, apa pun yang memicu loadPekerjaanInbox(true) (Ambil,
@@ -2232,6 +2341,7 @@ function executeLepasPekerjaan(pekerjaanId) {
 
 
 </script>
+
 
 
 

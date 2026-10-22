@@ -4,26 +4,17 @@
 // Riwayat Laporan lama; Filter & Unduh PDF DIPINDAH ke Aktivitas)
 // ============================================================
 
-var riwayatSearchState = { full: [] };
+var riwayatReqSeq_ = 0;
 
-function applyRiwayatSearchAndRender() {
-  var q = (document.getElementById('reports-search').value || '').trim().toLowerCase();
-  var filtered = riwayatSearchState.full;
-  if (q) {
-    filtered = riwayatSearchState.full.filter(function (p) {
-      return (p.subject || '').toLowerCase().indexOf(q) !== -1 ||
-             (p.description || '').toLowerCase().indexOf(q) !== -1;
-    });
-  }
-  renderRiwayatPekerjaan(filtered);
-}
+function currentRiwayatQuery_() { return (document.getElementById('reports-search').value || '').trim(); }
 
-document.getElementById('reports-search').addEventListener('input', debounce_(applyRiwayatSearchAndRender, 200));
+function applyRiwayatSearchAndRender() { loadRiwayatPekerjaan(); }
+
+document.getElementById('reports-search').addEventListener('input', debounce_(applyRiwayatSearchAndRender, 350));
 
 function loadRiwayatPekerjaan(force) {
   var session = loadSession();
   if (!session) return;
-
 
   var titleEl = document.getElementById('reports-card-title');
   if (titleEl && appBootstrap) {
@@ -37,55 +28,44 @@ function loadRiwayatPekerjaan(force) {
     }
   }
 
-  var cacheKey = 'default'; // Tahap 4 — filter granular dipindah ke Aktivitas; Riwayat tidak punya sub-filter server-side.
+  var q = currentRiwayatQuery_();
+  var cacheKey = q.toLowerCase();
   var cached = pageDataCache.pekerjaanRiwayatByKey[cacheKey];
 
-  if (cached && !force) {
-    riwayatSearchState.full = cached;
-    applyRiwayatSearchAndRender();
-    return;
-  }
+  if (cached && !force) { renderRiwayatFeed_(cached, q, cacheKey); return; }
+  if (cached) renderRiwayatFeed_(cached, q, cacheKey);
+  else renderListSkeleton_('my-reports-list', 3, q ? 'Mencari riwayat...' : 'Memuat riwayat pekerjaan...');
 
-  if (!cached) {
-    renderListSkeleton_('my-reports-list', 3, 'Memuat riwayat pekerjaan...');
-  }
-
-  google.script.run
-    .withSuccessHandler(function (response) {
-      var container = document.getElementById('my-reports-list');
-      if (!response.success) {
-        if (!cached) container.innerHTML = '<p>' + response.error + '</p>';
-        return;
-      }
-      pageDataCache.pekerjaanRiwayatByKey[cacheKey] = response.data.pekerjaan;
-      riwayatSearchState.full = response.data.pekerjaan;
-      applyRiwayatSearchAndRender();
-    })
-    .withFailureHandler(function () {
-      if (!cached) document.getElementById('my-reports-list').innerHTML = '<p>Gagal memuat riwayat.</p>';
-    })
-    .getPekerjaanList(session.accessCode, { view: 'riwayat' });
+  var seq = ++riwayatReqSeq_;
+  fetchFeedPage_({ view: 'riwayat', q: q, limit: FEED_PAGE_SIZE_, offset: 0 }, function (data) {
+    if (seq !== riwayatReqSeq_) return;
+    var entry = { list: data.pekerjaan, total: data.total, hasMore: data.hasMore };
+    pageDataCache.pekerjaanRiwayatByKey[cacheKey] = entry;
+    renderRiwayatFeed_(entry, q, cacheKey);
+  }, function (err) {
+    if (seq !== riwayatReqSeq_ || cached) return;
+    document.getElementById('my-reports-list').innerHTML = '<p>' + (err || 'Gagal memuat riwayat.') + '</p>';
+  });
 }
 
-function renderRiwayatPekerjaan(list) {
-  var container = document.getElementById('my-reports-list');
-  container.innerHTML = '';
-
-  if (!list || list.length === 0) {
-    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('description', 26) + '</div>Belum ada riwayat pekerjaan.<br>' +
+function renderRiwayatFeed_(entry, q, cacheKey) {
+  var empty = q
+    ? '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('description', 26) + '</div>Tidak ada riwayat yang cocok.</div>'
+    : '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('description', 26) + '</div>Belum ada riwayat pekerjaan.<br>' +
       '<button class="btn-primary" id="empty-state-buat-pekerjaan">Buat Pekerjaan Sekarang</button></div>';
-    var ctaBtn = document.getElementById('empty-state-buat-pekerjaan');
-    if (ctaBtn) {
-      ctaBtn.addEventListener('click', function () { goToPage('buat'); });
-    }
-    return;
-  }
-
   // Kartu Riwayat memakai fungsi yang SAMA PERSIS dengan Aktivitas
   // (buildPekerjaanListCard_) supaya identik by construction.
-  list.forEach(function (p) {
-    container.appendChild(buildPekerjaanListCard_(p));
+  renderFeedList_(document.getElementById('my-reports-list'), entry, empty, function (done, fail) {
+    fetchFeedPage_({ view: 'riwayat', q: q, limit: FEED_PAGE_SIZE_, offset: entry.list.length }, function (data) {
+      if (pageDataCache.pekerjaanRiwayatByKey[cacheKey] !== entry) { return; }
+      entry.list = entry.list.concat(data.pekerjaan);
+      entry.total = data.total;
+      entry.hasMore = data.hasMore;
+      done(data.pekerjaan);
+    }, fail);
   });
+  var ctaBtn = document.getElementById('empty-state-buat-pekerjaan');
+  if (ctaBtn) ctaBtn.addEventListener('click', function () { goToPage('buat'); });
 }
 
 // ============================================================

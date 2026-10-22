@@ -37,68 +37,57 @@ function renderActivityTabs() {
 }
 
 
+var aktivitasReqSeq_ = 0;
+
+function currentAktivitasParams_() {
+  var q = (document.getElementById('activity-search').value || '').trim();
+  var arah = currentActivityFilter === 'all' ? '' : currentActivityFilter;
+  return { arah: arah, q: q, key: feedKey_(arah, q.toLowerCase()) };
+}
+
 function loadPekerjaanAktivitas(force) {
   var session = loadSession();
   if (!session) return;
-
-  var cached = pageDataCache.pekerjaanAktivitas;
   renderActivityTabs();
 
-  if (cached && !force) {
-    renderAktivitasFiltered();
-    return;
-  }
-
-  if (!cached) {
-
-  renderListSkeleton_('activity-feed-list', 3, 'Memuat aktivitas tim...');
-  }
-
-  google.script.run
-    .withSuccessHandler(function (response) {
-      if (!response.success) {
-        if (!cached) document.getElementById('activity-feed-list').innerHTML = '<p>' + response.error + '</p>';
-        return;
-      }
-      pageDataCache.pekerjaanAktivitas = response.data.pekerjaan;
-      renderAktivitasFiltered();
-    })
-    .withFailureHandler(function () {
-      if (!cached) document.getElementById('activity-feed-list').innerHTML = '<p>Gagal memuat aktivitas.</p>';
-    })
-    .getPekerjaanList(session.accessCode, { view: 'aktivitas' });
-}
-
-function renderAktivitasFiltered() {
-  var all = pageDataCache.pekerjaanAktivitas || [];
-  var filtered = currentActivityFilter === 'all' ? all : all.filter(function (p) { return p.arah === currentActivityFilter; });
-
-  var q = (document.getElementById('activity-search').value || '').trim().toLowerCase();
-  if (q) {
-    filtered = filtered.filter(function (p) {
-      return (p.subject || '').toLowerCase().indexOf(q) !== -1 ||
-             (p.description || '').toLowerCase().indexOf(q) !== -1;
-    });
-  }
-
-  renderPekerjaanAktivitas(filtered);
-}
-
-document.getElementById('activity-search').addEventListener('input', debounce_(renderAktivitasFiltered, 200));
-
-function renderPekerjaanAktivitas(list) {
+  var prm = currentAktivitasParams_();
+  var cached = pageDataCache.pekerjaanAktivitasByKey[prm.key];
   var container = document.getElementById('activity-feed-list');
-  container.innerHTML = '';
 
-  if (!list || list.length === 0) {
-    container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('inbox', 26) + '</div>Belum ada aktivitas.</div>';
-    return;
-  }
+  if (cached && !force) { renderAktivitasFeed_(cached, prm); return; }
+  if (cached) renderAktivitasFeed_(cached, prm);
+  else renderListSkeleton_('activity-feed-list', 3, prm.q ? 'Mencari aktivitas...' : 'Memuat aktivitas tim...');
 
-  list.forEach(function (p) {
-    container.appendChild(buildPekerjaanListCard_(p));
+  var seq = ++aktivitasReqSeq_;
+  fetchFeedPage_({ view: 'aktivitas', arah: prm.arah, q: prm.q, limit: FEED_PAGE_SIZE_, offset: 0 }, function (data) {
+    if (seq !== aktivitasReqSeq_) return; // filter/pencarian sudah berganti
+    var entry = { list: data.pekerjaan, total: data.total, hasMore: data.hasMore };
+    pageDataCache.pekerjaanAktivitasByKey[prm.key] = entry;
+    renderAktivitasFeed_(entry, prm);
+  }, function (err) {
+    if (seq !== aktivitasReqSeq_ || cached) return;
+    container.innerHTML = '<p>' + (err || 'Gagal memuat aktivitas.') + '</p>';
   });
 }
+
+function renderAktivitasFeed_(entry, prm) {
+  renderFeedList_(document.getElementById('activity-feed-list'), entry,
+    '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('inbox', 26) + '</div>' + (prm.q ? 'Tidak ada aktivitas yang cocok.' : 'Belum ada aktivitas.') + '</div>',
+    function (done, fail) {
+      fetchFeedPage_({ view: 'aktivitas', arah: prm.arah, q: prm.q, limit: FEED_PAGE_SIZE_, offset: entry.list.length }, function (data) {
+        if (pageDataCache.pekerjaanAktivitasByKey[prm.key] !== entry) { return; } // cache sudah diganti
+        entry.list = entry.list.concat(data.pekerjaan);
+        entry.total = data.total;
+        entry.hasMore = data.hasMore;
+        done(data.pekerjaan);
+      }, fail);
+    });
+}
+
+// Filter & pencarian kini dijalankan di server (akurat atas seluruh data).
+function renderAktivitasFiltered() { loadPekerjaanAktivitas(); }
+
+document.getElementById('activity-search').addEventListener('input', debounce_(renderAktivitasFiltered, 350));
 
 // ------------------- FILTER & UNDUH PDF (dipindah dari Riwayat, 3.4) -------------------
 
