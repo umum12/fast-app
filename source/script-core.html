@@ -75,17 +75,18 @@ var confirmModalIsBusyMode = false;
  * Content, Lepas Pekerjaan — proses async yang pakai beginAction/
  * endAction(null)) yang mendapat loading state di tombol.
  */
-function showConfirmModal(message, onConfirm, iconName, busyMode, busyLabel) {
+function showConfirmModal(message, onConfirm, iconName, busyMode, busyLabel, labels) {
+  labels = labels || {};
   pendingConfirmCallback = onConfirm;
   confirmModalIsBusyMode = !!busyMode;
   confirmModalBusyLabel = busyLabel || 'Memproses...';
   document.getElementById('confirm-modal-icon').innerHTML = mdIcon(iconName || 'delete', 24);
   document.getElementById('confirm-modal-message').textContent = message;
   document.getElementById('confirm-modal-cancel').disabled = false;
-  document.getElementById('confirm-modal-cancel').innerHTML = '<span>Batal</span>';
+  document.getElementById('confirm-modal-cancel').innerHTML = '<span>' + (labels.cancel || 'Batal') + '</span>';
   var confirmBtn = document.getElementById('confirm-modal-confirm');
   confirmBtn.disabled = false;
-  confirmBtn.innerHTML = mdIcon('checkCircle', 18) + '<span>Ya, Lanjutkan</span>';
+  confirmBtn.innerHTML = mdIcon('checkCircle', 18) + '<span>' + (labels.confirm || 'Ya, Lanjutkan') + '</span>';
   document.getElementById('confirm-modal-overlay').classList.add('show');
 }
 
@@ -661,7 +662,7 @@ function renderLoadError_(container, what, retryFn, detail) {
 // dua kali untuk keluar. Memakai satu entri riwayat "penjaga"; tidak mengubah URL maupun data.
 // ============================================================
 var backNavInstalled_ = false;
-var backExitArmedUntil_ = 0;
+var exitingApp_ = false;
 
 function closeTopLayer_() {
   function isShown(id) { var el = document.getElementById(id); return !!(el && el.classList.contains('show')); }
@@ -695,22 +696,24 @@ function installBackNavigation_() {
   pushBackGuard_();
 
   window.addEventListener('popstate', function () {
+    if (exitingApp_) { exitingApp_ = false; history.back(); return; } // lanjutkan keluar
     // Hanya jalan saat sudah login (aplikasi tampil).
     if (!appBootstrap) return;
     if (closeTopLayer_()) { pushBackGuard_(); return; }
 
-    var homePage = (appBootstrap && appBootstrap.defaultPage) || 'beranda';
+    var homePage = 'beranda'; // halaman utama semua role
     if (currentPage === 'akun' && lastMainPage && lastMainPage !== 'akun') {
       goToPage(lastMainPage); pushBackGuard_(); return;
     }
     if (currentPage && currentPage !== homePage) {
       goToPage(homePage); pushBackGuard_(); return;
     }
-    // Di halaman utama: tekan sekali lagi (dalam 2 dtk) untuk keluar.
-    if (Date.now() < backExitArmedUntil_) { backExitArmedUntil_ = 0; history.back(); return; }
-    backExitArmedUntil_ = Date.now() + 2000;
-    showSnackbar('Tekan Kembali sekali lagi untuk keluar', 'info');
+    // Di halaman utama: tanya dulu. "Tidak" (atau Back lagi) menutup dialog; aplikasi & data tetap.
     pushBackGuard_();
+    showConfirmModal('Keluar dari aplikasi?', function () {
+      exitingApp_ = true;
+      history.go(-1); // ke entri dasar; popstate berikutnya meneruskan keluar
+    }, 'logout', false, null, { confirm: 'Ya', cancel: 'Tidak' });
   });
 }
 
@@ -748,7 +751,7 @@ function renderApp(bootstrap, session) {
   // Patch 8.x (2.3) — halaman default kini ditentukan server
   // (bootstrap.defaultPage), dikirim bersama respons login/bootstrap.
   // Fallback ke perhitungan role tetap dijaga untuk kompatibilitas.
-  var defaultPage = bootstrap.defaultPage || (user.role === 'fs' ? 'buat' : 'beranda');
+  var defaultPage = 'beranda'; // semua role (termasuk FS) mulai dari Beranda; abaikan nilai lama dari server
   var lastPage = (session.uiState && session.uiState.activePage) || defaultPage;
   // Tautan lama / launcher: index.html#buat -> langsung ke menu Buat.
   try {
@@ -778,10 +781,41 @@ function renderApp(bootstrap, session) {
 
 // Dipakai HANYA untuk resume sesi dari localStorage (tanpa form login) —
 // login baru langsung dapat payload bootstrap penuh, lihat handleLogin().
-function attemptBootstrap(session) {
-  showSplash_();
+var BOOTSTRAP_MAX_ATTEMPTS_ = 3;
+var BOOTSTRAP_WATCHDOG_MS_ = 20000; // satu percobaan tidak boleh menggantung lebih lama dari ini
+var bootstrapSeq_ = 0;
+var bootstrapInFlight_ = false;
+var bootstrapSession_ = null;
+
+function attemptBootstrap(session, attempt) {
+  attempt = attempt || 1;
+  bootstrapSession_ = session;
+  bootstrapInFlight_ = true;
+  var seq = ++bootstrapSeq_;
+  var finished = false;
+  hideBootstrapError_();
+  if (attempt === 1) showSplash_();
+
+  function fail(delayMs) {
+    if (finished || seq !== bootstrapSeq_) return;
+    finished = true;
+    clearTimeout(watchdog);
+    if (attempt < BOOTSTRAP_MAX_ATTEMPTS_) {
+      setTimeout(function () { if (seq === bootstrapSeq_) attemptBootstrap(session, attempt + 1); }, delayMs);
+    } else {
+      bootstrapInFlight_ = false;
+      showBootstrapError_();
+    }
+  }
+  // Setelah aplikasi dibuka kembali, koneksi lama kadang mati dan permintaan menggantung diam-diam.
+  var watchdog = setTimeout(function () { fail(0); }, BOOTSTRAP_WATCHDOG_MS_);
+
   google.script.run
     .withSuccessHandler(function (response) {
+      if (finished || seq !== bootstrapSeq_) return; // jawaban basi dari percobaan yang sudah ditinggalkan
+      finished = true;
+      clearTimeout(watchdog);
+      bootstrapInFlight_ = false;
       if (response.success) {
         if (response.data.bundle) { applyStartupBundle_(response.data.bundle); response.data.bundle = null; }
         renderApp(response.data, session);
@@ -795,12 +829,58 @@ function attemptBootstrap(session) {
         document.getElementById('login-error').textContent = response.error;
       }
     })
-    .withFailureHandler(function (error) {
-      hideSplash_(false);
-      showSnackbar('Gagal terhubung ke server. Periksa koneksi internet Anda.', 'error');
-    })
+    .withFailureHandler(function () { fail(1200 * attempt); })
     .getBootstrapData(session.accessCode, true);
 }
+
+/** Layar pemulihan: tidak pernah menyisakan layar kosong/macet saat server tak terjangkau. */
+function showBootstrapError_() {
+  hideSplash_(false);
+  var box = document.getElementById('bootstrap-error');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'bootstrap-error';
+    box.className = 'boot-error';
+    box.setAttribute('role', 'alert');
+    box.innerHTML =
+      '<div class="boot-error-card">' +
+        '<div class="error-state-icon">' + mdIcon('warning', 24) + '</div>' +
+        '<div class="error-state-title">Tidak dapat terhubung ke server</div>' +
+        '<div class="error-state-detail">Periksa koneksi internet Anda, lalu coba lagi. Data Anda aman.</div>' +
+        '<button type="button" class="btn-primary error-state-btn" id="btn-boot-retry">Coba lagi</button>' +
+        '<button type="button" class="boot-error-link" id="btn-boot-login">Masuk ulang</button>' +
+      '</div>';
+    document.body.appendChild(box);
+    document.getElementById('btn-boot-retry').addEventListener('click', retryBootstrap_);
+    document.getElementById('btn-boot-login').addEventListener('click', function () {
+      hideBootstrapError_();
+      clearSession();
+      document.getElementById('screen-login').style.display = 'flex';
+    });
+  }
+  box.classList.add('show');
+}
+
+function hideBootstrapError_() {
+  var box = document.getElementById('bootstrap-error');
+  if (box) box.classList.remove('show');
+}
+
+function retryBootstrap_() {
+  var session = bootstrapSession_ || loadSession();
+  if (session && session.accessCode) attemptBootstrap(session, 1);
+}
+
+// Dibuka kembali dari latar belakang / jaringan pulih: pulihkan otomatis tanpa perlu Clear All.
+function resumeBootstrapIfNeeded_() {
+  var box = document.getElementById('bootstrap-error');
+  var errorShown = !!(box && box.classList.contains('show'));
+  if (errorShown) { retryBootstrap_(); return; }
+  if (bootstrapInFlight_ && Date.now() - splashShownAt_ > 6000) retryBootstrap_(); // permintaan lama kemungkinan mati
+}
+document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') resumeBootstrapIfNeeded_(); });
+window.addEventListener('pageshow', function (e) { if (e.persisted) resumeBootstrapIfNeeded_(); });
+window.addEventListener('online', resumeBootstrapIfNeeded_);
 
 /**
  * Patch 8.x (Bagian 2.3) — loginByAccessCode() sekarang mengembalikan

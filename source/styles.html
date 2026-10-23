@@ -2925,3 +2925,9 @@ nav.bottom-nav .nav-item.nav-fab.active .nav-fab-circle { background: var(--colo
 /* Keterangan pada kartu ditampilkan penuh (tanpa dipotong), baris baru dipertahankan */
 .list-card-person-text .subtext.subtext-full { display: block; -webkit-line-clamp: unset; overflow: visible; text-overflow: clip; white-space: pre-line; word-break: break-word; margin-top: 2px; }
 .list-card-person-row { align-items: flex-start; }
+
+/* Layar pemulihan saat server tak terjangkau (menggantikan layar kosong/macet) */
+.boot-error { position: fixed; inset: 0; z-index: 9500; display: none; align-items: center; justify-content: center; padding: 24px; background: var(--color-bg, #f6f7f9); }
+.boot-error.show { display: flex; }
+.boot-error-card { width: 100%; max-width: 360px; text-align: center; background: #fff; border: 1px solid #fbd5d2; border-radius: 20px; padding: 26px 20px 18px; box-shadow: 0 8px 24px rgba(15,23,42,.08); }
+.boot-error-link { display: block; margin: 12px auto 0; background: none; border: none; color: var(--color-primary); font-size: 13px; font-weight: 600; cursor: pointer; min-height: 40px; }
