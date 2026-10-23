@@ -673,7 +673,7 @@ function closeTopLayer_() {
     return true;
   }
   if (isShown('bottom-sheet-overlay')) { closeBottomSheet(); return true; }
-  var jkIds = ['jk-picker-overlay', 'jk-form-overlay', 'jk-detail-overlay', 'about-overlay'];
+  var jkIds = ['jk-picker-overlay', 'jk-form-overlay', 'jk-detail-overlay', 'about-overlay', 'philosophy-overlay'];
   for (var i = 0; i < jkIds.length; i++) {
     if (isShown(jkIds[i])) {
       var closeBtn = document.getElementById(jkIds[i]).querySelector('.jk-close');
@@ -1012,6 +1012,21 @@ document.getElementById('input-access-code').addEventListener('keydown', functio
   more.addEventListener('click', function () { ov.classList.add('show'); });
   closeB.addEventListener('click', function () { ov.classList.remove('show'); });
   ov.addEventListener('click', function (e) { if (e.target === ov) ov.classList.remove('show'); });
+})();
+
+// Header: klik logo FS -> kartu Filosofi Logo.
+(function setupLogoPhilosophy_() {
+  var logo = document.getElementById('app-logo-btn');
+  var ov = document.getElementById('philosophy-overlay');
+  var closeB = document.getElementById('btn-philosophy-close');
+  if (!logo || !ov || !closeB) return;
+  closeB.innerHTML = mdIcon('close', 16);
+  function open() { ov.classList.add('show'); }
+  function close() { ov.classList.remove('show'); }
+  logo.addEventListener('click', open);
+  logo.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+  closeB.addEventListener('click', close);
+  ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
 })();
 
 document.getElementById('btn-logout').addEventListener('click', function () {

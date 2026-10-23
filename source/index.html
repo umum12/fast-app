@@ -6,7 +6,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,500,0..1,0&icon_names=account_circle,add,add_a_photo,add_circle,admin_panel_settings,alarm,apartment,apps,arrow_back,assignment_turned_in,badge,bar_chart,bookmark,build,build_circle,calculate,calendar_month,calendar_today,chat_bubble,check_circle,chevron_left,chevron_right,cleaning_services,close,cloud_upload,dark_mode,dashboard,database,delete,description,download,edit,edit_calendar,edit_note,event_available,event_busy,group,handshake,history,home,image,inbox,info,integration_instructions,inventory_2,key,keyboard_arrow_down,keyboard_arrow_up,landscape,layers,light_mode,lightbulb,list,location_on,lock,login,logout,monitoring,more_horiz,more_vert,notifications,notifications_active,notifications_off,person,person_add,person_check,person_remove,person_search,photo_camera,photo_library,post_add,refresh,save,schedule,search,send,sensors,settings,shield,sync,system_update,task,task_alt,terminal,trophy,tune,upload,verified_user,visibility,warning,work&display=block" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,500,0..1,0&icon_names=account_circle,add,add_a_photo,add_circle,admin_panel_settings,alarm,apartment,apps,architecture,arrow_back,assignment_turned_in,badge,bar_chart,bookmark,build,build_circle,calculate,calendar_month,calendar_today,chat_bubble,check_circle,chevron_left,chevron_right,cleaning_services,close,cloud_upload,dark_mode,dashboard,database,delete,description,developer_board,download,edit,edit_calendar,edit_note,event_available,event_busy,group,handshake,history,home,image,inbox,info,integration_instructions,inventory_2,key,keyboard_arrow_down,keyboard_arrow_up,landscape,layers,light_mode,lightbulb,list,location_on,lock,login,logout,monitoring,more_horiz,more_vert,notifications,notifications_active,notifications_off,palette,person,person_add,person_check,person_remove,person_search,photo_camera,photo_library,post_add,refresh,save,savings,schedule,search,send,sensors,settings,shield,sync,system_update,task,task_alt,terminal,trophy,tune,upload,verified,verified_user,visibility,warning,work&display=block" rel="stylesheet">
 <title>Facility Support</title>
 <style>
 <?!= include('styles'); ?>
@@ -30,7 +30,7 @@
 
       <div class="app-main">
         <header class="app-header">
-                    <div class="app-logo">
+                    <div class="app-logo" id="app-logo-btn" role="button" tabindex="0" aria-label="Filosofi logo FAST APP" title="Filosofi logo">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1229 646" role="img" aria-label="FS Facility Support"><path fill="#1F4E9C" fill-rule="evenodd" d="M9 602L324 60Q349 17 392 17L772 17L474 530Q433 602 392 602ZM178 474L253 474L332 340L522 340L561 272L372 272L404 215Q420 199 440 199L620 199L657 132L408 132Q372 132 350 175Z"/><path fill="#9CC247" fill-rule="evenodd" d="M480 625L721 198Q760 131 808 131L1170 131L914 581Q889 625 850 625ZM597 537L845 537Q880 537 902 498L964 388Q972 345 936 345L797 345Q782 345 788 329L806 299Q818 287 842 287L1018 287L1055 220L806 220Q775 220 755 255L690 376Q686 411 714 411L861 411Q872 412 870 424L851 457Q845 470 827 471L632 471Z"/><path fill="#D6312B" d="M803 17L1222 17L1177 97L759 97Z"/><text x="986" y="71" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="40" fill="#fff" text-anchor="middle" textLength="373" lengthAdjust="spacingAndGlyphs">FACILITY SUPPORT</text></svg>
                       <div class="app-title"> Facility Support</div>
           </div>
@@ -416,7 +416,7 @@
               </div>
               <div class="about-actions">
                 <button class="btn-outlined primary akun-pill-btn" id="btn-check-update" type="button" style="display:none;"><span class="akun-ico" data-ico="sysUpdate"></span><span id="btn-check-update-label">Periksa Pembaruan</span></button>
-                <button class="btn-primary akun-pill-btn about-more" id="btn-about-more" type="button"><span class="akun-ico" data-ico="moreVert"></span><span>More</span></button>
+                <button class="about-info-btn about-more" id="btn-about-more" type="button" aria-label="Tentang Aplikasi" title="Tentang Aplikasi"><span class="material-symbols-outlined">info</span></button>
               </div>
             </div>
           </section>
@@ -591,40 +591,92 @@
 
   <div id="global-spinner"><div class="spinner"></div></div>
 
-  <div class="jk-overlay" id="about-overlay">
-    <div class="jk-modal about-modal" role="dialog" aria-modal="true" aria-labelledby="about-modal-title">
-      <div class="jk-modal-header"><h3 id="about-modal-title">System Overview</h3><button class="jk-close" type="button" id="btn-about-close" aria-label="Tutup"></button></div>
-      <div class="about-body">
-        <h1 class="about-title">FAST APP</h1>
-        <div class="about-subtitle">INTEGRATED FACILITY SUPPORT &amp; SERVICES</div>
-        <div class="about-tagline">INTELLIGENT ORCHESTRATION. COMPOSABLE INFRASTRUCTURE. DIGITAL CONVERGENCE.</div>
-        <p>An experimental digital ecosystem exploring the convergence of AI-augmented engineering, cloud-native paradigms, and interoperable web technologies—transforming distributed capabilities into a cohesive operational framework.</p>
-        <h4>TECHNOLOGY STACK</h4>
-        <ul>
-          <li><strong>Presentation Layer:</strong> HTML5, CSS3, JavaScript (ES6+), GitHub Pages</li>
-          <li><strong>Application &amp; API Layer:</strong> Google Apps Script Web Apps</li>
-          <li><strong>Persistence Layer:</strong> Google Sheets</li>
-          <li><strong>Object &amp; File Storage:</strong> Google Drive</li>
-          <li><strong>Event-Driven Messaging:</strong> Firebase Cloud Messaging (FCM), Service Worker API</li>
-          <li><strong>UI Infrastructure &amp; Asset Delivery:</strong> Google Fonts, CDN-distributed icon libraries and visual resources</li>
-          <li><strong>AI-Augmented Engineering Pipeline:</strong> ChatGPT for conceptual synthesis and technical specification; Claude for code engineering and implementation; Gemini for interface design exploration and experience modeling</li>
-          <li><strong>Development Environment:</strong> Android-based engineering workflow, Firefox for Android, X-plore File Manager, Unexpected Keyboard</li>
-        </ul>
-        <h4>ARCHITECTURAL PARADIGM</h4>
-        <p>A decoupled, service-oriented application architecture orchestrating static content delivery, serverless execution, cloud-based persistence, and asynchronous event-driven communication within a unified digital ecosystem.</p>
-        <p>Grounded in interoperability, infrastructure abstraction, composable services, and architectural pragmatism—leveraging existing technology primitives to minimize operational overhead while maximizing functional integration.</p>
-        <div class="about-maturity">
-          <h4>DEVELOPMENT MATURITY (PROJECT MATURITY)</h4>
-          <p><strong>Experimental Prototype | Iterative Evolution</strong></p>
-          <p>FAST APP represents an ongoing exploration of applied systems engineering, validating architectural assumptions through functional implementation, cross-service integration, and iterative refinement.</p>
-          <p>Its development trajectory prioritizes capability convergence, operational coherence, and progressive technical validation. Production readiness, scalability, security posture, and resilience remain contingent on systematic testing and implementation-specific verification.</p>
+  <div class="jk-overlay" id="philosophy-overlay">
+    <div class="jk-modal ph-modal" role="dialog" aria-modal="true" aria-labelledby="ph-title">
+      <button class="jk-close ph-close" type="button" id="btn-philosophy-close" aria-label="Tutup"></button>
+      <div class="ph-card">
+        <div class="ph-watermark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1229 646" aria-hidden="true" focusable="false"><path fill="#1F4E9C" fill-rule="evenodd" d="M9 602L324 60Q349 17 392 17L772 17L474 530Q433 602 392 602ZM178 474L253 474L332 340L522 340L561 272L372 272L404 215Q420 199 440 199L620 199L657 132L408 132Q372 132 350 175Z"/><path fill="#9CC247" fill-rule="evenodd" d="M480 625L721 198Q760 131 808 131L1170 131L914 581Q889 625 850 625ZM597 537L845 537Q880 537 902 498L964 388Q972 345 936 345L797 345Q782 345 788 329L806 299Q818 287 842 287L1018 287L1055 220L806 220Q775 220 755 255L690 376Q686 411 714 411L861 411Q872 412 870 424L851 457Q845 470 827 471L632 471Z"/><path fill="#D6312B" d="M803 17L1222 17L1177 97L759 97Z"/></svg></div>
+        <div class="ph-content">
+          <div class="ph-head">
+            <div class="ph-head-left">
+              <div class="ph-logo-box"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1229 646" aria-hidden="true" focusable="false"><path fill="#1F4E9C" fill-rule="evenodd" d="M9 602L324 60Q349 17 392 17L772 17L474 530Q433 602 392 602ZM178 474L253 474L332 340L522 340L561 272L372 272L404 215Q420 199 440 199L620 199L657 132L408 132Q372 132 350 175Z"/><path fill="#9CC247" fill-rule="evenodd" d="M480 625L721 198Q760 131 808 131L1170 131L914 581Q889 625 850 625ZM597 537L845 537Q880 537 902 498L964 388Q972 345 936 345L797 345Q782 345 788 329L806 299Q818 287 842 287L1018 287L1055 220L806 220Q775 220 755 255L690 376Q686 411 714 411L861 411Q872 412 870 424L851 457Q845 470 827 471L632 471Z"/><path fill="#D6312B" d="M803 17L1222 17L1177 97L759 97Z"/></svg></div>
+              <div>
+                <span class="ph-pill">Brand Identity</span>
+                <h2 class="ph-title" id="ph-title">Logo Philosophy</h2>
+              </div>
+            </div>
+          </div>
+
+          <p class="ph-p">The <strong>FAST APP</strong> visual identity embodies a performance-driven design philosophy built upon structural reliability, operational efficiency, and responsive service execution.</p>
+          <p class="ph-p ph-p-box">Its integrated <strong>FS monogram</strong> utilizes assertive geometric forms, directional diagonals, and high-contrast negative space to communicate precision, agility, and functional convergence.</p>
+
+          <h3 class="ph-section"><span class="material-symbols-outlined">palette</span>Chromatic Architecture</h3>
+          <p class="ph-p">The chromatic architecture establishes a deliberate semantic hierarchy:</p>
+          <div class="ph-colors">
+            <div class="ph-color ph-blue"><span class="ph-dot"></span><div><b>Cobalt Blue</b> — signifies institutional trust and operational stability.</div></div>
+            <div class="ph-color ph-lime"><span class="ph-dot"></span><div><b>Lime Green</b> — represents productivity, continuous optimization, and sustainable performance.</div></div>
+            <div class="ph-color ph-red"><span class="ph-dot"></span><div><b>Signal Red</b> — functions as a visual indicator of urgency, prioritization, and response readiness.</div></div>
+          </div>
+
+          <p class="ph-p ph-principles">Through geometric abstraction, typographic integration, and controlled visual hierarchy, the FAST APP identity translates the principles of modern facility operations into a distinctive digital brand system—engineered for consistency, scalability, and cross-platform recognition.</p>
+
+          <div class="ph-banner">
+            <div class="ph-stripe"><i></i><i></i><i></i></div>
+            <div class="ph-banner-top"><span>FAST APP</span><span class="material-symbols-outlined">verified</span></div>
+            <p>Integrated Operations. Intelligent Coordination. Operational Excellence.</p>
+          </div>
         </div>
-        <h4>ENGINEERING ECONOMICS</h4>
-        <p>FAST APP investigates the economics of software innovation through the strategic composition of accessible cloud services, open-web standards, and AI-assisted development workflows—reducing reliance on dedicated infrastructure and proprietary development environments.</p>
-        <p>Its zero-cost tooling philosophy reflects an effort to maximize technological leverage within available free-tier allocations, subject to service quotas, provider policies, and potential usage-based charges.</p>
-        <div class="about-highlight">Infrastructure Minimalism. Engineering Leverage. Architectural Intent.</div>
-        <div class="about-quote">Conceptualized through AI. Realized through Orchestration. Unified by Architecture.</div>
-        <div class="about-quote">BEYOND TOOL INTEGRATION. TOWARD SYSTEMIC INNOVATION.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="jk-overlay" id="about-overlay">
+    <div class="jk-modal ab-modal" role="dialog" aria-modal="true" aria-labelledby="about-modal-title">
+      <button class="jk-close ab-close" type="button" id="btn-about-close" aria-label="Tutup"></button>
+      <div class="ab-card">
+        <div class="ab-watermark" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1229 646" aria-hidden="true" focusable="false"><path fill="#1F4E9C" fill-rule="evenodd" d="M9 602L324 60Q349 17 392 17L772 17L474 530Q433 602 392 602ZM178 474L253 474L332 340L522 340L561 272L372 272L404 215Q420 199 440 199L620 199L657 132L408 132Q372 132 350 175Z"/><path fill="#9CC247" fill-rule="evenodd" d="M480 625L721 198Q760 131 808 131L1170 131L914 581Q889 625 850 625ZM597 537L845 537Q880 537 902 498L964 388Q972 345 936 345L797 345Q782 345 788 329L806 299Q818 287 842 287L1018 287L1055 220L806 220Q775 220 755 255L690 376Q686 411 714 411L861 411Q872 412 870 424L851 457Q845 470 827 471L632 471Z"/><path fill="#D6312B" d="M803 17L1222 17L1177 97L759 97Z"/></svg></div>
+        <div class="ab-content">
+          <div class="ab-badge"><span class="material-symbols-outlined">developer_board</span>System Architecture</div>
+          <h1 class="ab-title" id="about-modal-title">FAST APP</h1>
+          <div class="ab-subtitle">Integrated Facility Support &amp; Services</div>
+          <div class="ab-tagline">INTELLIGENT ORCHESTRATION. COMPOSABLE INFRASTRUCTURE. DIGITAL CONVERGENCE.</div>
+          <p class="ab-intro">An experimental digital ecosystem exploring the convergence of AI-augmented engineering, cloud-native paradigms, and interoperable web technologies—transforming distributed capabilities into a cohesive operational framework.</p>
+
+          <div class="ab-divider"></div>
+          <h3 class="ab-section"><span class="material-symbols-outlined">layers</span>Technology Stack</h3>
+          <div class="ab-stack">
+            <div class="ab-stack-item"><span class="ab-stack-label">Presentation Layer</span>HTML5, CSS3, JavaScript (ES6+), GitHub Pages</div>
+            <div class="ab-stack-item"><span class="ab-stack-label">Application &amp; API Layer</span>Google Apps Script Web Apps</div>
+            <div class="ab-stack-item"><span class="ab-stack-label">Persistence Layer</span>Google Sheets</div>
+            <div class="ab-stack-item"><span class="ab-stack-label">Object &amp; File Storage</span>Google Drive</div>
+            <div class="ab-stack-item"><span class="ab-stack-label">Event-Driven Messaging</span>Firebase Cloud Messaging (FCM), Service Worker API</div>
+            <div class="ab-stack-item"><span class="ab-stack-label">UI Infrastructure &amp; Asset Delivery</span>Google Fonts, CDN-distributed icon libraries and visual resources</div>
+            <div class="ab-stack-item"><span class="ab-stack-label">AI-Augmented Engineering Pipeline</span>ChatGPT (conceptual synthesis &amp; spec), Claude (code engineering), Gemini (interface design &amp; UX)</div>
+            <div class="ab-stack-item"><span class="ab-stack-label">Development Environment</span>Android-based engineering workflow, Firefox for Android, X-plore File Manager, Unexpected Keyboard</div>
+          </div>
+
+          <div class="ab-divider"></div>
+          <h3 class="ab-section"><span class="material-symbols-outlined">architecture</span>Architectural Paradigm</h3>
+          <p class="ab-p">A decoupled, service-oriented application architecture orchestrating static content delivery, serverless execution, cloud-based persistence, and asynchronous event-driven communication within a unified digital ecosystem.</p>
+          <p class="ab-p">Grounded in interoperability, infrastructure abstraction, composable services, and architectural pragmatism—leveraging existing technology primitives to minimize operational overhead while maximizing functional integration.</p>
+
+          <div class="ab-maturity">
+            <div class="ab-maturity-title"><span class="material-symbols-outlined">warning</span>DEVELOPMENT MATURITY (PROJECT MATURITY)</div>
+            <div class="ab-maturity-badge">Experimental Prototype | Iterative Evolution</div>
+            <p>FAST APP represents an ongoing exploration of applied systems engineering, validating architectural assumptions through functional implementation, cross-service integration, and iterative refinement.</p>
+            <p>Its development trajectory prioritizes capability convergence, operational coherence, and progressive technical validation. Production readiness, scalability, security posture, and resilience remain contingent on systematic testing and implementation-specific verification.</p>
+          </div>
+
+          <h3 class="ab-section"><span class="material-symbols-outlined">savings</span>Engineering Economics</h3>
+          <p class="ab-p">FAST APP investigates the economics of software innovation through the strategic composition of accessible cloud services, open-web standards, and AI-assisted development workflows—reducing reliance on dedicated infrastructure and proprietary development environments.</p>
+          <p class="ab-p">Its zero-cost tooling philosophy reflects an effort to maximize technological leverage within available free-tier allocations, subject to service quotas, provider policies, and potential usage-based charges.</p>
+
+          <div class="ab-footer">
+            <div class="ab-footer-tagline">Infrastructure Minimalism. Engineering Leverage. Architectural Intent.</div>
+            <div class="ab-footer-sub">Conceptualized through AI. Realized through Orchestration. Unified by Architecture.</div>
+            <div class="ab-footer-highlight">BEYOND TOOL INTEGRATION. TOWARD SYSTEMIC INNOVATION.</div>
+          </div>
+        </div>
       </div>
     </div>
   </div>

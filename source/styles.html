@@ -2931,3 +2931,90 @@ nav.bottom-nav .nav-item.nav-fab.active .nav-fab-circle { background: var(--colo
 .boot-error.show { display: flex; }
 .boot-error-card { width: 100%; max-width: 360px; text-align: center; background: #fff; border: 1px solid #fbd5d2; border-radius: 20px; padding: 26px 20px 18px; box-shadow: 0 8px 24px rgba(15,23,42,.08); }
 .boot-error-link { display: block; margin: 12px auto 0; background: none; border: none; color: var(--color-primary); font-size: 13px; font-weight: 600; cursor: pointer; min-height: 40px; }
+
+/* ===== Header: logo dapat diklik (Logo Philosophy) ===== */
+header.app-header .app-logo { cursor: pointer; border-radius: 10px; -webkit-tap-highlight-color: transparent; transition: transform .12s ease, opacity .12s; }
+header.app-header .app-logo:active { transform: scale(.95); opacity: .85; }
+header.app-header .app-logo:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 3px; }
+
+/* ===== Card Filosofi Logo (ph-*) — referensi logo-klik.html ===== */
+.ph-modal { max-width: 440px; padding: 0 !important; border-radius: 24px; overflow-y: auto; background: #fff; }
+.ph-card { position: relative; overflow: hidden; background: #fff; }
+.ph-watermark { position: absolute; right: -40px; bottom: -10px; width: 300px; opacity: .05; pointer-events: none; }
+.ph-watermark svg, .ph-logo-box svg { width: 100%; height: auto; display: block; }
+.ph-content { position: relative; z-index: 1; padding: 22px 20px 20px; display: flex; flex-direction: column; gap: 14px; }
+.ph-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding-bottom: 14px; border-bottom: 1px solid #f1f5f9; }
+.ph-head-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ph-logo-box { flex: 0 0 auto; width: 52px; height: 52px; border-radius: 16px; background: #f8fafc; border: 1px solid #e2e8f0; box-shadow: 0 1px 2px rgba(15,23,42,.06); padding: 8px; display: flex; align-items: center; justify-content: center; }
+.ph-pill { display: inline-block; padding: 2px 10px; border-radius: 999px; background: #eaf0fb; color: #1F4E9C; border: 1px solid #d3e0f6; font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 3px; }
+.ph-title { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -.01em; color: #0f172a; line-height: 1.2; }
+.ph-p { margin: 0; font-size: 13.5px; line-height: 1.6; color: #334155; }
+.ph-p strong { color: #0f172a; font-weight: 700; }
+.ph-p-box { background: rgba(248,250,252,.85); border: 1px solid #f1f5f9; border-radius: 16px; padding: 14px; color: #475569; }
+.ph-section { margin: 4px 0 -4px; display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: #94a3b8; }
+.ph-section .material-symbols-outlined { font-size: 16px; }
+.ph-colors { display: grid; gap: 8px; }
+.ph-color { display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border-radius: 16px; font-size: 12.5px; line-height: 1.55; color: #475569; border: 1px solid transparent; }
+.ph-color b { font-weight: 800; }
+.ph-dot { flex: 0 0 auto; width: 9px; height: 9px; border-radius: 50%; margin-top: 5px; }
+.ph-blue { background: #f0f5fd; border-color: #dbe6f8; } .ph-blue b { color: #0f2a5c; } .ph-blue .ph-dot { background: #1F4E9C; }
+.ph-lime { background: #f6faeb; border-color: #e4efc8; } .ph-lime b { color: #3f5a0f; } .ph-lime .ph-dot { background: #7ba32a; }
+.ph-red { background: #fdf1f0; border-color: #f8d7d4; } .ph-red b { color: #7f1d1d; } .ph-red .ph-dot { background: #D6312B; }
+.ph-principles { font-size: 12.5px; color: #64748b; border-top: 1px solid #f1f5f9; padding-top: 14px; }
+.ph-banner { position: relative; overflow: hidden; border-radius: 16px; background: #1c1c1c; color: #fff; padding: 16px 16px 14px; box-shadow: 0 4px 10px rgba(0,0,0,.18); }
+.ph-stripe { position: absolute; left: 0; right: 0; top: 0; height: 4px; display: flex; }
+.ph-stripe i { flex: 1; display: block; } .ph-stripe i:nth-child(1) { background: #1F4E9C; } .ph-stripe i:nth-child(2) { background: #9CC247; } .ph-stripe i:nth-child(3) { background: #D6312B; }
+.ph-banner-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; padding-top: 2px; font-size: 11px; font-weight: 800; letter-spacing: .14em; color: #8fb2f0; }
+.ph-banner-top .material-symbols-outlined { font-size: 15px; color: #94a3b8; }
+.ph-banner p { margin: 0; font-size: 12px; font-weight: 500; line-height: 1.45; color: #cbd5e1; }
+.ph-close { flex: 0 0 auto; }
+
+/* ===== Tombol Periksa Pembaruan + Info (referensi tombol-more-card-about.html) ===== */
+.about-actions { align-items: center; gap: 12px; margin-top: 16px; }
+.about-actions #btn-check-update { flex: 1; min-height: 48px; height: 48px; padding: 0 20px; border: 1.5px solid #1b53a4; border-radius: 24px !important; background: transparent; color: #1b53a4; font-size: 15px; font-weight: 500; letter-spacing: .1px; transition: background-color .2s, transform .1s; }
+.about-actions #btn-check-update:hover { background: rgba(27,83,164,.08); }
+.about-actions #btn-check-update:active { transform: scale(.98); background: rgba(27,83,164,.12); }
+.about-actions #btn-check-update:disabled { opacity: .6; }
+.about-info-btn { flex: 0 0 auto; width: 48px; height: 48px; margin-left: auto; border-radius: 50%; border: none; background: #1b53a4; color: #fff; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 2px 6px rgba(27,83,164,.3); transition: background-color .2s, transform .1s; -webkit-tap-highlight-color: transparent; }
+.about-info-btn:hover { background: #154388; }
+.about-info-btn:active { transform: scale(.95); }
+.about-info-btn .material-symbols-outlined { font-size: 22px; }
+
+/* ===== Card About (ab-*) — referensi about.html ===== */
+.ab-modal { max-width: 480px; padding: 0 !important; border-radius: 28px; overflow-y: auto; background: #fdfcff; }
+.ab-card { position: relative; overflow: hidden; background: #fdfcff; border: 1px solid #c4c6cf; border-radius: 28px; }
+.ab-watermark { position: absolute; top: -10px; right: -50px; width: 280px; opacity: .06; pointer-events: none; }
+.ab-watermark svg { width: 100%; height: auto; display: block; }
+.ab-close { position: absolute; top: 14px; right: 14px; z-index: 3; }
+.ab-content { position: relative; z-index: 1; padding: 24px 22px 22px; }
+.ab-badge { display: inline-flex; align-items: center; gap: 6px; background: #d7e2ff; color: #001b3f; padding: 6px 12px; border-radius: 8px; font-size: 11px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; margin-bottom: 12px; }
+.ab-badge .material-symbols-outlined { font-size: 14px; }
+.ab-title { margin: 0; font-size: 28px; font-weight: 800; color: #1b53a4; letter-spacing: -.5px; line-height: 1.1; }
+.ab-subtitle { font-size: 12px; font-weight: 700; color: #43474e; letter-spacing: 1px; text-transform: uppercase; margin: 4px 0 12px; }
+.ab-tagline { font-size: 11px; font-weight: 500; color: #1b53a4; background: rgba(27,83,164,.08); padding: 8px 12px; border-radius: 8px; letter-spacing: .5px; line-height: 1.4; margin-bottom: 16px; }
+.ab-intro { margin: 0 0 4px; font-size: 14px; line-height: 1.55; color: #43474e; }
+.ab-divider { height: 1px; background: #e0e2ec; margin: 20px 0; }
+.ab-section { margin: 0 0 12px; display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase; color: #1b53a4; }
+.ab-section .material-symbols-outlined { font-size: 18px; }
+.ab-stack { display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.4; color: #1a1c1e; }
+.ab-stack-item { background: #f8f9fe; padding: 10px 12px; border-radius: 12px; border-left: 3px solid #1b53a4; }
+.ab-stack-label { display: block; font-weight: 700; margin-bottom: 2px; }
+.ab-p { margin: 0 0 12px; font-size: 13px; line-height: 1.55; color: #43474e; }
+.ab-maturity { background: #ffdad6; border: 1px solid rgba(186,26,26,.2); border-radius: 12px; padding: 16px; margin: 20px 0; }
+.ab-maturity-title { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; color: #ba1a1a; font-size: 13px; font-weight: 700; letter-spacing: .6px; text-transform: uppercase; line-height: 1.3; }
+.ab-maturity-title .material-symbols-outlined { font-size: 18px; flex: 0 0 auto; }
+.ab-maturity-badge { display: inline-block; background: #ba1a1a; color: #fff; font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 4px; margin-bottom: 10px; letter-spacing: .5px; }
+.ab-maturity p { margin: 0 0 8px; font-size: 13px; line-height: 1.5; color: #410002; }
+.ab-maturity p:last-child { margin-bottom: 0; }
+.ab-footer { text-align: center; margin-top: 24px; padding-top: 16px; border-top: 1px dashed #c4c6cf; }
+.ab-footer-tagline { font-size: 11px; font-weight: 700; letter-spacing: .6px; color: #1b53a4; text-transform: uppercase; margin-bottom: 6px; }
+.ab-footer-sub { font-size: 11px; color: #43474e; line-height: 1.4; }
+.ab-footer-highlight { margin-top: 10px; font-size: 11px; font-weight: 700; color: #1a1c1e; letter-spacing: .5px; }
+.about-actions .about-info-btn, .about-actions #btn-check-update[style*="display: none"] + .about-info-btn { flex: 0 0 48px !important; width: 48px; padding: 0 !important; }
+
+/* Tombol tutup tetap terlihat saat isi kartu digulir: yang bergulir hanya kartunya */
+.ph-modal, .ab-modal { position: relative; overflow: hidden !important; max-height: 88vh; }
+.ph-card, .ab-card { max-height: 88vh; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.ph-close { position: absolute; top: 14px; right: 14px; z-index: 5; box-shadow: 0 1px 4px rgba(15,23,42,.15); }
+.ph-head { padding-right: 40px; }
+.ab-close { box-shadow: 0 1px 4px rgba(15,23,42,.15); }
