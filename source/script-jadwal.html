@@ -1310,14 +1310,21 @@ function renderContentBanner_(list) {
 
   items.forEach(function (c) {
     var typeInfo = CONTENT_TYPE_BADGE[c.contentType] || { cls: 'badge-neutral', icon: 'description' };
+    var tone = c.contentType === 'warning' ? 'red' : (c.contentType === 'information' ? 'lime' : 'blue');
     var slide = document.createElement('div');
-    slide.className = 'cc-slide' + (c.contentType === 'warning' ? ' is-warning' : '');
+    slide.className = 'cc-slide tone-' + tone + (c.contentType === 'warning' ? ' is-warning' : '');
 
+    var head = document.createElement('div');
+    head.className = 'cc-head';
+    var iconBox = document.createElement('span');
+    iconBox.className = 'cc-icon';
+    iconBox.innerHTML = mdIcon(typeInfo.icon || 'description', 20);
     var badge = document.createElement('span');
-    badge.className = 'badge ' + typeInfo.cls + ' cc-badge';
-    badge.innerHTML = mdIcon(typeInfo.icon || 'description', 14) + '<span></span>';
-    badge.lastChild.textContent = c.contentTypeLabel;
-    slide.appendChild(badge);
+    badge.className = 'cc-badge';
+    badge.textContent = c.contentTypeLabel;
+    head.appendChild(iconBox);
+    head.appendChild(badge);
+    slide.appendChild(head);
 
     var title = document.createElement('div');
     title.className = 'cc-title';
@@ -1359,7 +1366,8 @@ function renderContentBanner_(list) {
     var next = document.createElement('button');
     next.type = 'button'; next.className = 'cc-nav cc-next'; next.setAttribute('aria-label', 'Berikutnya');
     next.innerHTML = mdIcon('chevronRight', 18);
-    wrap.appendChild(prev); wrap.appendChild(next);
+    var foot = document.createElement('div');
+    foot.className = 'cc-foot';
 
     var dots = document.createElement('div');
     dots.className = 'cc-dots';
@@ -1369,7 +1377,8 @@ function renderContentBanner_(list) {
       d.addEventListener('click', function () { go(i, true); });
       dots.appendChild(d);
     });
-    wrap.appendChild(dots);
+    foot.appendChild(prev); foot.appendChild(dots); foot.appendChild(next);
+    wrap.appendChild(foot);
 
     var go = function (i, user) {
       idx = (i + n) % n;
@@ -1379,8 +1388,10 @@ function renderContentBanner_(list) {
     };
     var restart = function () {
       if (contentCarouselTimer_) clearInterval(contentCarouselTimer_);
+      if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
       contentCarouselTimer_ = setInterval(function () {
         if (!document.body.contains(wrap)) { clearInterval(contentCarouselTimer_); contentCarouselTimer_ = null; return; }
+        if (touching) return;
         go(idx + 1);
       }, 5000);
     };
@@ -1388,9 +1399,11 @@ function renderContentBanner_(list) {
     next.addEventListener('click', function () { go(idx + 1, true); });
 
     // Geser (swipe) di layar sentuh
-    var sx = null;
-    viewport.addEventListener('touchstart', function (e) { sx = e.touches[0].clientX; }, { passive: true });
+    var sx = null, touching = false;
+    viewport.addEventListener('touchstart', function (e) { sx = e.touches[0].clientX; touching = true; }, { passive: true });
+    viewport.addEventListener('touchcancel', function () { touching = false; sx = null; }, { passive: true });
     viewport.addEventListener('touchend', function (e) {
+      touching = false;
       if (sx === null) return;
       var dx = e.changedTouches[0].clientX - sx; sx = null;
       if (Math.abs(dx) > 40) go(idx + (dx < 0 ? 1 : -1), true);
@@ -1404,6 +1417,8 @@ function renderContentBanner_(list) {
 function renderContentManagementList_(list) {
   var container = document.getElementById('content-management-list');
   container.innerHTML = '';
+  // Konten otomatis sistem (piket, dll.) hanya tampil di Carousel; daftar kelola ini khusus konten buatan Admin.
+  list = (list || []).filter(function (c) { return c.source !== 'system'; });
 
   if (!list || list.length === 0) {
     container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('description', 26) + '</div>Belum ada konten.</div>';
