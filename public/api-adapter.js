@@ -12,8 +12,13 @@
   var CFG = window.FASTAPP_CONFIG || {};
   var EXEC_URL = CFG.EXEC_URL || '';
   var TIMEOUT_MS = CFG.TIMEOUT_MS || 330000;
+  // Permintaan baca/startup dibatasi singkat agar tidak menggantung (mis. koneksi lama mati setelah aplikasi dibuka
+  // kembali di Android). Operasi tulis & PDF tetap memakai batas panjang agar tidak terputus di tengah proses.
+  var SHORT_TIMEOUT_MS = 25000;
+  var SHORT_FNS = { getBootstrapData: 1, loginByAccessCode: 1, getHomeBootstrap: 1, getDashboard: 1, getContentAktif: 1,
+    getJadwalAktif: 1, getPekerjaanList: 1, getPekerjaanVersion: 1, getKomentarList: 1 };
 
-  var PAGE_MAP = { stats: 'statistik.html', statistik: 'statistik.html', buat: 'buat.html', pdfrender: 'pdfrender.html' };
+  var PAGE_MAP = { stats: 'statistik.html', statistik: 'statistik.html', pdfrender: 'pdfrender.html' };
   // Alamat dasar situs ini (folder tempat halaman berada), mis. https://user.github.io/fast-app/
   var BASE_URL = new URL('./', location.href).href;
   var EXEC_RE = /^https:\/\/script\.google\.com\/macros\/(?:u\/\d+\/)?s\/[^\/]+\/(?:exec|dev)(?:\?|#|$)/;
@@ -24,7 +29,7 @@
         reject(new Error('EXEC_URL belum diisi di config.json.')); return;
       }
       var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-      var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, TIMEOUT_MS) : null;
+      var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, SHORT_FNS[fn] ? Math.min(SHORT_TIMEOUT_MS, TIMEOUT_MS) : TIMEOUT_MS) : null;
 
       fetch(EXEC_URL + '?route=api', {
         method: 'POST',
