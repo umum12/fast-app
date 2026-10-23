@@ -624,6 +624,97 @@ function goToPage(pageKey) {
 }
 
 // ============================================================
+// STATE GAGAL MEMUAT — kartu pesan + tombol "Coba lagi" (menggantikan teks polos yang buntu).
+// ============================================================
+function renderLoadError_(container, what, retryFn, detail) {
+  if (!container) return;
+  container.innerHTML = '';
+  var box = document.createElement('div');
+  box.className = 'error-state';
+  box.setAttribute('role', 'alert');
+  var ic = document.createElement('div');
+  ic.className = 'error-state-icon';
+  ic.innerHTML = mdIcon('warning', 24);
+  var t = document.createElement('div');
+  t.className = 'error-state-title';
+  t.textContent = 'Gagal memuat ' + what;
+  var d = document.createElement('div');
+  d.className = 'error-state-detail';
+  d.textContent = (typeof detail === 'string' && detail) ? detail : 'Periksa koneksi internet Anda, lalu coba lagi.';
+  var b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'btn-primary error-state-btn';
+  b.textContent = 'Coba lagi';
+  b.addEventListener('click', function () {
+    b.disabled = true;
+    b.textContent = 'Memuat...';
+    if (typeof retryFn === 'function') retryFn();
+  });
+  box.appendChild(ic); box.appendChild(t); box.appendChild(d); box.appendChild(b);
+  container.appendChild(box);
+}
+
+// ============================================================
+// TOMBOL KEMBALI (Android/browser) — UX
+// Tanpa ini, tombol Back langsung keluar dari PWA walau detail/sheet/foto sedang terbuka.
+// Urutan: tutup lapisan paling atas -> kembali ke halaman utama -> (di halaman utama) tekan
+// dua kali untuk keluar. Memakai satu entri riwayat "penjaga"; tidak mengubah URL maupun data.
+// ============================================================
+var backNavInstalled_ = false;
+var backExitArmedUntil_ = 0;
+
+function closeTopLayer_() {
+  function isShown(id) { var el = document.getElementById(id); return !!(el && el.classList.contains('show')); }
+  if (isShown('photo-viewer')) { closePhotoViewer(); return true; }
+  if (isShown('confirm-modal-overlay')) {
+    var cancelBtn = document.getElementById('confirm-modal-cancel');
+    if (cancelBtn && !cancelBtn.disabled) hideConfirmModal(); // sedang memproses: abaikan, jangan tutup
+    return true;
+  }
+  if (isShown('bottom-sheet-overlay')) { closeBottomSheet(); return true; }
+  var jkIds = ['jk-picker-overlay', 'jk-form-overlay', 'jk-detail-overlay', 'about-overlay'];
+  for (var i = 0; i < jkIds.length; i++) {
+    if (isShown(jkIds[i])) {
+      var closeBtn = document.getElementById(jkIds[i]).querySelector('.jk-close');
+      if (closeBtn) closeBtn.click(); else document.getElementById(jkIds[i]).classList.remove('show');
+      return true;
+    }
+  }
+  if (isShown('activity-detail-overlay')) { closeActivityDetail(); return true; }
+  return false;
+}
+
+function pushBackGuard_() {
+  try { history.pushState({ faGuard: true }, '', location.href); } catch (e) {}
+}
+
+function installBackNavigation_() {
+  if (backNavInstalled_) return;
+  backNavInstalled_ = true;
+  try { history.replaceState({ faBase: true }, '', location.href); } catch (e) {}
+  pushBackGuard_();
+
+  window.addEventListener('popstate', function () {
+    // Hanya jalan saat sudah login (aplikasi tampil).
+    if (!appBootstrap) return;
+    if (closeTopLayer_()) { pushBackGuard_(); return; }
+
+    var homePage = (appBootstrap && appBootstrap.defaultPage) || 'beranda';
+    if (currentPage === 'akun' && lastMainPage && lastMainPage !== 'akun') {
+      goToPage(lastMainPage); pushBackGuard_(); return;
+    }
+    if (currentPage && currentPage !== homePage) {
+      goToPage(homePage); pushBackGuard_(); return;
+    }
+    // Di halaman utama: tekan sekali lagi (dalam 2 dtk) untuk keluar.
+    if (Date.now() < backExitArmedUntil_) { backExitArmedUntil_ = 0; history.back(); return; }
+    backExitArmedUntil_ = Date.now() + 2000;
+    showSnackbar('Tekan Kembali sekali lagi untuk keluar', 'info');
+    pushBackGuard_();
+  });
+}
+
+// ============================================================
 // RENDER APP (POST-LOGIN)
 // ============================================================
 
@@ -667,6 +758,7 @@ function renderApp(bootstrap, session) {
     }
   } catch (e) {}
   goToPage(lastPage);
+  installBackNavigation_();
 
 
   if (user.role !== 'demo') {

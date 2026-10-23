@@ -2173,7 +2173,7 @@ function loadPekerjaanInbox(force) {
     .withSuccessHandler(function (response) {
       var container = document.getElementById('pekerjaan-list');
       if (!response.success) {
-        if (!cached) container.innerHTML = '<p>' + response.error + '</p>';
+        if (!cached) renderLoadError_(container, 'daftar pekerjaan', function () { loadPekerjaanInbox(true); }, response.error);
         var bar1 = document.getElementById('linear-progress');
         if (bar1) bar1.classList.remove('show');
         return;
@@ -2191,7 +2191,7 @@ function loadPekerjaanInbox(force) {
       if (bar2) bar2.classList.remove('show');
     })
     .withFailureHandler(function () {
-      if (!cached) document.getElementById('pekerjaan-list').innerHTML = '<p>Gagal memuat daftar pekerjaan.</p>';
+      if (!cached) renderLoadError_(document.getElementById('pekerjaan-list'), 'daftar pekerjaan', function () { loadPekerjaanInbox(true); });
       var bar3 = document.getElementById('linear-progress');
       if (bar3) bar3.classList.remove('show');
     })
@@ -2306,11 +2306,17 @@ function renderPekerjaanInboxList(list) {
 
 
 
+var ambilInFlight_ = {};
+
 function doAmbilPekerjaan(pekerjaanId) {
+  // Cegah ketukan ganda: permintaan kedua tidak dikirim (akan memunculkan galat "sudah diambil" yang membingungkan).
+  if (ambilInFlight_[pekerjaanId]) return;
+  ambilInFlight_[pekerjaanId] = true;
   var session = loadSession();
   beginAction(null, 'Mengambil...');
   google.script.run
     .withSuccessHandler(function (response) {
+      delete ambilInFlight_[pekerjaanId];
       endAction(null);
       if (!response.success) { showSnackbar(response.error, 'error'); }
       else { showSnackbar('Pekerjaan berhasil diambil.', 'success'); }
@@ -2318,6 +2324,7 @@ function doAmbilPekerjaan(pekerjaanId) {
       loadPekerjaanInbox(true);
     })
     .withFailureHandler(function () {
+      delete ambilInFlight_[pekerjaanId];
       endAction(null);
       showSnackbar('Gagal mengambil pekerjaan. Coba lagi.', 'error');
     })

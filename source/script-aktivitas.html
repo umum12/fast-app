@@ -86,7 +86,7 @@ function loadPekerjaanAktivitas(force) {
     renderAktivitasFeed_(entry, prm);
   }, function (err) {
     if (seq !== aktivitasReqSeq_ || cached) return;
-    container.innerHTML = '<p>' + (err || 'Gagal memuat aktivitas.') + '</p>';
+    renderLoadError_(container, 'aktivitas', function () { loadPekerjaanAktivitas(true); }, err);
   });
 }
 

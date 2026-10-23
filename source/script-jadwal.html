@@ -62,7 +62,7 @@ function loadRiwayatPekerjaan(force) {
     renderRiwayatFeed_(entry, q, cacheKey);
   }, function (err) {
     if (seq !== riwayatReqSeq_ || cached) return;
-    container.innerHTML = '<p>' + (err || 'Gagal memuat riwayat.') + '</p>';
+    renderLoadError_(container, 'riwayat', function () { loadRiwayatPekerjaan(true); }, err);
   });
 }
 
@@ -813,7 +813,7 @@ function loadAktivitasSummary(force) {
   var cached = pageDataCache.dashboard;
   if (!cached) renderSkeleton('dashboard-stats', 3);
   fetchDashboardData_(function (data) {
-    if (!data) { if (!cached) document.getElementById('dashboard-stats').innerHTML = '<p>Gagal memuat statistik.</p>'; return; }
+    if (!data) { if (!cached) renderLoadError_(document.getElementById('dashboard-stats'), 'statistik', function () { loadAktivitasSummary(true); }); return; }
     renderDashboardStats(data.stats);
   });
 }
@@ -1578,7 +1578,7 @@ function buildPekerjaanListCard_(p, opts) {
   personText.className = 'list-card-person-text';
   personText.innerHTML = '<div class="name-line"><span class="name">' + officer + '</span>' +
     (floorText ? '<span class="name-floor">' + mdIcon('location', 12) + floorText + '</span>' : '') + '</div>' +
-    '<div class="subtext">' + truncateText_(p.completionNotes || p.description, 12) + '</div>';
+    '<div class="subtext subtext-full">' + escapeHtmlJk_(p.completionNotes || p.description || '') + '</div>';
   personRow.appendChild(personText);
   main.appendChild(personRow);
 
