@@ -3018,3 +3018,32 @@ header.app-header .app-logo:focus-visible { outline: 2px solid var(--color-prima
 .ph-close { position: absolute; top: 14px; right: 14px; z-index: 5; box-shadow: 0 1px 4px rgba(15,23,42,.15); }
 .ph-head { padding-right: 40px; }
 .ab-close { box-shadow: 0 1px 4px rgba(15,23,42,.15); }
+
+/* ===== Kartu Laporan Kerja v2 (Riwayat, Aktivitas, Menu Pekerjaan) — ref desain-card-laporan-kerja.html ===== */
+.list-card.lc2, #my-reports-list .list-card.lc2:nth-child(even), #activity-feed-list .list-card.lc2:nth-child(even), #pekerjaan-list .list-card.lc2:nth-child(even) { flex-direction: column; align-items: stretch; background: #fff; border: 1px solid #f1f5f9; border-radius: 24px; padding: 18px; gap: 10px; margin-bottom: 14px; box-shadow: 0 1px 3px 1px rgba(0,0,0,.05), 0 1px 2px rgba(0,0,0,.08); }
+.list-card.lc2:last-child { margin-bottom: 0; }
+.lc2 .list-card-row-main { gap: 10px; width: 100%; }
+.lc2 .lc-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; color: #475569; font-weight: 400; }
+.lc2 .lc-meta .icon-slot { display: flex; color: #94a3b8; }
+.lc2 .lc-sep { color: #cbd5e1; }
+.lc2 .lc-time { color: #64748b; }
+.lc2 .lc-person { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.lc2 .lc-avatar { width: 26px; height: 26px; border-radius: 50%; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+.lc2 .lc-name { font-size: 14px; font-weight: 600; color: #1e293b; word-break: break-word; min-width: 0; }
+.lc2 .lc-floor { display: inline-flex; align-items: center; gap: 2px; font-size: 12px; color: #64748b; min-width: 0; word-break: break-word; }
+.lc2 .lc-floor .material-symbols-outlined { color: #94a3b8; flex: 0 0 auto; }
+.lc2 .lc-desc { margin: 0; font-size: 13px; line-height: 1.55; color: #475569; background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 16px; padding: 12px; white-space: pre-line; word-break: break-word; }
+.lc2 .lc-gallery { display: grid; gap: 8px; }
+.lc2 .lc-g1 { grid-template-columns: 1fr; } .lc2 .lc-g2 { grid-template-columns: 1fr 1fr; } .lc2 .lc-g3 { grid-template-columns: 1fr 1fr 1fr; }
+.lc2 .lc-thumb { position: relative; overflow: hidden; border-radius: 12px; background: #f1f5f9; border: 1px solid #e2e8f0; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #94a3b8; -webkit-tap-highlight-color: transparent; }
+.lc2 .lc-g1 .lc-thumb { height: 176px; } .lc2 .lc-g2 .lc-thumb { aspect-ratio: 16 / 9; } .lc2 .lc-g3 .lc-thumb { aspect-ratio: 4 / 3; }
+.lc2 .lc-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .3s; }
+.lc2 .lc-thumb:active img { transform: scale(1.04); }
+.lc2 .lc-more { position: absolute; inset: 0; background: rgba(15,23,42,.55); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; letter-spacing: .02em; }
+.lc2 .lc-gallery-empty { display: flex; align-items: center; justify-content: center; gap: 8px; height: 64px; border-radius: 12px; background: #f8fafc; border: 1px dashed #e2e8f0; color: #94a3b8; font-size: 12px; }
+.lc2 .lc-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 12px; border-top: 1px solid #f1f5f9; }
+.lc2 .lc-foot-info { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; color: #64748b; min-width: 0; }
+.lc2 .lc-bar { color: #cbd5e1; }
+.lc2 .lc-comment { display: inline-flex; align-items: center; gap: 4px; color: #475569; font-weight: 500; }
+.lc2 .lc-detail { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 700; color: var(--color-primary); padding: 4px 6px 4px 10px; border-radius: 12px; }
+.lc2.has-actions > .list-card-actions-row { margin-top: 2px; }

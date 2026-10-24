@@ -1529,6 +1529,52 @@ function formatAktivitasDateShort_(ddmmyyyyHHmm) {
   return INDO_DAY_NAMES_[d.getDay()].substring(0, 3) + ', ' + dp[0] + ' ' + INDO_MONTH_SHORT_[d.getMonth()] + ' ' + dp[2];
 }
 
+/** Warna avatar inisial (stabil per nama). */
+var LC_AVATAR_TONES_ = [['#e0e7ff', '#4338ca'], ['#ccfbf1', '#0f766e'], ['#fef3c7', '#b45309'], ['#ffe4e6', '#be123c'], ['#e0f2fe', '#0369a1'], ['#ede9fe', '#6d28d9']];
+function lcAvatarTone_(name) {
+  var h = 0, str = String(name || '');
+  for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 997;
+  return LC_AVATAR_TONES_[h % LC_AVATAR_TONES_.length];
+}
+
+/**
+ * Galeri foto adaptif pada kartu: 0 = placeholder, 1 = lebar penuh, 2 = dua kolom, 3 = tiga kolom,
+ * >3 = tiga thumbnail dengan "+N" pada thumbnail terakhir. Ketuk thumbnail membuka penampil foto.
+ */
+function buildLcGallery_(photos, urls) {
+  var wrap = document.createElement('div');
+  var n = photos.length;
+  if (n === 0) {
+    wrap.className = 'lc-gallery lc-gallery-empty';
+    wrap.innerHTML = mdIcon('photo', 18) + '<span>Tidak ada lampiran foto</span>';
+    return wrap;
+  }
+  var shown = Math.min(n, 3);
+  wrap.className = 'lc-gallery lc-g' + shown;
+  for (var i = 0; i < shown; i++) {
+    (function (idx) {
+      var cell = document.createElement('div');
+      cell.className = 'lc-thumb';
+      var img = document.createElement('img');
+      img.src = photos[idx].thumbUrl || photos[idx].url;
+      img.alt = 'Foto ' + (idx + 1);
+      img.loading = 'lazy';
+      img.decoding = 'async';
+      img.onerror = function () { cell.classList.add('lc-broken'); img.style.display = 'none'; cell.insertAdjacentHTML('beforeend', mdIcon('photo', 22)); };
+      cell.appendChild(img);
+      if (idx === 2 && n > 3) {
+        var more = document.createElement('div');
+        more.className = 'lc-more';
+        more.textContent = '+' + (n - 3);
+        cell.appendChild(more);
+      }
+      cell.addEventListener('click', function (e) { e.stopPropagation(); openPhotoViewer(urls, idx); });
+      wrap.appendChild(cell);
+    })(i);
+  }
+  return wrap;
+}
+
 /**
  * Kartu daftar Pekerjaan (badge-pill+dot, tanggal, avatar+nama+
  * keterangan, thumbnail/placeholder+chevron) — SATU fungsi dipakai
@@ -1544,7 +1590,7 @@ function buildPekerjaanListCard_(p, opts) {
   var floorText = p.zoneCode ? (p.floorName + ' · ' + p.zoneCode) : (p.floorName || '');
 
   var card = document.createElement('div');
-  card.className = 'list-card list-card-row';
+  card.className = 'list-card list-card-row lc2';
 
   var main = document.createElement('div');
   main.className = 'list-card-row-main';
@@ -1554,33 +1600,47 @@ function buildPekerjaanListCard_(p, opts) {
   badgeRow.innerHTML =
     '<span class="badge-pill ' + jenisInfo.cls + '"><span class="dot"></span>' + jenisInfo.label + '</span>' +
     '<span class="badge badge-status-pulse ' + statusCls + '"><span class="dot pulse"></span>' + p.statusLabel + '</span>' +
-    (p.assignmentMode === 'direct' && p.targetUserCode ? '<span class="badge badge-info">Direct \u2192 ' + (p.targetUserName || p.targetUserCode) + '</span>' : '');
+    (p.assignmentMode === 'direct' && p.targetUserCode ? '<span class="badge badge-info">Direct \u2192 ' + escapeHtmlJk_(p.targetUserName || p.targetUserCode) + '</span>' : '');
   main.appendChild(badgeRow);
 
   // Arah Mandiri: utamakan performedAt (kapan pekerjaan BENAR-BENAR dilakukan).
   var displayDate = (p.arah === 'mandiri' && p.performedAt) ? p.performedAt : (p.completedAt || p.startedAt || p.createdAt);
+  var dtParts = String(formatDateTimeFull_(displayDate) || '').split(' | ');
 
   var dateRow = document.createElement('div');
-  dateRow.className = 'list-card-date-line';
-  dateRow.innerHTML =
-    '<span class="list-card-date"><span class="icon-slot">' + mdIcon('calendar', 16) + '</span><span>' + formatDateTimeFull_(displayDate) + '</span></span>';
+  dateRow.className = 'list-card-date-line lc-meta';
+  dateRow.innerHTML = '<span class="icon-slot">' + mdIcon('calendar', 16) + '</span><span>' + escapeHtmlJk_(dtParts[0]) + '</span>' +
+    (dtParts[1] ? '<span class="lc-sep">\u2022</span><span class="lc-time">' + escapeHtmlJk_(dtParts[1]) + ' WIB</span>' : '');
   main.appendChild(dateRow);
 
   var personRow = document.createElement('div');
-  personRow.className = 'list-card-person-row';
-  var avatar = document.createElement('span');
-  avatar.className = 'avatar-circle';
-  avatar.style.background = 'var(--status-info-bg)';
-  avatar.style.color = 'var(--status-info-fg)';
-  avatar.innerHTML = mdIcon('account', 18);
-  personRow.appendChild(avatar);
-  var personText = document.createElement('div');
-  personText.className = 'list-card-person-text';
-  personText.innerHTML = '<div class="name-line"><span class="name">' + officer + '</span>' +
-    (floorText ? '<span class="name-floor">' + mdIcon('location', 12) + floorText + '</span>' : '') + '</div>' +
-    '<div class="subtext subtext-full">' + escapeHtmlJk_(p.completionNotes || p.description || '') + '</div>';
-  personRow.appendChild(personText);
+  personRow.className = 'lc-person';
+  var tone = lcAvatarTone_(officer);
+  personRow.innerHTML =
+    '<span class="lc-avatar" style="background:' + tone[0] + ';color:' + tone[1] + ';">' + escapeHtmlJk_(String(officer || '?').trim().charAt(0).toUpperCase() || '?') + '</span>' +
+    '<span class="lc-name">' + escapeHtmlJk_(officer || '') + '</span>' +
+    (floorText ? '<span class="lc-sep">\u2022</span><span class="lc-floor">' + mdIcon('location', 14) + '<span>' + escapeHtmlJk_(floorText) + '</span></span>' : '');
   main.appendChild(personRow);
+
+  var descText = p.completionNotes || p.description || '';
+  if (descText) {
+    var desc = document.createElement('p');
+    desc.className = 'lc-desc';
+    desc.textContent = descText;
+    main.appendChild(desc);
+  }
+
+  var photoUrls = photos.map(function (photo) { return photo.url; });
+  main.appendChild(buildLcGallery_(photos, photoUrls));
+
+  var foot = document.createElement('div');
+  foot.className = 'lc-foot';
+  var commentText = p.commentCount > 0 ? (p.commentCount + ' Komentar') : 'Belum ada komentar';
+  foot.innerHTML =
+    '<div class="lc-foot-info"><span>' + (photos.length > 0 ? (photos.length + ' Foto Lampiran') : 'Tanpa Foto') + '</span>' +
+    '<span class="lc-bar">|</span><span class="lc-comment">' + mdIcon('chatBubble', 14) + '<span>' + commentText + '</span></span></div>' +
+    '<span class="lc-detail">Lihat Detail' + mdIcon('chevronRight', 16) + '</span>';
+  main.appendChild(foot);
 
   var pendingActions = null;
   if (opts.actions && typeof buildPekerjaanActionRow_ === 'function') {
@@ -1589,41 +1649,6 @@ function buildPekerjaanListCard_(p, opts) {
   }
 
   card.appendChild(main);
-
-  var side = document.createElement('div');
-  side.className = 'list-card-row-side';
-
-  var thumbSide = document.createElement('div');
-  thumbSide.className = photos.length > 0 ? 'op-card-thumb-side' : 'op-card-thumb-side no-photo';
-  if (photos.length > 0) {
-    var img = document.createElement('img');
-    img.src = photos[0].thumbUrl || photos[0].url;
-    img.alt = 'Foto dokumentasi';
-    thumbSide.appendChild(img);
-    thumbSide.addEventListener('click', function (e) {
-      e.stopPropagation();
-      openPhotoViewer(photos.map(function (photo) { return photo.url; }), 0);
-    });
-  } else {
-    thumbSide.innerHTML = '<div class="no-photo-inner">' + mdIcon('photo', 18) + '<span>Tidak ada foto</span></div>';
-  }
-  var chips = '';
-  if (p.commentCount > 0) chips += '<span class="thumb-chip">' + mdIcon('chatBubble', 11) + p.commentCount + '</span>';
-  if (photos.length > 0) chips += '<span class="thumb-chip">' + mdIcon('photo', 11) + photos.length + '</span>';
-  if (chips) {
-    var chipWrap = document.createElement('div');
-    chipWrap.className = 'thumb-chips';
-    chipWrap.innerHTML = chips;
-    thumbSide.appendChild(chipWrap);
-  }
-  side.appendChild(thumbSide);
-
-  var chevron = document.createElement('span');
-  chevron.className = 'list-card-chevron';
-  chevron.innerHTML = mdIcon('chevronRight', 18);
-  side.appendChild(chevron);
-
-  card.appendChild(side);
   if (pendingActions) { card.classList.add('has-actions'); card.appendChild(pendingActions); }
 
   card.addEventListener('click', function () { openPekerjaanDetail(p, { actions: !!opts.actions }); });
