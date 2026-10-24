@@ -1191,3 +1191,52 @@ if (btnReloadClose) btnReloadClose.addEventListener('click', closeReloadOverlay_
 
 
 </script>
+<script>
+// ============================================================
+// TAMPILAN — tema (terang/gelap/otomatis) & ukuran teks.
+// Disimpan di perangkat (localStorage, aman bila diblokir). Penerapan awal
+// ada di <head> index.html agar tidak berkedip.
+// ============================================================
+(function () {
+  function get_(k, def) { try { return localStorage.getItem(k) || def; } catch (e) { return def; } }
+  function set_(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+
+  function applyTheme_() {
+    var m = get_('fs_theme', 'light');
+    var dark = m === 'dark' || (m === 'auto' && mq && mq.matches);
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  }
+  function applyFont_() {
+    var f = get_('fs_fontsize', 'normal');
+    document.documentElement.setAttribute('data-fs', f === 'lg' || f === 'xl' ? f : 'normal');
+  }
+  function paint_() {
+    var t = get_('fs_theme', 'light'), f = get_('fs_fontsize', 'normal');
+    [['seg-theme', t], ['seg-fs', f]].forEach(function (p) {
+      var box = document.getElementById(p[0]);
+      if (!box) return;
+      [].forEach.call(box.querySelectorAll('button'), function (b) {
+        b.setAttribute('aria-checked', b.getAttribute('data-v') === p[1] ? 'true' : 'false');
+      });
+    });
+  }
+  function bind_(id, key, apply) {
+    var box = document.getElementById(id);
+    if (!box) return;
+    box.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-v]');
+      if (!b) return;
+      set_(key, b.getAttribute('data-v'));
+      apply(); paint_();
+    });
+  }
+  bind_('seg-theme', 'fs_theme', applyTheme_);
+  bind_('seg-fs', 'fs_fontsize', applyFont_);
+  if (mq) {
+    var onChange = function () { if (get_('fs_theme', 'light') === 'auto') applyTheme_(); };
+    if (mq.addEventListener) mq.addEventListener('change', onChange); else if (mq.addListener) mq.addListener(onChange);
+  }
+  applyTheme_(); applyFont_(); paint_();
+})();
+</script>

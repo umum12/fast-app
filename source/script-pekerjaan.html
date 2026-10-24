@@ -518,44 +518,60 @@ document.getElementById('photo-file-input').addEventListener('change', function 
  */
 function compressImage(file) {
   return new Promise(function (resolve, reject) {
-    var reader = new FileReader();
-    reader.onerror = function () { reject(new Error('Gagal membaca file')); };
-    reader.onload = function () {
-      var img = new Image();
-      img.onerror = function () { reject(new Error('Gagal memuat gambar')); };
-      img.onload = function () {
-        var maxSide = 1280;
-        var w = img.width;
-        var h = img.height;
-        if (w > h && w > maxSide) { h = Math.round(h * (maxSide / w)); w = maxSide; }
-        else if (h >= w && h > maxSide) { w = Math.round(w * (maxSide / h)); h = maxSide; }
-
-        var canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-
-        var targetBytes = 100 * 1024;
-        var quality = 0.8;
-        var dataUrl = canvas.toDataURL('image/jpeg', quality);
-
-        function sizeOf(dUrl) {
-          return Math.round((dUrl.length - 'data:image/jpeg;base64,'.length) * 3 / 4);
-        }
-
-        var attempts = 0;
-        while (sizeOf(dataUrl) > targetBytes && quality > 0.3 && attempts < 8) {
-          quality -= 0.1;
-          dataUrl = canvas.toDataURL('image/jpeg', quality);
-          attempts++;
-        }
-
-        var base64 = dataUrl.split(',')[1];
-        resolve({ base64: base64, mimeType: 'image/jpeg', previewUrl: dataUrl });
+    var TARGET = 100 * 1024;
+    function sizeOf(d) { return Math.round((d.length - 'data:image/jpeg;base64,'.length) * 3 / 4); }
+    function encode(src, sw, sh, maxSide) {
+      var w = sw, h = sh;
+      if (w > h && w > maxSide) { h = Math.round(h * (maxSide / w)); w = maxSide; }
+      else if (h >= w && h > maxSide) { w = Math.round(w * (maxSide / h)); h = maxSide; }
+      var canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      // Latar putih: PNG transparan tidak menjadi hitam saat jadi JPEG.
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(src, 0, 0, w, h);
+      var quality = 0.8;
+      var dataUrl = canvas.toDataURL('image/jpeg', quality);
+      var attempts = 0;
+      while (sizeOf(dataUrl) > TARGET && quality > 0.3 && attempts < 8) {
+        quality -= 0.1;
+        dataUrl = canvas.toDataURL('image/jpeg', quality);
+        attempts++;
+      }
+      canvas.width = 0; canvas.height = 0; // lepas memori kanvas
+      return dataUrl;
+    }
+    function finish(src, sw, sh) {
+      var d = encode(src, sw, sh, 1280);
+      // Foto sangat detail yang masih jauh di atas target: perkecil sedikit lagi.
+      if (sizeOf(d) > TARGET * 1.6) d = encode(src, sw, sh, 1024);
+      resolve({ base64: d.split(',')[1], mimeType: 'image/jpeg', previewUrl: d });
+    }
+    // Jalur cadangan (FileReader + <img>) untuk browser tanpa createImageBitmap.
+    function viaImage() {
+      var reader = new FileReader();
+      reader.onerror = function () { reject(new Error('Gagal membaca file')); };
+      reader.onload = function () {
+        var img = new Image();
+        img.onerror = function () { reject(new Error('Gagal memuat gambar')); };
+        img.onload = function () {
+          try { finish(img, img.width, img.height); } catch (e) { reject(e); }
+        };
+        img.src = reader.result;
       };
-      img.src = reader.result;
-    };
-    reader.readAsDataURL(file);
+      reader.readAsDataURL(file);
+    }
+    if (window.createImageBitmap) {
+      // Jalur cepat: langsung dari berkas (tanpa base64 perantara), orientasi EXIF dihormati.
+      createImageBitmap(file, { imageOrientation: 'from-image' }).then(function (bmp) {
+        try { finish(bmp, bmp.width, bmp.height); } catch (e) { viaImage(); }
+        try { bmp.close(); } catch (e2) {}
+      }, viaImage);
+    } else {
+      viaImage();
+    }
   });
 }
 
@@ -1123,6 +1139,27 @@ function renderSkeleton(containerId, lineCount) {
     html += '<div class="skeleton-line" style="width:' + (widths[i % widths.length]) + ';"></div>';
   }
   el.innerHTML = html;
+}
+
+/** Kerangka (skeleton) bersama — pengganti teks "Memuat..." supaya tata letak tidak melompat. */
+function skeletonLinesHtml_(label, n) {
+  var w = [92, 74, 84, 66], h = '<div class="sk-stack" aria-busy="true"><span class="sr-only">' + label + '</span>';
+  for (var i = 0; i < (n || 3); i++) h += '<div class="skeleton-block sk-l" style="width:' + w[i % w.length] + '%"></div>';
+  return h + '</div>';
+}
+function skeletonJadwalHtml_() {
+  return '<div class="sk-stack" aria-busy="true"><span class="sr-only">Memuat jadwal</span>' +
+    '<div class="sk-row"><div class="skeleton-block sk-chip"></div><div class="skeleton-block sk-chip"></div></div>' +
+    '<div class="skeleton-block sk-box"></div></div>';
+}
+function skeletonStatsHtml_() {
+  return '<div class="sk-stat" aria-busy="true"><span class="sr-only">Memuat statistik</span>' +
+    '<div class="skeleton-block sk-statbox"></div><div class="skeleton-block sk-statbox"></div><div class="skeleton-block sk-statbox"></div></div>';
+}
+function skeletonCommentsHtml_() {
+  var one = '<div class="sk-row" style="align-items:flex-start;"><div class="skeleton-block skeleton-avatar"></div><div style="flex:1;display:flex;flex-direction:column;gap:6px;">' +
+    '<div class="skeleton-block skeleton-line-name"></div><div class="skeleton-block sk-l" style="width:80%"></div></div></div>';
+  return '<div class="sk-stack" aria-busy="true"><span class="sr-only">Memuat komentar</span>' + one + one + '</div>';
 }
 
 /**
@@ -1834,7 +1871,7 @@ function renderKomentarSection_(p, body) {
     renderKomentarList_(p, []);
     renderKomentarForm_(p, !isDemo);
   } else {
-    document.getElementById('komentar-list').innerHTML = '<div class="inline-loading"><span class="spinner-sm"></span>Memuat komentar...</div>';
+    document.getElementById('komentar-list').innerHTML = skeletonCommentsHtml_();
   }
   // Cache < 30 dtk: cukup, hemat request. Selain itu verifikasi ke server tanpa menghapus tampilan yang ada.
   if (!(cached && cached.t && (Date.now() - cached.t) < 30000)) loadKomentar_(p);

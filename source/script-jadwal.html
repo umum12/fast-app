@@ -584,7 +584,7 @@ function loadJadwalAktif(force) {
   }
 
   if (!cached) {
-    document.getElementById('jadwal-piket-summary').innerHTML = '<div class="inline-loading"><span class="spinner-sm"></span>Memuat jadwal...</div>';
+    document.getElementById('jadwal-piket-summary').innerHTML = skeletonJadwalHtml_();
   }
 
   google.script.run
@@ -787,7 +787,7 @@ document.getElementById('btn-jadwal-piket-audit').addEventListener('click', func
   if (!session) return;
 
   var body = document.getElementById('activity-detail-body');
-  body.innerHTML = '<p class="card-header-title" style="margin:0 0 10px;">Riwayat Perubahan Jadwal</p><div class="inline-loading"><span class="spinner-sm"></span>Memuat...</div>';
+  body.innerHTML = '<p class="card-header-title" style="margin:0 0 10px;">Riwayat Perubahan Jadwal</p>' + skeletonLinesHtml_('Memuat riwayat perubahan', 4);
   document.getElementById('activity-detail-title').textContent = 'RIWAYAT PERUBAHAN';
   document.getElementById('activity-detail-overlay').classList.add('show');
 
@@ -944,7 +944,7 @@ function fetchDashboardData_(onData) {
 function loadAktivitasSummary(force) {
   if (force) pageDataCache.dashboard = null;
   var cached = pageDataCache.dashboard;
-  if (!cached) renderSkeleton('dashboard-stats', 3);
+  if (!cached) document.getElementById('dashboard-stats').innerHTML = skeletonStatsHtml_();
   fetchDashboardData_(function (data) {
     if (!data) { if (!cached) renderLoadError_(document.getElementById('dashboard-stats'), 'statistik', function () { loadAktivitasSummary(true); }); return; }
     renderDashboardStats(data.stats);

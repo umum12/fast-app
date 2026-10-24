@@ -9,6 +9,17 @@
 <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,500,0..1,0&icon_names=account_circle,add,add_a_photo,add_circle,admin_panel_settings,alarm,apartment,apps,architecture,arrow_back,assignment_turned_in,badge,bar_chart,bookmark,build,build_circle,calculate,calendar_month,calendar_today,chat_bubble,check_circle,chevron_left,chevron_right,cleaning_services,close,cloud_upload,dark_mode,dashboard,database,delete,description,developer_board,download,edit,edit_calendar,edit_note,event_available,event_busy,group,handshake,history,home,image,inbox,info,integration_instructions,inventory_2,key,keyboard_arrow_down,keyboard_arrow_up,landscape,layers,light_mode,lightbulb,list,location_on,lock,login,logout,monitoring,more_horiz,more_vert,notifications,notifications_active,notifications_off,palette,person,person_add,person_check,person_remove,person_search,photo_camera,photo_library,post_add,refresh,save,savings,schedule,search,send,sensors,settings,shield,sync,system_update,task,task_alt,terminal,trophy,tune,upload,verified,verified_user,visibility,warning,work&display=block" rel="stylesheet">
 <title>Statistik Laporan</title>
+<script>
+(function () {
+  try {
+    var m = localStorage.getItem('fs_theme') || 'light', f = localStorage.getItem('fs_fontsize') || 'normal';
+    var dark = m === 'dark' || (m === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    var r = document.documentElement;
+    r.setAttribute('data-theme', dark ? 'dark' : 'light');
+    r.setAttribute('data-fs', f === 'lg' || f === 'xl' ? f : 'normal');
+  } catch (e) {}
+})();
+</script>
 <style>
   :root {
     --color-primary: #2563eb;
@@ -216,6 +227,268 @@
   .footer-note { text-align: center; font-size: 11px; color: var(--color-text-faint); margin-top: 16px; }
 
 <?!= include('login-styles'); ?>
+
+/* ==DARK-GEN-START== */
+/* ===== TAMPILAN: tema gelap (token) + ukuran teks + kontrol Akun ===== */
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --color-primary: #60a5fa;
+  --color-primary-dark: #93c5fd;
+  --color-primary-soft: #1b2a4a;
+  --color-bg: #0b1120;
+  --color-surface: #131b2e;
+  --color-text: #e5e7eb;
+  --color-text-muted: #a3aec2;
+  --color-text-faint: #7b8799;
+  --color-border: #263248;
+  --color-danger: #f87171;
+
+  --status-available-bg: #1b2a4a; --status-available-fg: #93c5fd;
+  --status-claimed-bg: #3a2c12;   --status-claimed-fg: #fbbf24;
+  --status-completed-bg: #12301f; --status-completed-fg: #4ade80;
+  --status-neutral-bg: #232c3d;   --status-neutral-fg: #b6c0d1;
+  --status-alert-bg: #3b1519;     --status-alert-fg: #fca5a5;
+  --status-info-bg: #2a1f4d;      --status-info-fg: #c4b5fd;
+
+  --md-secondary: #94a3b8;
+  --md-secondary-container: #263248;
+  --md-on-secondary-container: #cbd5e1;
+  --md-warning: #fbbf24;
+  --md-warning-container: #3a2c12;
+  --md-on-warning-container: #fde68a;
+  --md-primary-container: #1b2a4a;
+  --md-on-primary-container: #bfdbfe;
+  --md-outline: #334155;
+  --md-surface-container: #1a2336;
+  --md-surface-container-high: #222c42;
+
+  --elevation-1: 0 1px 2px rgba(0,0,0,0.4), 0 1px 3px rgba(0,0,0,0.35);
+  --elevation-2: 0 2px 4px rgba(0,0,0,0.4), 0 3px 8px rgba(0,0,0,0.38);
+  --elevation-3: 0 4px 8px rgba(0,0,0,0.45), 0 8px 16px rgba(0,0,0,0.4);
+}
+
+/* Ukuran teks (diterapkan ke seluruh halaman; tata letak tetap responsif) */
+html[data-fs="lg"] body { zoom: 1.1; }
+html[data-fs="xl"] body { zoom: 1.2; }
+
+
+html[data-theme="dark"] .card {
+  background: rgba(19,27,46,0.96);
+  border: 1px solid #2b3650;
+}
+html[data-theme="dark"] .card h2 {
+  color: #c2cde0;
+}
+html[data-theme="dark"] .dash-top {
+  border-bottom: 1px solid #20293c;
+}
+html[data-theme="dark"] .dash-ico {
+  background: #132142;
+  border: 1px solid #1e2e54;
+}
+html[data-theme="dark"] .dash-title {
+  color: #c2cde0;
+}
+html[data-theme="dark"] .dash-meta {
+  color: #8896a9;
+}
+html[data-theme="dark"] .badge-readonly {
+  background: #463c14;
+  color: #f7a160;
+  border: 1px solid #907d32;
+}
+html[data-theme="dark"] .updated-badge {
+  background: #192235;
+  border: 1px solid #2b3650;
+  color: #8896a9;
+}
+html[data-theme="dark"] .updated-badge strong {
+  color: #afbccf;
+}
+html[data-theme="dark"] .period-tabs {
+  background: #1d273d;
+}
+html[data-theme="dark"] .period-tab-btn {
+  color: #a1aebf;
+}
+html[data-theme="dark"] .stale-chip.amber {
+  background: #463c14;
+  color: #f7a160;
+}
+html[data-theme="dark"] .stale-chip.rose {
+  background: #401316;
+  color: #ef597e;
+}
+html[data-theme="dark"] .stale-ok {
+  background: #19422f;
+  color: #8cfbdc;
+}
+html[data-theme="dark"] .stale-item {
+  border-top: 1px solid #20293c;
+}
+html[data-theme="dark"] .stale-subj {
+  color: #c2cde0;
+}
+html[data-theme="dark"] .stale-age.amber {
+  background: #463c14;
+  color: #f7a160;
+}
+html[data-theme="dark"] .stale-age.rose {
+  background: #401316;
+  color: #ef597e;
+}
+html[data-theme="dark"] .ins-tile {
+  border: 1px solid #2b3650;
+  background: #192235;
+}
+html[data-theme="dark"] .ins-l {
+  color: #8896a9;
+}
+html[data-theme="dark"] .ins-v {
+  color: #cdd6ed;
+}
+html[data-theme="dark"] .kpi-card {
+  background: rgba(19,27,46,0.96);
+  border: 1px solid #2b3650;
+}
+html[data-theme="dark"] .kpi-label {
+  color: #8896a9;
+}
+html[data-theme="dark"] .kpi-v {
+  color: #cdd6ed;
+}
+html[data-theme="dark"] .kpi-sub.good {
+  color: #76fad1;
+}
+html[data-theme="dark"] .tone-blue {
+  background: #132142;
+  color: #2d69ec;
+}
+html[data-theme="dark"] .tone-emerald {
+  background: #19422f;
+  color: #76fad1;
+}
+html[data-theme="dark"] .tone-indigo {
+  background: #142243;
+}
+html[data-theme="dark"] .tone-violet {
+  background: #1a123f;
+}
+html[data-theme="dark"] .tone-amber {
+  background: #463c14;
+  color: #faa543;
+}
+html[data-theme="dark"] .tone-rose {
+  background: #401316;
+  color: #e64064;
+}
+html[data-theme="dark"] .tone-sky {
+  background: #132141;
+  color: #51c2fd;
+}
+html[data-theme="dark"] .peak-badge {
+  background: #132142;
+  border: 1px solid #1e2e54;
+  color: #4770e6;
+}
+html[data-theme="dark"] .donut-hole {
+  background: #151c2d;
+}
+html[data-theme="dark"] .donut-hole .total-v {
+  color: #c2cde0;
+}
+html[data-theme="dark"] .legend-row {
+  background: rgba(25,34,53,0.90);
+  border: 1px solid #20293c;
+}
+html[data-theme="dark"] .legend-label {
+  color: #afbccf;
+}
+html[data-theme="dark"] .legend-value {
+  color: #cdd6ed;
+  background: #151c2d;
+  border: 1px solid #2b3650;
+}
+html[data-theme="dark"] .card-foot-note {
+  border-top: 1px solid #20293c;
+}
+html[data-theme="dark"] .total-chip {
+  color: #afbccf;
+  background: #1d273d;
+  border: 1px solid #2b3650;
+}
+html[data-theme="dark"] .jenis-bar-row {
+  background: rgba(25,34,53,0.80);
+  border: 1px solid #20293c;
+}
+html[data-theme="dark"] .jenis-bar-top .label {
+  color: #c2cde0;
+}
+html[data-theme="dark"] .jenis-bar-top .value {
+  color: #8896a9;
+}
+html[data-theme="dark"] .jenis-bar-track {
+  background: #263351;
+}
+html[data-theme="dark"] .floor-card .fl {
+  color: #afbccf;
+}
+html[data-theme="dark"] .rank-row {
+  background: #151c2d;
+  border: 1px solid #20293c;
+}
+html[data-theme="dark"] .rank-row:hover {
+  border-color: #2b3650;
+}
+html[data-theme="dark"] .rank-row.r1 {
+  background: linear-gradient(90deg, #463c14, #151c2d 60%);
+  border-color: #907d32;
+}
+html[data-theme="dark"] .rank-row.r2 {
+  background: linear-gradient(90deg, #192235, #151c2d 60%);
+  border-color: #2b3650;
+}
+html[data-theme="dark"] .rank-row.r3 {
+  background: linear-gradient(90deg, #442f14, #151c2d 60%);
+  border-color: #855c2e;
+}
+html[data-theme="dark"] .rank-medal {
+  background: #1d273d;
+  color: #8896a9;
+}
+html[data-theme="dark"] .rank-medal.gold {
+  background: #675920;
+  color: #f7a160;
+}
+html[data-theme="dark"] .rank-medal.silver {
+  background: #1d273d;
+  color: #a1aebf;
+  border: 1px solid #3d4c70;
+}
+html[data-theme="dark"] .rank-medal.bronze {
+  background: #5a3f1a;
+  color: #ef9375;
+  border: 1px solid #906232;
+}
+html[data-theme="dark"] .rank-name {
+  color: #c2cde0;
+}
+html[data-theme="dark"] .top-tag {
+  background: #675920;
+  color: #f2a87a;
+}
+html[data-theme="dark"] .rank-track {
+  background: #1d273d;
+}
+html[data-theme="dark"] .rank-total .v {
+  color: #cdd6ed;
+}
+
+/* Kartu lantai memakai warna inline dari JS: paksa selaras tema gelap */
+html[data-theme="dark"] .floor-card { background: #1a2336 !important; border-color: #263248 !important; }
+html[data-theme="dark"] .floor-card .fv { color: #e5e7eb !important; }
+
+/* ==DARK-GEN-END== */
 </style>
 </head>
 <body>
