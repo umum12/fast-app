@@ -6,11 +6,135 @@
 
 var riwayatReqSeq_ = 0;
 
+// Filter Riwayat (tampilan saja; difilter di server sebelum paginasi).
+var riwayatFilter_ = { jenis: '', floorCode: '', range: '', status: '', peran: '' };
+
 function currentRiwayatQuery_() { return (document.getElementById('reports-search').value || '').trim(); }
 
 function applyRiwayatSearchAndRender() { loadRiwayatPekerjaan(); }
 
 document.getElementById('reports-search').addEventListener('input', debounce_(applyRiwayatSearchAndRender, 350));
+
+function pad2_(n) { return (n < 10 ? '0' : '') + n; }
+function ymd_(d) { return d.getFullYear() + '-' + pad2_(d.getMonth() + 1) + '-' + pad2_(d.getDate()); }
+
+var RIWAYAT_RANGES_ = [
+  { key: '', label: 'Semua tanggal' },
+  { key: 'today', label: 'Hari ini' },
+  { key: '7d', label: '7 hari terakhir' },
+  { key: '30d', label: '30 hari terakhir' },
+  { key: 'month', label: 'Bulan ini' }
+];
+var RIWAYAT_STATUS_ = [
+  { key: '', label: 'Semua status' },
+  { key: 'TERBUKA', label: 'Menunggu Diambil' },
+  { key: 'DIKERJAKAN', label: 'Dikerjakan' },
+  { key: 'SELESAI', label: 'Selesai' }
+];
+var RIWAYAT_PERAN_ = [
+  { key: '', label: 'Semua peran' },
+  { key: 'dibuat', label: 'Saya buat' },
+  { key: 'ditangani', label: 'Saya tangani' }
+];
+
+/** Rentang tanggal -> { dateFrom, dateTo } (yyyy-MM-dd, zona waktu perangkat). */
+function riwayatRangeDates_(key) {
+  var now = new Date(), to = ymd_(now), from = '';
+  if (key === 'today') from = to;
+  else if (key === '7d') from = ymd_(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6));
+  else if (key === '30d') from = ymd_(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29));
+  else if (key === 'month') from = ymd_(new Date(now.getFullYear(), now.getMonth(), 1));
+  else return {};
+  return { dateFrom: from, dateTo: to };
+}
+
+/** Parameter server dari filter aktif (hanya yang terisi). */
+function riwayatFilterParams_() {
+  var f = riwayatFilter_, p = {};
+  if (f.jenis) p.jenis = f.jenis;
+  if (f.floorCode) p.floorCode = f.floorCode;
+  if (f.status) p.status = f.status;
+  if (f.peran) p.peran = f.peran;
+  var r = riwayatRangeDates_(f.range);
+  if (r.dateFrom) { p.dateFrom = r.dateFrom; p.dateTo = r.dateTo; }
+  return p;
+}
+
+function riwayatFilterCount_() {
+  var f = riwayatFilter_, n = 0;
+  ['jenis', 'floorCode', 'range', 'status', 'peran'].forEach(function (k) { if (f[k]) n++; });
+  return n;
+}
+
+function riwayatOptionLabel_(opts, key) {
+  var o = opts.filter(function (x) { return x.key === key; })[0];
+  return o ? o.label : '';
+}
+
+function riwayatJenisOptions_() {
+  var out = [{ key: '', label: 'Semua jenis' }];
+  Object.keys(JENIS_PEKERJAAN_BADGE).forEach(function (k) { out.push({ key: k, label: JENIS_PEKERJAAN_BADGE[k].label }); });
+  return out;
+}
+
+function riwayatFloorOptions_() {
+  var out = [{ key: '', label: 'Semua lantai' }];
+  ((appBootstrap && appBootstrap.master && appBootstrap.master.floors) || []).forEach(function (f) {
+    out.push({ key: f.floor_code, label: f.floor_name });
+  });
+  return out;
+}
+
+/** Baris chip filter: setiap chip membuka pemilih yang sama dengan filter Aktivitas. */
+function renderRiwayatFilterRow_() {
+  var row = document.getElementById('riwayat-filter-row');
+  if (!row) return;
+  var role = appBootstrap && appBootstrap.currentUser ? appBootstrap.currentUser.role : '';
+  var jenisOpts = riwayatJenisOptions_(), floorOpts = riwayatFloorOptions_();
+  var defs = [
+    { k: 'jenis', title: 'Pilih Jenis', all: 'Jenis', opts: jenisOpts },
+    { k: 'floorCode', title: 'Pilih Lantai', all: 'Lantai', opts: floorOpts },
+    { k: 'range', title: 'Pilih Tanggal', all: 'Tanggal', opts: RIWAYAT_RANGES_ },
+    { k: 'status', title: 'Pilih Status', all: 'Status', opts: RIWAYAT_STATUS_ }
+  ];
+  // "Peran" hanya bermakna untuk FS (Riwayat FS = dibuat ATAU ditangani).
+  if (role === 'fs') defs.push({ k: 'peran', title: 'Peran Saya', all: 'Peran', opts: RIWAYAT_PERAN_ });
+  row.innerHTML = '';
+  defs.forEach(function (d) {
+    var val = riwayatFilter_[d.k];
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'rw-chip' + (val ? ' active' : '');
+    b.setAttribute('data-filter', d.k);
+    b.innerHTML = '<span>' + (val ? riwayatOptionLabel_(d.opts, val) : d.all) + '</span>' + mdIcon('chevronDown', 14);
+    b.addEventListener('click', function () {
+      openFilterPicker_(d.title, d.opts, val, function (key) {
+        riwayatFilter_[d.k] = key;
+        renderRiwayatFilterRow_();
+        loadRiwayatPekerjaan();
+      });
+    });
+    row.appendChild(b);
+  });
+  if (riwayatFilterCount_() > 0) {
+    var r = document.createElement('button');
+    r.type = 'button'; r.className = 'rw-chip rw-chip-reset'; r.setAttribute('data-filter', 'reset');
+    r.innerHTML = mdIcon('close', 14) + '<span>Reset</span>';
+    r.addEventListener('click', function () {
+      riwayatFilter_ = { jenis: '', floorCode: '', range: '', status: '', peran: '' };
+      renderRiwayatFilterRow_();
+      loadRiwayatPekerjaan();
+    });
+    row.appendChild(r);
+  }
+}
+
+/** Kunci cache: pencarian + filter aktif ('' = tampilan bawaan, boleh disimpan permanen). */
+function riwayatCacheKey_(q) {
+  var f = riwayatFilter_;
+  var fk = [f.jenis, f.floorCode, f.range, f.status, f.peran].join('|');
+  return fk === '||||' ? q.toLowerCase() : q.toLowerCase() + '#' + fk;
+}
 
 function loadRiwayatPekerjaan(force) {
   var session = loadSession();
@@ -28,8 +152,9 @@ function loadRiwayatPekerjaan(force) {
     }
   }
 
+  renderRiwayatFilterRow_();
   var q = currentRiwayatQuery_();
-  var cacheKey = q.toLowerCase();
+  var cacheKey = riwayatCacheKey_(q);
   var container = document.getElementById('my-reports-list');
   var cached = pageDataCache.pekerjaanRiwayatByKey[cacheKey];
 
@@ -49,7 +174,7 @@ function loadRiwayatPekerjaan(force) {
   else if (!cached) renderListSkeleton_('my-reports-list', 3, q ? 'Mencari riwayat...' : 'Memuat riwayat pekerjaan...');
 
   var seq = ++riwayatReqSeq_;
-  fetchFeedPage_({ view: 'riwayat', q: q, limit: FEED_PAGE_SIZE_, offset: 0 }, function (data) {
+  fetchFeedPage_(riwayatParams_(q, 0), function (data) {
     if (seq !== riwayatReqSeq_) return;
     if (cacheKey === '') persistSet_('riwayat', { list: data.pekerjaan, total: data.total, hasMore: data.hasMore });
     if (cached && container.dataset.feedKey === cacheKey &&
@@ -66,16 +191,24 @@ function loadRiwayatPekerjaan(force) {
   });
 }
 
+/** Parameter satu halaman Riwayat (filter aktif ikut dikirim). */
+function riwayatParams_(q, offset, fprm) {
+  var p = { view: 'riwayat', q: q, limit: FEED_PAGE_SIZE_, offset: offset };
+  var extra = fprm || riwayatFilterParams_();
+  for (var k in extra) p[k] = extra[k];
+  return p;
+}
+
 function renderRiwayatFeed_(entry, q, cacheKey) {
   document.getElementById('my-reports-list').dataset.feedKey = cacheKey;
-  var empty = q
+  var empty = (q || riwayatFilterCount_() > 0)
     ? '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('description', 26) + '</div>Tidak ada riwayat yang cocok.</div>'
     : '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('description', 26) + '</div>Belum ada riwayat pekerjaan.<br>' +
       '<button class="btn-primary" id="empty-state-buat-pekerjaan">Buat Pekerjaan Sekarang</button></div>';
   // Kartu Riwayat memakai fungsi yang SAMA PERSIS dengan Aktivitas
   // (buildPekerjaanListCard_) supaya identik by construction.
   renderFeedList_(document.getElementById('my-reports-list'), entry, empty, function (done, fail) {
-    fetchFeedPage_({ view: 'riwayat', q: q, limit: FEED_PAGE_SIZE_, offset: entry.list.length }, function (data) {
+    fetchFeedPage_(riwayatParams_(q, entry.list.length), function (data) {
       if (pageDataCache.pekerjaanRiwayatByKey[cacheKey] !== entry) { return; }
       entry.list = entry.list.concat(data.pekerjaan);
       entry.total = data.total;

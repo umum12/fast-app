@@ -3047,3 +3047,12 @@ header.app-header .app-logo:focus-visible { outline: 2px solid var(--color-prima
 .lc2 .lc-comment { display: inline-flex; align-items: center; gap: 4px; color: #475569; font-weight: 500; }
 .lc2 .lc-detail { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 2px; font-size: 12px; font-weight: 700; color: var(--color-primary); padding: 4px 6px 4px 10px; border-radius: 12px; }
 .lc2.has-actions > .list-card-actions-row { margin-top: 2px; }
+
+/* ===== Riwayat: baris chip filter ===== */
+.rw-filter-row { display: flex; gap: 8px; overflow-x: auto; padding: 0 0 12px; margin: 0 -2px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.rw-filter-row::-webkit-scrollbar { display: none; }
+.rw-chip { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid #e2e8f0; background: #fff; color: #475569; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; -webkit-tap-highlight-color: transparent; white-space: nowrap; }
+.rw-chip svg, .rw-chip .material-symbols-outlined { flex-shrink: 0; }
+.rw-chip:active { background: #f1f5f9; }
+.rw-chip.active { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+.rw-chip-reset { color: #be123c; border-color: #fecdd3; background: #fff1f2; }

@@ -91,6 +91,24 @@
   @media (min-width: 560px) { .realtime-note { display: inline-flex; } }
 
   /* KPI */
+  .stale-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .stale-chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+  .stale-chip.amber { background: #fffbeb; color: #b45309; }
+  .stale-chip.rose { background: #fff1f2; color: #be123c; }
+  .stale-ok { display: flex; align-items: center; gap: 8px; padding: 12px; border-radius: 14px; background: #ecfdf5; color: #047857; font-size: 13px; font-weight: 600; }
+  .stale-item { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 10px 0; border-top: 1px solid #f1f5f9; }
+  .stale-item:first-child { border-top: 0; }
+  .stale-main { min-width: 0; flex: 1; }
+  .stale-subj { font-size: 13px; font-weight: 600; color: #1e293b; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; word-break: break-word; }
+  .stale-meta { font-size: 11.5px; color: #94a3b8; margin-top: 2px; }
+  .stale-age { flex-shrink: 0; font-size: 11.5px; font-weight: 700; padding: 3px 8px; border-radius: 999px; }
+  .stale-age.amber { background: #fffbeb; color: #b45309; }
+  .stale-age.rose { background: #fff1f2; color: #be123c; }
+  .ins-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .ins-tile { border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px; background: #f8fafc; min-width: 0; }
+  .ins-l { font-size: 11px; color: #64748b; font-weight: 600; }
+  .ins-v { font-size: 18px; font-weight: 800; color: #0f172a; margin: 4px 0 2px; word-break: break-word; }
+  .ins-s { font-size: 11px; color: #94a3b8; line-height: 1.35; }
   .kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 14px; }
   @media (min-width: 640px) { .kpi-grid { grid-template-columns: repeat(4, 1fr); } }
   .kpi-card { background: rgba(255,255,255,.96); border: 1px solid #e2e8f0; border-radius: 16px; padding: 14px;
@@ -230,6 +248,18 @@
     </header>
 
     <section class="kpi-grid" id="quick-stats"></section>
+
+    <div class="card" id="stale-card">
+      <h2><span class="ms" style="color:#e11d48;">warning</span> Perlu Perhatian</h2>
+      <p class="card-subtitle" id="stale-subtitle">Pekerjaan kolaboratif yang belum tuntas (semua periode)</p>
+      <div id="stale-body"></div>
+    </div>
+
+    <div class="card">
+      <h2><span class="ms" style="color:#4f46e5;">bar_chart</span> Sorotan Periode Ini</h2>
+      <p class="card-subtitle">Kecepatan layanan dan lokasi yang paling sering melapor</p>
+      <div class="ins-grid" id="insight-grid"></div>
+    </div>
 
     <div class="card">
       <div class="card-head">
@@ -429,6 +459,61 @@
     renderJenisList(data.perJenis);
     renderLantaiDonut(data.perLantai);
     renderRankingList(data.ranking);
+    renderStale(data.insight);
+    renderInsight(data);
+  }
+
+  var STATUS_LABEL_ = { TERBUKA: 'Belum diambil', DIKERJAKAN: 'Belum selesai' };
+
+  function renderStale(ins) {
+    var body = document.getElementById('stale-body');
+    var st = ins && ins.stale;
+    if (!st) { body.innerHTML = ''; return; }
+    document.getElementById('stale-subtitle').textContent =
+      'Belum diambil > ' + st.terbukaHours + ' jam, atau belum selesai > ' + st.dikerjakanHours + ' jam (semua periode)';
+    if (!st.items.length) {
+      body.innerHTML = '<div class="stale-ok"><span class="ms">check_circle</span>Semua pekerjaan tertangani tepat waktu.</div>';
+      return;
+    }
+    var html = '<div class="stale-chips">' +
+      '<span class="stale-chip amber">' + st.terbukaCount + ' belum diambil</span>' +
+      '<span class="stale-chip rose">' + st.dikerjakanCount + ' belum selesai</span></div>';
+    st.items.forEach(function (it) {
+      var tone = it.status === 'DIKERJAKAN' ? 'rose' : 'amber';
+      var meta = [STATUS_LABEL_[it.status] || it.status, it.lantai, it.handler].filter(Boolean).join(' \u00b7 ');
+      html += '<div class="stale-item"><div class="stale-main"><div class="stale-subj">' + esc_(it.subject || '(tanpa subjek)') + '</div>' +
+        '<div class="stale-meta">' + esc_(meta) + '</div></div><span class="stale-age ' + tone + '">' + esc_(it.ageLabel) + '</span></div>';
+    });
+    var more = st.terbukaCount + st.dikerjakanCount - st.items.length;
+    if (more > 0) html += '<div class="stale-meta" style="padding-top:8px;">+ ' + more + ' pekerjaan lainnya</div>';
+    body.innerHTML = html;
+  }
+
+  function insTile_(label, value, sub) {
+    return '<div class="ins-tile"><div class="ins-l">' + esc_(label) + '</div><div class="ins-v">' + esc_(value) + '</div><div class="ins-s">' + esc_(sub) + '</div></div>';
+  }
+
+  // Menit -> "45 mnt" / "3 j 20 mnt" / "2 hr 4 j" (sama dengan sisi server)
+  function durasi_(m) {
+    m = Math.max(0, Math.round(m));
+    if (m < 60) return m + ' mnt';
+    var h = Math.floor(m / 60), rm = m % 60;
+    if (h < 24) return h + ' j' + (rm ? ' ' + rm + ' mnt' : '');
+    var d = Math.floor(h / 24), rh = h % 24;
+    return d + ' hr' + (rh ? ' ' + rh + ' j' : '');
+  }
+
+  function renderInsight(data) {
+    var grid = document.getElementById('insight-grid');
+    var ins = data.insight || {};
+    var r = ins.respons || {}, p = ins.penyelesaian || {};
+    var lm = (ins.lantaiMasalah || [])[0];
+    var jn = (data.perJenis || [])[0];
+    grid.innerHTML =
+      insTile_('Rata-rata diambil', r.avgMenit != null ? durasi_(r.avgMenit) : '\u2014', r.n ? 'sejak dibuat (' + r.n + ' pekerjaan)' : 'belum ada data') +
+      insTile_('Rata-rata selesai', p.avgMenit != null ? durasi_(p.avgMenit) : '\u2014', p.n ? 'sejak mulai dikerjakan (' + p.n + ')' : 'belum ada data') +
+      insTile_('Lantai paling sering lapor', lm ? lm.label : '\u2014', lm ? lm.total + ' lapor/permintaan' : 'belum ada lapor/permintaan') +
+      insTile_('Jenis terbanyak', jn ? jn.label : '\u2014', jn ? jn.total + ' pekerjaan' : 'belum ada data');
   }
 
   function renderQuickStats(data) {
