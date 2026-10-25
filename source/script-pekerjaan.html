@@ -875,8 +875,11 @@ function submitSelesaiForm_() {
   }
 
   var pekerjaanId = buatPrefillContext.pekerjaanId;
+  // Kunci kirim tetap sama selama percobaan yang sama (kirim ulang tidak menggandakan foto/notifikasi).
+  if (!buatPrefillContext.submitKey) buatPrefillContext.submitKey = createSubmitKey_();
   var data = {
     notes: notesEl.value,
+    submitKey: buatPrefillContext.submitKey,
     photos: selesaiPhotos.filter(Boolean).map(function (ph) {
       return { base64: ph.base64, mimeType: ph.mimeType };
     })
@@ -979,6 +982,17 @@ document.getElementById('btn-lihat-riwayat-setelah-submit').addEventListener('cl
 // BROWSER STATE CACHE — Patch 6.05 (Performance & Navigation Optimization)
 // ============================================================
 
+// PERBAIKAN (audit frontend): dua penanda untuk menolak jawaban server yang basi.
+//  sessionEpoch_ naik setiap sesi berakhir/berganti (logout, sesi tidak valid) -> jawaban permintaan
+//   milik sesi lama DIABAIKAN sepenuhnya (tidak boleh menulis cache pengguna berikutnya).
+//  cacheGen_ naik setiap cache dibatalkan (mutasi) -> jawaban yang dimulai sebelum mutasi tidak
+//   boleh menghidupkan kembali data lama di cache.
+var sessionEpoch_ = 0;
+var cacheGen_ = 0;
+function reqGuard_() { return { ep: sessionEpoch_, gen: cacheGen_ }; }
+function reqDead_(g) { return g.ep !== sessionEpoch_; }
+function reqStale_(g) { return g.gen !== cacheGen_; }
+
 var pageDataCache = {
   dashboard: null,               // { stats } (Patch 10.x — reminders dihapus)
   pekerjaanInbox: null,          // [...] daftar inbox (Menu Pekerjaan)
@@ -1050,6 +1064,7 @@ function sameFeedList_(a, b) {
 /** Seluruh cache Pekerjaan basi setelah mutasi apa pun (Create/Ambil/
  * Lepas/Selesaikan/Hapus) — pola event-driven cache Patch 8.0. */
 function invalidateAllPekerjaanCaches_() {
+  cacheGen_++;
   pageDataCache.pekerjaanInbox = null;
   pageDataCache.pekerjaanRiwayatByKey = {};
   pageDataCache.pekerjaanAktivitas = null;
@@ -1067,6 +1082,8 @@ function invalidateAllPekerjaanCaches_() {
  * tab/browser yang sama tidak pernah melihat data user sebelumnya.
  */
 function resetAllPageDataCache_() {
+  sessionEpoch_++;
+  cacheGen_++;
   pageDataCache.dashboard = null;
   pageDataCache.pekerjaanInbox = null;
   pageDataCache.pekerjaanRiwayatByKey = {};
@@ -1149,15 +1166,21 @@ function appendFeedMore_(container, entry, fetchMore) {
 }
 
 /** Satu halaman getPekerjaanList (view aktivitas/riwayat). ok(data) / fail(). */
-function fetchFeedPage_(params, ok, fail) {
+function fetchFeedPage_(params, ok, fail, retried_) {
   var session = loadSession();
   if (!session) return;
+  var g = reqGuard_();
   google.script.run
     .withSuccessHandler(function (response) {
+      if (reqDead_(g)) return;                       // sesi sudah berganti
+      if (reqStale_(g) && !retried_) {               // ada mutasi saat menunggu: ambil ulang sekali
+        fetchFeedPage_(params, ok, fail, true);
+        return;
+      }
       if (!response || !response.success) { fail(response && response.error); return; }
       ok(response.data);
     })
-    .withFailureHandler(function () { fail(); })
+    .withFailureHandler(function () { if (reqDead_(g)) return; fail(); })
     .getPekerjaanList(session.accessCode, params);
 }
 
@@ -1882,6 +1905,7 @@ var komentarCache_ = {};
 function renderKomentarSection_(p, body) {
   var section = document.createElement('div');
   section.className = 'komentar-section';
+  section.dataset.pid = p.pekerjaanId;
   section.innerHTML =
     '<div class="komentar-head"><span class="title">Komentar</span>' +
     '<button class="btn-icon" type="button" id="btn-komentar-refresh" aria-label="Muat ulang komentar">' + mdIcon('refresh', 18) + '</button></div>' +
@@ -1913,13 +1937,26 @@ function loadKomentar_(p) {
   var listEl = document.getElementById('komentar-list');
   if (!listEl) return;
   var hadCache = !!komentarCache_[p.pekerjaanId] || !p.commentCount;
+  var gKom = reqGuard_();
+  // Panel komentar masih milik laporan ini? (detail bisa sudah ditutup/berganti saat jawaban tiba)
+  function samePanel_() {
+    var l = document.getElementById('komentar-list');
+    var sec = l && l.closest ? l.closest('.komentar-section') : null;
+    return !!(l && sec && sec.dataset.pid === String(p.pekerjaanId));
+  }
   google.script.run
     .withSuccessHandler(function (response) {
-      listEl = document.getElementById('komentar-list');
-      if (!listEl) return; // Detail sudah ditutup
-      if (!response.success) { if (!hadCache) listEl.innerHTML = '<div class="komentar-empty">' + response.error + '</div>'; return; }
+      if (reqDead_(gKom)) return;
       var prev = komentarCache_[p.pekerjaanId];
-      komentarCache_[p.pekerjaanId] = { list: response.data.komentar, canKirim: response.data.canKirim, t: Date.now() };
+      if (response.success && !reqStale_(gKom)) {
+        komentarCache_[p.pekerjaanId] = { list: response.data.komentar, canKirim: response.data.canKirim, t: Date.now() };
+      }
+      if (!samePanel_()) return; // Detail sudah ditutup / berpindah laporan lain
+      listEl = document.getElementById('komentar-list');
+      if (!response.success) {
+        if (!hadCache) { listEl.innerHTML = ''; var errEl = document.createElement('div'); errEl.className = 'komentar-empty'; errEl.textContent = response.error || 'Gagal memuat komentar.'; listEl.appendChild(errEl); }
+        return;
+      }
       p.commentCount = response.data.komentar.length;
       // Tidak berubah -> jangan gambar ulang (tanpa kedip; teks yang sedang diedit aman).
       var unchanged = prev && sameFeedList_(prev.list, response.data.komentar) && listEl.children.length > 0 && !listEl.querySelector('.inline-loading');
@@ -1927,6 +1964,7 @@ function loadKomentar_(p) {
       renderKomentarForm_(p, response.data.canKirim);
     })
     .withFailureHandler(function () {
+      if (reqDead_(gKom) || !samePanel_()) return;
       var el = document.getElementById('komentar-list');
       if (el && !hadCache) el.innerHTML = '<div class="komentar-empty">Gagal memuat komentar.</div>';
     })
@@ -2237,8 +2275,11 @@ function loadPekerjaanInbox(force) {
     renderListSkeleton_('pekerjaan-list', 3, 'Memuat data pekerjaan...');
   }
 
+  var gInbox = reqGuard_();
   google.script.run
     .withSuccessHandler(function (response) {
+      if (reqDead_(gInbox)) return;
+      if (reqStale_(gInbox)) { loadPekerjaanInbox(true); return; } // mutasi terjadi saat menunggu
       var container = document.getElementById('pekerjaan-list');
       if (!response.success) {
         if (!cached) renderLoadError_(container, 'daftar pekerjaan', function () { loadPekerjaanInbox(true); }, response.error);
@@ -2259,6 +2300,7 @@ function loadPekerjaanInbox(force) {
       if (bar2) bar2.classList.remove('show');
     })
     .withFailureHandler(function () {
+      if (reqDead_(gInbox)) return;
       if (!cached) renderLoadError_(document.getElementById('pekerjaan-list'), 'daftar pekerjaan', function () { loadPekerjaanInbox(true); });
       var bar3 = document.getElementById('linear-progress');
       if (bar3) bar3.classList.remove('show');
@@ -2315,7 +2357,9 @@ function prefetchTabs_() {
     if (!session || document.visibilityState !== 'visible') { prefetchDone_ = false; return; }
 
     if (!pageDataCache.pekerjaanInbox) {
+      var gPre = reqGuard_();
       google.script.run.withSuccessHandler(function (r) {
+        if (reqDead_(gPre) || reqStale_(gPre)) return;
         if (!r || !r.success || pageDataCache.pekerjaanInbox) return;
         pageDataCache.pekerjaanInbox = r.data.pekerjaan;
         persistSet_('inbox', r.data.pekerjaan);

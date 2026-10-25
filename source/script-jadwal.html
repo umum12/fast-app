@@ -590,13 +590,15 @@ function loadJadwalAktif(force) {
     document.getElementById('jadwal-piket-summary').innerHTML = skeletonJadwalHtml_();
   }
 
+  var gJad = reqGuard_();
   google.script.run
     .withSuccessHandler(function (response) {
+      if (reqDead_(gJad)) return;
       if (!response.success) {
         if (!cached) document.getElementById('jadwal-piket-summary').textContent = response.error;
         return;
       }
-      pageDataCache.jadwalAktif = response.data.jadwal;
+      if (!reqStale_(gJad)) pageDataCache.jadwalAktif = response.data.jadwal;
       renderJadwalPiket_(response.data.jadwal);
     })
     .withFailureHandler(function () {
@@ -894,13 +896,17 @@ function loadHomeBootstrap(force) {
     if (appBootstrap.currentUser.role === 'admin') renderContentManagementList_(pcContent);
   }
 
+  var gHome = reqGuard_();
   google.script.run
     .withSuccessHandler(function (response) {
+      if (reqDead_(gHome)) return;
       if (!response.success) return;
-      pageDataCache.dashboard = response.data.dashboard;
-      pageDataCache.content = response.data.content;
-      persistSet_('content', response.data.content);
-      persistSet_('dashboard', response.data.dashboard);
+      if (!reqStale_(gHome)) {
+        pageDataCache.dashboard = response.data.dashboard;
+        pageDataCache.content = response.data.content;
+        persistSet_('content', response.data.content);
+        persistSet_('dashboard', response.data.dashboard);
+      }
       if (!(shownStale && sameFeedList_(pcContent, response.data.content))) {
         renderContentBanner_(response.data.content);
         if (appBootstrap.currentUser.role === 'admin') renderContentManagementList_(response.data.content);
@@ -933,14 +939,18 @@ function fetchDashboardData_(onData) {
   var pcDash = persistGet_('dashboard');
   if (pcDash && pcDash.stats) onData(pcDash);
 
+  var gDash = reqGuard_();
   google.script.run
     .withSuccessHandler(function (response) {
+      if (reqDead_(gDash)) return;
       if (!response.success) { if (!pcDash) onData(null); return; }
-      pageDataCache.dashboard = response.data;
-      persistSet_('dashboard', response.data);
+      if (!reqStale_(gDash)) {
+        pageDataCache.dashboard = response.data;
+        persistSet_('dashboard', response.data);
+      }
       onData(response.data);
     })
-    .withFailureHandler(function () { if (!pcDash) onData(null); })
+    .withFailureHandler(function () { if (reqDead_(gDash)) return; if (!pcDash) onData(null); })
     .getDashboard(session.accessCode);
 }
 
@@ -1414,11 +1424,15 @@ function loadContentAktif(force) {
     return;
   }
 
+  var gCont = reqGuard_();
   google.script.run
     .withSuccessHandler(function (response) {
+      if (reqDead_(gCont)) return;
       if (!response.success) return;
-      pageDataCache.content = response.data.content;
-      persistSet_('content', response.data.content);
+      if (!reqStale_(gCont)) {
+        pageDataCache.content = response.data.content;
+        persistSet_('content', response.data.content);
+      }
       renderContentBanner_(response.data.content);
       if (appBootstrap.currentUser.role === 'admin') renderContentManagementList_(response.data.content);
     })

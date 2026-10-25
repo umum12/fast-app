@@ -180,22 +180,29 @@ document.getElementById('btn-back-from-akun').addEventListener('click', function
 
 var SESSION_KEY = 'fs_session';
 
+// Penyimpanan bisa diblokir/penuh (mode privat): dibungkus try/catch dan, bila gagal, sesi
+// ditahan di memori agar aplikasi tetap berjalan selama tab terbuka.
+var memSession_ = null;
+
 function saveSession(session) {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  memSession_ = session;
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify(session)); } catch (e) { /* tetap di memori */ }
 }
 
 function loadSession() {
-  var raw = localStorage.getItem(SESSION_KEY);
-  if (!raw) return null;
+  var raw = null;
+  try { raw = localStorage.getItem(SESSION_KEY); } catch (e) { raw = null; }
+  if (!raw) return memSession_;
   try {
     return JSON.parse(raw);
   } catch (e) {
-    return null;
+    return memSession_;
   }
 }
 
 function clearSession() {
-  localStorage.removeItem(SESSION_KEY);
+  memSession_ = null;
+  try { localStorage.removeItem(SESSION_KEY); } catch (e) { /* abaikan */ }
 }
 
 // ============================================================
@@ -800,6 +807,7 @@ function attemptBootstrap(session, attempt) {
   bootstrapSession_ = session;
   bootstrapInFlight_ = true;
   var seq = ++bootstrapSeq_;
+  var bootEpoch_ = sessionEpoch_;
   var finished = false;
   hideBootstrapError_();
   if (attempt === 1) showSplash_();
@@ -821,6 +829,7 @@ function attemptBootstrap(session, attempt) {
   google.script.run
     .withSuccessHandler(function (response) {
       if (finished || seq !== bootstrapSeq_) return; // jawaban basi dari percobaan yang sudah ditinggalkan
+      if (bootEpoch_ !== sessionEpoch_) return;      // sesi berakhir/berganti saat menunggu
       finished = true;
       clearTimeout(watchdog);
       bootstrapInFlight_ = false;
