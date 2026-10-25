@@ -29,7 +29,6 @@ const PUBLIC = path.join(ROOT, 'public');
 const PAGES = [
   { src: 'index',      out: 'index.html',     title: 'Facility Support', manifest: 'manifest.json', required: true },
   { src: 'statistik',  out: 'statistik.html', title: 'Statistik Laporan - Facility Support', manifest: 'manifest.json' },
-  { src: 'buat-cepat', out: 'buat.html',      title: 'Buat Laporan - Facility Support', manifest: 'manifest-buat.json' },
   { src: 'pdfrender',  out: 'pdfrender.html', title: 'PDF - Facility Support', manifest: 'manifest.json' }
 ];
 
@@ -70,9 +69,6 @@ function resolveIncludes(html, from, stack) {
 
 // Scriptlet Apps Script yang diketahui, diganti padanan statisnya.
 function replaceKnownScriptlets(html, execUrl) {
-  // buat-cepat.html: manifest dinamis dari /exec -> manifest statis di situs ini.
-  html = html.replace(/<link\s+rel=["']manifest["']\s+href=["']<\?!?=\s*WEBAPP_EXEC_URL\s*\?>\?page=manifest-buat["']\s*>/g,
-    '<link rel="manifest" href="manifest-buat.json">');
   // Sisa pemakaian WEBAPP_EXEC_URL (jika ada) -> URL /exec dari config.
   html = html.replace(/<\?!?=\s*WEBAPP_EXEC_URL\s*\?>/g, execUrl);
   return html;
@@ -82,7 +78,7 @@ function inject(html, page, execUrlOk) {
   const head = [];
   if (!/<meta[^>]+charset/i.test(html)) head.push('<meta charset="utf-8">');
   if (!/<meta[^>]+name=["']viewport["']/i.test(html)) {
-    head.push('<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">');
+    head.push('<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">');
   }
   if (!/<title[\s>]/i.test(html)) head.push('<title>' + page.title + '</title>');
   if (!/<link[^>]+rel=["']manifest["']/i.test(html)) head.push('<link rel="manifest" href="' + page.manifest + '">');
@@ -122,12 +118,12 @@ function basePath(cfg) {
   return p;
 }
 function writeManifests(outDir, base) {
-  for (const f of ['manifest.json', 'manifest-buat.json']) {
+  for (const f of ['manifest.json']) {
     const fp = path.join(outDir, f);
     if (!fs.existsSync(fp)) continue;
     const m = JSON.parse(fs.readFileSync(fp, 'utf8'));
-    m.id = f === 'manifest-buat.json' ? base + 'buat.html' : base;
-    m.start_url = f === 'manifest-buat.json' ? './buat.html' : './';
+    m.id = base;
+    m.start_url = './';
     m.scope = './';
     fs.writeFileSync(fp, JSON.stringify(m, null, 2) + '\n');
   }
@@ -200,7 +196,7 @@ function main() {
   //              dan service worker lama TETAP aktif (rollback otomatis).
   //   optional = dicoba semampunya.
   const critical = ['./', 'config.js', 'api-adapter.js', 'manifest.json'].concat(builtPages);
-  const optional = ['firebase-config.js', 'pwa-install.js', 'pwa-update.js', 'manifest-buat.json', 'icons/icon-192.png', 'icons/icon-512.png'];
+  const optional = ['firebase-config.js', 'pwa-install.js', 'pwa-update.js', 'icons/icon-192.png', 'icons/icon-512.png'];
   const swPath = path.join(OUT, 'sw.js');
   fs.writeFileSync(swPath, fs.readFileSync(swPath, 'utf8')
     .replace(/__BUILD_ID__/g, buildId)
