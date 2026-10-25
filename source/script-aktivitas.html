@@ -363,7 +363,7 @@ var iconButtonMap = [
   if (buatHeaderIcon) buatHeaderIcon.innerHTML = mdIcon('postAdd', 22);
 
   var btnResetBuat = document.getElementById('btn-cancel-report-form');
-  if (btnResetBuat) btnResetBuat.innerHTML = mdIcon('close', 18);
+  if (btnResetBuat) btnResetBuat.innerHTML = mdIcon('refresh', 18);
 
   var pekerjaanHeaderIcon = document.getElementById('pekerjaan-header-icon');
   if (pekerjaanHeaderIcon) pekerjaanHeaderIcon.innerHTML = mdIcon('task', 22);
@@ -442,6 +442,7 @@ document.getElementById('btn-cancel-report-form').addEventListener('click', func
 
   
 function resetPekerjaanForm() {
+      if (typeof createSubmitKeyValue_ !== 'undefined') createSubmitKeyValue_ = '';
       document.getElementById('form-subject').value = '';
       document.getElementById('form-description').value = '';
       if (formDescCounter) formDescCounter.textContent = '0/500';

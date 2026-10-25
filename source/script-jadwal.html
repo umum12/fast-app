@@ -39,7 +39,8 @@ var RIWAYAT_PERAN_ = [
 
 /** Rentang tanggal -> { dateFrom, dateTo } (yyyy-MM-dd, zona waktu perangkat). */
 function riwayatRangeDates_(key) {
-  var now = new Date(), to = ymd_(now), from = '';
+  // Audit #15: patokan tanggal = WIB (sama dengan server), bukan jam perangkat.
+  var now = new Date(Date.now() + 7 * 3600000 + new Date().getTimezoneOffset() * 60000), to = ymd_(now), from = '';
   if (key === 'today') from = to;
   else if (key === '7d') from = ymd_(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6));
   else if (key === '30d') from = ymd_(new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29));
@@ -97,6 +98,8 @@ function renderRiwayatFilterRow_() {
     { k: 'range', title: 'Pilih Tanggal', all: 'Tanggal', opts: RIWAYAT_RANGES_ },
     { k: 'status', title: 'Pilih Status', all: 'Status', opts: RIWAYAT_STATUS_ }
   ];
+  var subEl = document.getElementById('reports-card-subtitle');
+  if (subEl) subEl.textContent = role === 'fs' ? 'Pekerjaan yang Anda buat atau tangani' : 'Penugasan yang Anda buat';
   // "Peran" hanya bermakna untuk FS (Riwayat FS = dibuat ATAU ditangani).
   if (role === 'fs') defs.push({ k: 'peran', title: 'Peran Saya', all: 'Peran', opts: RIWAYAT_PERAN_ });
   row.innerHTML = '';
@@ -1605,12 +1608,12 @@ function renderContentManagementList_(list) {
     actions.className = 'cm-actions';
     var editBtn = document.createElement('button');
     editBtn.type = 'button';
-    editBtn.className = 'cm-btn';
+    editBtn.className = 'cm-btn'; editBtn.setAttribute('aria-label', 'Ubah konten');
     editBtn.innerHTML = mdIcon('edit', 14) + '<span class="cm-lbl">Ubah</span>';
     editBtn.addEventListener('click', function () { openContentForm_(c); });
     var deleteBtn = document.createElement('button');
     deleteBtn.type = 'button';
-    deleteBtn.className = 'cm-btn cm-danger';
+    deleteBtn.className = 'cm-btn cm-danger'; deleteBtn.setAttribute('aria-label', 'Hapus konten');
     deleteBtn.innerHTML = mdIcon('delete', 14) + '<span class="cm-lbl">Hapus</span>';
     deleteBtn.addEventListener('click', function () { confirmHapusContent_(c.contentId); });
     actions.appendChild(editBtn); actions.appendChild(deleteBtn);

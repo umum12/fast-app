@@ -331,6 +331,8 @@ var snackbarTimer = null;
  * (untuk konfirmasi penting). Pesan lama tanpa detail tidak berubah.
  */
 function showSnackbar(message, type, detail) {
+  // Audit #6: sesi tidak valid (akun dinonaktifkan / kode diganti) -> kembali ke layar login.
+  if (typeof message === 'string' && message.indexOf('Sesi tidak valid') === 0 && exitInvalidSession_(message)) return;
   var el = document.getElementById('snackbar');
   var t = type || 'info';
   el.className = 'snackbar-' + t + (detail ? ' snackbar-rich' : '');
@@ -667,6 +669,12 @@ var exitingApp_ = false;
 function closeTopLayer_() {
   function isShown(id) { var el = document.getElementById(id); return !!(el && el.classList.contains('show')); }
   if (isShown('photo-viewer')) { closePhotoViewer(); return true; }
+  // Sedang mengirim / memuat ulang: Back diabaikan (proses tidak boleh ditinggalkan di tengah jalan).
+  if (isShown('sending-overlay') || isShown('reload-overlay')) {
+    try { showSnackbar('Sedang memproses, mohon tunggu...', 'info'); } catch (e) {}
+    return true;
+  }
+  if (isShown('photo-source-overlay')) { document.getElementById('photo-source-overlay').classList.remove('show'); return true; }
   if (isShown('confirm-modal-overlay')) {
     var cancelBtn = document.getElementById('confirm-modal-cancel');
     if (cancelBtn && !cancelBtn.disabled) hideConfirmModal(); // sedang memproses: abaikan, jangan tutup
@@ -949,6 +957,24 @@ function handleLogout() {
   document.getElementById('input-access-code').value = '';
 }
 
+/** Audit #6: satu pintu untuk 'Sesi tidak valid' dari aksi apa pun. Return true bila ditangani. */
+function exitInvalidSession_(msg) {
+  var app = document.getElementById('screen-app');
+  if (!app || app.style.display === 'none') return false;
+  stopInactivityTimer();
+  clearSession();
+  if (typeof resetAllPageDataCache_ === 'function') resetAllPageDataCache_();
+  appBootstrap = null;
+  ['sending-overlay', 'reload-overlay'].forEach(function (id) {
+    var o = document.getElementById(id); if (o) o.classList.remove('show');
+  });
+  app.style.display = 'none';
+  document.getElementById('screen-login').style.display = 'flex';
+  document.getElementById('input-access-code').value = '';
+  document.getElementById('login-error').textContent = msg;
+  return true;
+}
+
 // ============================================================
 // AUTO-LOGOUT SETELAH 30 MENIT TIDAK ADA AKTIVITAS
 // ============================================================
@@ -1206,6 +1232,11 @@ if (btnReloadClose) btnReloadClose.addEventListener('click', closeReloadOverlay_
     var m = get_('fs_theme', 'light');
     var dark = m === 'dark' || (m === 'auto' && mq && mq.matches);
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    // Audit #18: warna bilah status browser mengikuti tema.
+    var tc = document.querySelector('meta[name="theme-color"]');
+    if (!tc) { tc = document.createElement('meta'); tc.name = 'theme-color'; tc.content = '#1F4E9C'; document.head.appendChild(tc); }
+    if (!tc.getAttribute('data-light')) tc.setAttribute('data-light', tc.content);
+    tc.content = dark ? '#0b1120' : tc.getAttribute('data-light');
   }
   function applyFont_() {
     var f = get_('fs_fontsize', 'normal');
@@ -1238,5 +1269,24 @@ if (btnReloadClose) btnReloadClose.addEventListener('click', closeReloadOverlay_
     if (mq.addEventListener) mq.addEventListener('change', onChange); else if (mq.addListener) mq.addListener(onChange);
   }
   applyTheme_(); applyFont_(); paint_();
+})();
+</script>
+<script>
+// Audit #17: penanda offline global (aplikasi wajib online; data cache tampil apa adanya).
+(function () {
+  var bar = null;
+  function show_(on) {
+    if (on && !bar) {
+      bar = document.createElement('div');
+      bar.id = 'offline-bar';
+      bar.setAttribute('role', 'status');
+      bar.textContent = 'Anda sedang offline — data yang tampil mungkin bukan yang terbaru.';
+      document.body.appendChild(bar);
+    }
+    if (bar) bar.classList.toggle('show', on);
+  }
+  window.addEventListener('offline', function () { show_(true); });
+  window.addEventListener('online', function () { show_(false); });
+  if (navigator.onLine === false) show_(true);
 })();
 </script>

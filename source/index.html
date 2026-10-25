@@ -246,7 +246,7 @@
                   <p class="card-header-title" id="buat-header-title" style="text-transform:uppercase; letter-spacing:0.02em;">Buat Pekerjaan</p>
                 </div>
                 <div class="card-header-row-actions">
-                  <button class="btn-icon" id="btn-cancel-report-form" type="button" aria-label="Reset"></button>
+                  <button class="btn-icon" id="btn-cancel-report-form" type="button" aria-label="Reset form" title="Reset form"></button>
                 </div>
               </div>
 
@@ -256,14 +256,14 @@
 
               <div class="form-group form-jenis-lantai-row">
                 <div class="form-jenis-lantai-col">
-                  <label class="form-label">Jenis</label>
+                  <label class="form-label" for="form-jenis">Jenis</label>
                   <div class="select-field-wrap">
                     <span class="select-field-icon" id="form-jenis-icon"></span>
                     <select id="form-jenis"></select>
                   </div>
                 </div>
                 <div class="form-jenis-lantai-col">
-                  <label class="form-label">Lantai</label>
+                  <label class="form-label" for="form-floor">Lantai</label>
                   <div class="select-field-wrap">
                     <span class="select-field-icon" id="form-floor-icon"></span>
                     <select id="form-floor">
@@ -294,7 +294,7 @@
               </div>
 
               <div class="form-group" id="form-assignment-mode-group" style="display:none;">
-                <label class="form-label">Mode Penugasan</label>
+                <label class="form-label" for="form-assignment-mode">Mode Penugasan</label>
                 <div class="select-field-wrap">
                   <span class="select-field-icon" id="form-mode-icon"></span>
                   <select id="form-assignment-mode" class="form-input">
@@ -314,12 +314,12 @@
               </div>
 
               <div class="form-group">
-                <label class="form-label" id="form-subject-label">Subjek (opsional)</label>
+                <label class="form-label" id="form-subject-label" for="form-subject">Subjek (opsional)</label>
                 <input id="form-subject" class="form-input" type="text" maxlength="100" placeholder="Contoh: Zona A">
               </div>
 
               <div class="form-group">
-                <label class="form-label" id="form-description-label" style="text-transform:uppercase; letter-spacing:0.04em; font-weight:600;">Keterangan</label>
+                <label class="form-label" id="form-description-label" for="form-description">Keterangan</label>
                 <textarea id="form-description" class="form-input" rows="4" maxlength="500" placeholder="Jelaskan secara singkat tentang pekerjaan ini..."></textarea>
                 <div class="char-counter" id="form-description-counter">0/500</div>
               </div>
@@ -360,12 +360,12 @@
                 <div class="card-header-icon" id="reports-header-icon"></div>
                 <div class="card-header-text">
                   <p class="card-header-title" id="reports-card-title">Riwayat Pekerjaan Saya</p>
-                  <p class="card-header-subtitle">Pekerjaan yang Anda buat atau tangani</p>
+                  <p class="card-header-subtitle" id="reports-card-subtitle">Pekerjaan yang Anda buat atau tangani</p>
                 </div>
               </div>
               <div class="search-input-wrap" style="margin-bottom:10px;">
                 <span id="reports-search-icon"></span>
-                <input id="reports-search" class="form-input" type="text" placeholder="Cari subjek atau keterangan...">
+                <input id="reports-search" class="form-input" type="text" aria-label="Cari laporan" placeholder="Cari subjek atau keterangan...">
               </div>
               <div class="rw-filter-row" id="riwayat-filter-row" role="group" aria-label="Filter riwayat"></div>
               <div id="my-reports-list"><div aria-busy="true"><span class="sr-only">Memuat riwayat</span><div class="skeleton-card"><div class="skeleton-card-main"><div class="skeleton-block skeleton-pill"></div><div class="skeleton-block skeleton-date"></div><div class="skeleton-person-row"><div class="skeleton-block skeleton-avatar"></div><div class="skeleton-person-lines"><div class="skeleton-block skeleton-line-name"></div><div class="skeleton-block skeleton-line-sub"></div></div></div></div><div class="skeleton-block skeleton-thumb"></div></div><div class="skeleton-card"><div class="skeleton-card-main"><div class="skeleton-block skeleton-pill"></div><div class="skeleton-block skeleton-date"></div><div class="skeleton-person-row"><div class="skeleton-block skeleton-avatar"></div><div class="skeleton-person-lines"><div class="skeleton-block skeleton-line-name"></div><div class="skeleton-block skeleton-line-sub"></div></div></div></div><div class="skeleton-block skeleton-thumb"></div></div></div></div>
@@ -482,7 +482,7 @@
               </div>
               <div class="search-input-wrap" style="margin-bottom:10px;">
                 <span id="activity-search-icon"></span>
-                <input id="activity-search" class="form-input" type="text" placeholder="Cari subjek atau keterangan...">
+                <input id="activity-search" class="form-input" type="text" aria-label="Cari aktivitas" placeholder="Cari subjek atau keterangan...">
               </div>
 
               <div id="activity-feed-list"><div aria-busy="true"><span class="sr-only">Memuat aktivitas</span><div class="skeleton-card"><div class="skeleton-card-main"><div class="skeleton-block skeleton-pill"></div><div class="skeleton-block skeleton-date"></div><div class="skeleton-person-row"><div class="skeleton-block skeleton-avatar"></div><div class="skeleton-person-lines"><div class="skeleton-block skeleton-line-name"></div><div class="skeleton-block skeleton-line-sub"></div></div></div></div><div class="skeleton-block skeleton-thumb"></div></div><div class="skeleton-card"><div class="skeleton-card-main"><div class="skeleton-block skeleton-pill"></div><div class="skeleton-block skeleton-date"></div><div class="skeleton-person-row"><div class="skeleton-block skeleton-avatar"></div><div class="skeleton-person-lines"><div class="skeleton-block skeleton-line-name"></div><div class="skeleton-block skeleton-line-sub"></div></div></div></div><div class="skeleton-block skeleton-thumb"></div></div></div></div>

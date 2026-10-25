@@ -374,8 +374,10 @@ function updateFormProgress() {
   if (desc) doneCount++;
   if (photoCount > 0) doneCount++;
 
-  var percent = Math.round((doneCount / 4) * 100);
-  progressEl.textContent = 'Progres: ' + percent + '% | ' + photoCount + ' Foto Terpilih';
+  // Audit #10: foto opsional -> progres hanya menghitung kolom wajib (Jenis, Lantai, Keterangan).
+  var requiredDone = (jenis ? 1 : 0) + (floor ? 1 : 0) + (desc ? 1 : 0);
+  var percent = Math.round((requiredDone / 3) * 100);
+  progressEl.textContent = 'Kolom wajib: ' + percent + '% | ' + photoCount + ' Foto (opsional)';
 }
 
 // ------------------- PHOTO SLOTS (foto kondisi awal) -------------------
@@ -394,6 +396,29 @@ function updateFormProgress() {
 var PHOTO_SLOT_CAPTIONS_ = ['Foto Kondisi Awal', 'Foto Hasil / Sesudah', 'Foto Detail Tambahan'];
 var SELESAI_PHOTO_CAPTIONS_UNUSED_ = 0;
 
+/** Audit #9: konfirmasi hapus foto; slot dikosongkan di tempat (foto lain TIDAK bergeser, caption tetap cocok). */
+/** Audit #7: kunci kirim — dipakai ulang saat 'Coba lagi', diganti baru setelah berhasil. */
+var createSubmitKeyValue_ = '';
+function createSubmitKey_() {
+  if (!createSubmitKeyValue_) {
+    createSubmitKeyValue_ = Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+  }
+  return createSubmitKeyValue_;
+}
+
+/** Audit #13: slot foto bisa difokus & dioperasikan keyboard/pembaca layar. */
+function makeSlotAccessible_(slot, caption, filled) {
+  slot.setAttribute('role', 'button');
+  slot.tabIndex = 0;
+  slot.setAttribute('aria-label', (filled ? 'Ganti ' : 'Tambah ') + (caption || 'foto').toLowerCase());
+  slot.addEventListener('keydown', function (e) {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target === slot) { e.preventDefault(); (slot.querySelector('.photo-thumb-inner') || slot).click(); }
+  });
+}
+function confirmRemovePhoto_(onYes) {
+  showConfirmModal('Hapus foto ini?', onYes, 'delete', false, null, { confirm: 'Ya, Hapus', cancel: 'Batal' });
+}
+
 function renderPhotoSlots() {
   var container = document.getElementById('photo-slots');
   container.innerHTML = '';
@@ -401,6 +426,7 @@ function renderPhotoSlots() {
   for (var i = 0; i < MAX_PHOTOS; i++) {
     var slot = document.createElement('div');
     slot.className = 'photo-slot-v2';
+    makeSlotAccessible_(slot, PHOTO_SLOT_CAPTIONS_[i], !!selectedPhotos[i]);
 
     if (selectedPhotos[i]) {
       var inner = document.createElement('div');
@@ -424,8 +450,7 @@ function renderPhotoSlots() {
       removeBtn.addEventListener('click', function (idx) {
         return function (e) {
           e.stopPropagation();
-          selectedPhotos.splice(idx, 1);
-          renderPhotoSlots();
+          confirmRemovePhoto_(function () { selectedPhotos[idx] = null; renderPhotoSlots(); });
         };
       }(i));
       slot.appendChild(removeBtn);
@@ -602,6 +627,7 @@ var performedAtEl = document.getElementById('form-performed-at');
     photos: selectedPhotos.filter(Boolean).map(function (p) {
       return { base64: p.base64, mimeType: p.mimeType };
     }),
+    submitKey: createSubmitKey_(),
     assignmentMode: assignmentMode,
     targetUserCode: (isPenugasan && assignmentMode === 'direct' && targetEl) ? targetEl.value : '',
     performedAt: (performedAtEl && performedAtEl.offsetParent !== null && performedAtEl.value) ? performedAtEl.value : ''
@@ -616,7 +642,10 @@ var performedAtEl = document.getElementById('form-performed-at');
   if (isPenugasan && assignmentMode === 'direct' && !data.targetUserCode) {
     setInlineError_(targetEl, 'Pilih petugas penerima.'); firstBad = firstBad || targetEl;
   }
-  if (firstBad) return;
+  if (firstBad) {
+    try { firstBad.scrollIntoView({ block: 'center', behavior: 'smooth' }); firstBad.focus({ preventScroll: true }); } catch (e) {}
+    return;
+  }
 
   var session = loadSession();
   var submitBtn = document.getElementById('btn-submit-report');
@@ -631,6 +660,7 @@ var performedAtEl = document.getElementById('form-performed-at');
         showSnackbar(response.error, 'error');
         return;
       }
+      createSubmitKeyValue_ = '';
       selectedPhotos = [];
       renderPhotoSlots();
       document.getElementById('form-subject').value = '';
@@ -734,6 +764,7 @@ function renderSelesaiPhotoSlots_() {
   for (var i = 0; i < MAX_PHOTOS; i++) {
     var slot = document.createElement('div');
     slot.className = 'photo-slot-v2';
+    makeSlotAccessible_(slot, SELESAI_PHOTO_CAPTIONS_[i], !!selesaiPhotos[i]);
     var open = (function (idx) { return function () { selesaiActiveSlot = idx; openPhotoSourceSheet('selesai-photo-input'); }; })(i);
     if (selesaiPhotos[i]) {
       var inner = document.createElement('div');
@@ -749,7 +780,7 @@ function renderSelesaiPhotoSlots_() {
       rm.textContent = '×';
       rm.setAttribute('aria-label', 'Hapus foto');
       rm.addEventListener('click', (function (idx) {
-        return function (e) { e.stopPropagation(); selesaiPhotos.splice(idx, 1); renderSelesaiPhotoSlots_(); };
+        return function (e) { e.stopPropagation(); confirmRemovePhoto_(function () { selesaiPhotos[idx] = null; renderSelesaiPhotoSlots_(); }); };
       })(i));
       slot.appendChild(rm);
     } else {
@@ -2038,7 +2069,7 @@ function renderKomentarForm_(p, canKirim) {
 
   wrap.innerHTML =
     '<div class="komentar-form">' +
-      '<textarea id="komentar-input" class="form-input" rows="1" maxlength="500" placeholder="Tulis komentar..."></textarea>' +
+      '<textarea id="komentar-input" aria-label="Tulis komentar" class="form-input" rows="1" maxlength="500" placeholder="Tulis komentar..."></textarea>' +
       '<button class="btn-primary" id="btn-komentar-kirim" type="button">Kirim</button>' +
     '</div>';
 
