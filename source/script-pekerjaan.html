@@ -929,7 +929,7 @@ function showPekerjaanSuccessCard(jenis) {
     subtextEl.textContent = isMandiri
       ? 'Pekerjaan ini bersifat mandiri dan otomatis ditandai selesai.'
       : (jenis === 'penugasan'
-        ? 'Menunggu diambil oleh Facility Support terkait.'
+        ? 'Belum diambil oleh Facility Support terkait.'
         : 'Menunggu ditindaklanjuti oleh Administrator.');
   }
   document.getElementById('buat-success-card').style.display = 'block';
@@ -2161,7 +2161,7 @@ document.addEventListener('visibilitychange', function () {
 var currentPekerjaanFilter = 'all';
 var PEKERJAAN_FILTERS = [
   { key: 'all', label: 'Semua' },
-  { key: 'TERBUKA', label: 'Menunggu Diambil' },
+  { key: 'TERBUKA', label: 'Belum Diambil' },
   { key: 'DIKERJAKAN', label: 'Dikerjakan' }
 ];
 
@@ -2402,7 +2402,7 @@ function doAmbilPekerjaan(pekerjaanId) {
 
 /**
  * PATCH — FIX bug "card tidak sinkron setelah Ambil" (status masih
- * tampil 'Menunggu Diambil', tombol Lepas tidak muncul di Detail sampai
+ * tampil 'Belum Diambil', tombol Lepas tidak muncul di Detail sampai
  * refresh manual). Akar masalah SEBELUMNYA: hanya tombol & field
  * p.status/p.handledBy yang ditambal manual — badge status di kartu,
  * p.statusLabel, p.canLepas, p.canAmbil TIDAK ikut diperbarui, membuat

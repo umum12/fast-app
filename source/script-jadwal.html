@@ -27,7 +27,7 @@ var RIWAYAT_RANGES_ = [
 ];
 var RIWAYAT_STATUS_ = [
   { key: '', label: 'Semua status' },
-  { key: 'TERBUKA', label: 'Menunggu Diambil' },
+  { key: 'TERBUKA', label: 'Belum Diambil' },
   { key: 'DIKERJAKAN', label: 'Dikerjakan' },
   { key: 'SELESAI', label: 'Selesai' }
 ];
@@ -669,7 +669,7 @@ function renderJadwalTable_(list, counts) {
   countsBar.innerHTML =
     '<div class="jk-count"><span class="jk-count-ico piket">' + mdIcon('shield', 20) + '</span><span class="jk-count-txt">' + counts.piket + ' Piket</span></div>' +
     '<span class="jk-count-sep">\u2022</span>' +
-    '<div class="jk-count"><span class="jk-count-txt">' + (counts.absen + counts.libur) + ' Kehadiran</span><span class="jk-count-ico hadir">' + mdIcon('personCheck', 20) + '</span></div>';
+    '<div class="jk-count"><span class="jk-count-txt">' + (counts.absen + counts.libur) + ' Ketidakhadiran</span><span class="jk-count-ico hadir">' + mdIcon('personCheck', 20) + '</span></div>';
 
   var today = todayDateStr_();
   var table = document.createElement('table');

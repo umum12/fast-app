@@ -736,20 +736,20 @@ html[data-theme="dark"] .floor-card .fv { color: #e5e7eb !important; }
     renderInsight(data);
   }
 
-  var STATUS_LABEL_ = { TERBUKA: 'Belum diambil', DIKERJAKAN: 'Belum selesai' };
+  var STATUS_LABEL_ = { TERBUKA: 'Belum Diambil', DIKERJAKAN: 'Belum selesai' };
 
   function renderStale(ins) {
     var body = document.getElementById('stale-body');
     var st = ins && ins.stale;
     if (!st) { body.innerHTML = ''; return; }
     document.getElementById('stale-subtitle').textContent =
-      'Belum diambil > ' + st.terbukaHours + ' jam, atau belum selesai > ' + st.dikerjakanHours + ' jam (semua periode)';
+      'Belum Diambil > ' + st.terbukaHours + ' jam, atau belum selesai > ' + st.dikerjakanHours + ' jam (semua periode)';
     if (!st.items.length) {
       body.innerHTML = '<div class="stale-ok"><span class="ms">check_circle</span>Semua pekerjaan tertangani tepat waktu.</div>';
       return;
     }
     var html = '<div class="stale-chips">' +
-      '<span class="stale-chip amber">' + st.terbukaCount + ' belum diambil</span>' +
+      '<span class="stale-chip amber">' + st.terbukaCount + ' Belum Diambil</span>' +
       '<span class="stale-chip rose">' + st.dikerjakanCount + ' belum selesai</span></div>';
     st.items.forEach(function (it) {
       var tone = it.status === 'DIKERJAKAN' ? 'rose' : 'amber';
