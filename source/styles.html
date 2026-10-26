@@ -3879,3 +3879,49 @@ html[data-theme="dark"] .selesai-id { color: #f87171; }
 html[data-theme="dark"] .cm-status.cm-tayang { color: #4ade80; }
 
 /* ==DARK-GEN-END== */
+
+/* ===== Jadwal Kolaborasi: kalender mingguan, filter, salin ===== */
+.jk-toolbar { margin-top: 12px; display: flex; flex-direction: column; gap: 10px; }
+.jk-tb-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.jk-seg { display: inline-flex; background: var(--md-surface-container); border: 1px solid var(--color-border); border-radius: 999px; padding: 3px; }
+.jk-seg-btn { border: 0; background: transparent; font: inherit; font-size: 13px; font-weight: 600; color: var(--color-text-muted); padding: 7px 16px; border-radius: 999px; cursor: pointer; min-height: 34px; }
+.jk-seg-btn.active { background: var(--color-surface); color: var(--color-primary); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.jk-copy-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 13px; font-weight: 600; padding: 0 14px; min-height: 36px; border-radius: 999px; cursor: pointer; }
+.jk-copy-btn:active { background: var(--md-surface-container); }
+.jk-fchips { justify-content: flex-start; flex-wrap: wrap; }
+.jk-fchip { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text-muted); font: inherit; font-size: 13px; font-weight: 600; padding: 0 14px; min-height: 34px; border-radius: 999px; cursor: pointer; }
+.jk-fchip.active { background: var(--color-primary-soft); border-color: var(--color-primary); color: var(--color-primary); }
+.jk-cal { margin-top: 10px; }
+.jk-cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.jk-cal-label { font-size: 13.5px; font-weight: 700; color: var(--color-text); text-align: center; }
+.jk-cal-navbtn { width: 40px; height: 40px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.jk-cal-navbtn:disabled { opacity: .35; cursor: default; }
+.jk-cal-day { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: 14px; margin-bottom: 6px; background: var(--color-surface); }
+.jk-cal-day.is-weekend { background: var(--md-surface-container); }
+.jk-cal-day.is-today { border-color: var(--color-primary); box-shadow: inset 3px 0 0 var(--color-primary); }
+.jk-cal-day.is-past { opacity: .55; }
+.jk-cal-date { flex: none; width: 38px; display: flex; flex-direction: column; align-items: center; line-height: 1.1; padding-top: 2px; }
+.jk-cal-date .dn { font-size: 11px; font-weight: 700; color: var(--color-text-muted); text-transform: uppercase; }
+.jk-cal-date .dd { font-size: 20px; font-weight: 700; color: var(--color-text); }
+.jk-cal-day.is-today .jk-cal-date .dd { color: var(--color-primary); }
+.jk-cal-items { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-height: 38px; }
+.jk-cal-empty { color: var(--color-text-faint, #94a3b8); font-size: 14px; }
+.jk-chip { display: inline-flex; flex-direction: column; align-items: flex-start; border: 0; font: inherit; text-align: left; padding: 6px 12px; border-radius: 12px; cursor: pointer; min-height: 38px; max-width: 100%; }
+.jk-chip b { font-size: 13px; font-weight: 700; }
+.jk-chip small { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .02em; opacity: .9; }
+.jk-cal-hint { text-align: center; color: var(--color-text-muted); font-size: 13px; padding: 10px 0 4px; }
+.jk-chip-ok { flex-direction: row; align-items: center; gap: 6px; cursor: default; background: var(--status-completed-bg); color: var(--status-completed-fg); }
+.jk-chip-ok b { font-size: 13px; }
+
+.draft-note { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 12px; padding: 10px 12px; border-radius: 12px; background: var(--color-primary-soft); border: 1px solid var(--color-border); font-size: 12.5px; color: var(--color-text); }
+.draft-note-btn { flex: none; border: 0; background: transparent; color: var(--color-primary); font: inherit; font-size: 12.5px; font-weight: 700; cursor: pointer; min-height: 32px; padding: 0 6px; }
+
+.tl { list-style: none; margin: 8px 0 0; padding: 0; }
+.tl-item { display: flex; gap: 10px; align-items: flex-start; position: relative; }
+.tl-dot { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--color-primary-soft); color: var(--color-primary); display: inline-flex; align-items: center; justify-content: center; }
+.tl-dot-now { background: var(--status-neutral-bg); border: 2px dashed var(--color-primary); width: 18px; height: 18px; margin: 2px; box-sizing: border-box; }
+.tl-body { display: flex; flex-direction: column; min-width: 0; padding-bottom: 2px; }
+.tl-body b { font-size: 13.5px; color: var(--color-text); }
+.tl-body small { font-size: 12px; color: var(--color-text-muted); }
+.tl-gap { margin: 2px 0 2px 10px; padding: 2px 0 2px 20px; border-left: 2px solid var(--color-border); font-size: 11.5px; font-weight: 600; color: var(--color-text-muted); list-style: none; }
+.tl-total { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--color-border); font-size: 12.5px; font-weight: 700; color: var(--color-text); list-style: none; }

@@ -27,6 +27,7 @@ var RIWAYAT_RANGES_ = [
 ];
 var RIWAYAT_STATUS_ = [
   { key: '', label: 'Semua status' },
+  { key: 'BELUM_SELESAI', label: 'Belum selesai' },
   { key: 'TERBUKA', label: 'Belum Diambil' },
   { key: 'DIKERJAKAN', label: 'Dikerjakan' },
   { key: 'SELESAI', label: 'Selesai' }
@@ -617,24 +618,326 @@ function filterJadwalDalamJendela_(list) {
 }
 
 function renderJadwalPiket_(fullList) {
-  var inWindow = filterJadwalDalamJendela_(fullList);
-  var windowDays = (appBootstrap && appBootstrap.scheduleDisplayWindowDays) || 21;
-  var windowWeeks = Math.round(windowDays / 7);
+  jkWindowList_ = filterJadwalDalamJendela_(fullList);
+  jkRender_();
+}
 
+
+// ============================================================
+// JADWAL KOLABORASI — tampilan Kalender mingguan, filter, dan salin ke WhatsApp
+// (hanya frontend; data & hak akses tidak berubah)
+// ============================================================
+var jkView_ = 'kalender';          // 'kalender' | 'tabel'
+var jkWeekIdx_ = 0;                // minggu ke-n dalam jendela (0 = minggu yang memuat hari ini)
+var jkFilter_ = { mine: false, user: '' };
+var jkWindowList_ = [];            // entri dalam jendela 21 hari (belum difilter)
+try { var jkSavedView_ = localStorage.getItem('fa_jk_view'); if (jkSavedView_ === 'tabel' || jkSavedView_ === 'kalender') jkView_ = jkSavedView_; } catch (e) { /* abaikan */ }
+
+function jkUtc_(s) { var p = String(s).split('-'); return Date.UTC(+p[0], +p[1] - 1, +p[2]); }
+function jkYmd_(ms) { var d = new Date(ms); return d.getUTCFullYear() + '-' + pad2_(d.getUTCMonth() + 1) + '-' + pad2_(d.getUTCDate()); }
+function jkMondayMs_(s) { var ms = jkUtc_(s); var dow = new Date(ms).getUTCDay(); return ms - ((dow + 6) % 7) * 86400000; }
+function jkShortDate_(ms) { var d = new Date(ms); return d.getUTCDate() + ' ' + INDO_MONTH_SHORT_[d.getUTCMonth()]; }
+
+/** Daftar entri setelah filter "Saya"/petugas. */
+function jkFiltered_() {
+  var me = appBootstrap && appBootstrap.currentUser ? appBootstrap.currentUser.userCode : '';
+  return jkWindowList_.filter(function (e) {
+    if (jkFilter_.mine) return e.userCode === me;
+    if (jkFilter_.user) return e.userCode === jkFilter_.user;
+    return true;
+  });
+}
+
+/** Jumlah minggu (Senin–Minggu) yang menutupi jendela tampilan. */
+function jkWeekCount_() {
+  var windowDays = (appBootstrap && appBootstrap.scheduleDisplayWindowDays) || 21;
+  var start = jkMondayMs_(todayDateStr_());
+  var end = jkUtc_(todayDateStr_()) + windowDays * 86400000;
+  return Math.max(1, Math.floor((end - start) / (7 * 86400000)) + 1);
+}
+
+function jkSortEntries_(a, b) {
+  var ka = jkKubuOfJenis_(a.jenis) === 'piket' ? 0 : 1, kb = jkKubuOfJenis_(b.jenis) === 'piket' ? 0 : 1;
+  if (ka !== kb) return ka - kb;
+  return String(a.userName).localeCompare(String(b.userName));
+}
+
+function jkRender_() {
+  if (jkFilter_.user && !jkWindowList_.some(function (e) { return e.userCode === jkFilter_.user; })) jkFilter_.user = '';
+  var list = jkFiltered_();
   var counts = { piket: 0, absen: 0, libur: 0 };
-  inWindow.forEach(function (e) {
+  list.forEach(function (e) {
     if (e.jenis === 'libur_pengganti') counts.libur++;
     else if (jkKubuOfJenis_(e.jenis) === 'piket') counts.piket++;
     else counts.absen++;
   });
-
+  var windowDays = (appBootstrap && appBootstrap.scheduleDisplayWindowDays) || 21;
+  var filtered = jkFilter_.mine || jkFilter_.user;
   document.getElementById('jadwal-piket-summary').innerHTML =
     '<div class="jk-info">' +
-      '<span>' + mdIcon('reminder', 16) + windowWeeks + ' minggu ke depan</span>' +
-      '<span>' + mdIcon('description', 16) + inWindow.length + ' jadwal aktif</span>' +
+      '<span>' + mdIcon('reminder', 16) + Math.round(windowDays / 7) + ' minggu ke depan</span>' +
+      '<span>' + mdIcon('description', 16) + list.length + (filtered ? ' jadwal (terfilter)' : ' jadwal aktif') + '</span>' +
     '</div>';
 
-  renderJadwalTable_(inWindow, counts);
+  jkRenderToolbar_();
+
+  var tableWrap = document.getElementById('jadwal-piket-table');
+  var cal = document.getElementById('jadwal-piket-cal');
+  var emptyEl = document.getElementById('jadwal-piket-empty');
+  if (jkView_ === 'tabel') {
+    cal.style.display = 'none';
+    renderJadwalTable_(list, counts);
+  } else {
+    tableWrap.style.display = 'none';
+    if (emptyEl) emptyEl.style.display = 'none';
+    jkRenderCounts_(list.length ? counts : null, tableWrap);
+    cal.style.display = '';
+    jkRenderCalendar_(list);
+  }
+}
+
+function jkRenderCounts_(counts, beforeEl) {
+  var countsBar = document.getElementById('jk-counts');
+  if (!counts) { if (countsBar) countsBar.style.display = 'none'; return; }
+  if (!countsBar) {
+    countsBar = document.createElement('div');
+    countsBar.id = 'jk-counts';
+    countsBar.className = 'jk-counts';
+    beforeEl.parentNode.insertBefore(countsBar, beforeEl);
+  }
+  countsBar.style.display = '';
+  countsBar.innerHTML =
+    '<div class="jk-count"><span class="jk-count-ico piket">' + mdIcon('shield', 20) + '</span><span class="jk-count-txt">' + counts.piket + ' Piket</span></div>' +
+    '<span class="jk-count-sep">•</span>' +
+    '<div class="jk-count"><span class="jk-count-txt">' + (counts.absen + counts.libur) + ' Ketidakhadiran</span><span class="jk-count-ico hadir">' + mdIcon('personCheck', 20) + '</span></div>';
+}
+
+function jkRenderToolbar_() {
+  var bar = document.getElementById('jk-toolbar');
+  if (!bar) return;
+  var role = appBootstrap && appBootstrap.currentUser ? appBootstrap.currentUser.role : '';
+  bar.style.display = '';
+  bar.innerHTML = '';
+
+  var row1 = document.createElement('div');
+  row1.className = 'jk-tb-row';
+  var seg = document.createElement('div');
+  seg.className = 'jk-seg';
+  seg.setAttribute('role', 'group');
+  seg.setAttribute('aria-label', 'Tampilan jadwal');
+  [['kalender', 'Kalender'], ['tabel', 'Tabel']].forEach(function (v) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'jk-seg-btn' + (jkView_ === v[0] ? ' active' : '');
+    b.setAttribute('aria-pressed', jkView_ === v[0] ? 'true' : 'false');
+    b.textContent = v[1];
+    b.addEventListener('click', function () {
+      if (jkView_ === v[0]) return;
+      jkView_ = v[0];
+      try { localStorage.setItem('fa_jk_view', jkView_); } catch (e) { /* abaikan */ }
+      jkRender_();
+    });
+    seg.appendChild(b);
+  });
+  row1.appendChild(seg);
+
+  var copyBtn = document.createElement('button');
+  copyBtn.type = 'button';
+  copyBtn.className = 'jk-copy-btn';
+  copyBtn.setAttribute('aria-label', 'Salin jadwal untuk WhatsApp');
+  copyBtn.innerHTML = mdIcon('copy', 16) + '<span>Salin</span>';
+  copyBtn.addEventListener('click', jkCopySchedule_);
+  row1.appendChild(copyBtn);
+  bar.appendChild(row1);
+
+  var row2 = document.createElement('div');
+  row2.className = 'jk-tb-row jk-fchips';
+  function chip(label, active, onClick, withArrow) {
+    var c = document.createElement('button');
+    c.type = 'button';
+    c.className = 'jk-fchip' + (active ? ' active' : '');
+    c.setAttribute('aria-pressed', active ? 'true' : 'false');
+    c.innerHTML = '<span></span>' + (withArrow ? mdIcon('chevronDown', 16) : '');
+    c.firstChild.textContent = label;
+    c.addEventListener('click', onClick);
+    row2.appendChild(c);
+  }
+  chip('Semua', !jkFilter_.mine && !jkFilter_.user, function () { jkFilter_ = { mine: false, user: '' }; jkRender_(); });
+  if (role !== 'demo') {
+    chip('Jadwal Saya', jkFilter_.mine, function () { jkFilter_ = { mine: true, user: '' }; jkRender_(); });
+  }
+  // Petugas: hanya yang punya jadwal dalam jendela (daftar pendek & relevan).
+  var seen = {}, people = [];
+  jkWindowList_.forEach(function (e) { if (!seen[e.userCode]) { seen[e.userCode] = 1; people.push({ key: e.userCode, label: e.userName }); } });
+  people.sort(function (a, b) { return String(a.label).localeCompare(String(b.label)); });
+  if (people.length > 1) {
+    var cur = people.filter(function (p) { return p.key === jkFilter_.user; })[0];
+    chip(cur ? cur.label : 'Petugas', !!cur, function () {
+      if (typeof openFilterPicker_ !== 'function') return;
+      openFilterPicker_('Pilih Petugas', [{ key: '', label: 'Semua petugas' }].concat(people), jkFilter_.user, function (key) {
+        jkFilter_ = { mine: false, user: key };
+        jkRender_();
+      });
+    }, true);
+  }
+  bar.appendChild(row2);
+}
+
+function jkRenderCalendar_(list) {
+  var cal = document.getElementById('jadwal-piket-cal');
+  cal.innerHTML = '';
+  var weeks = jkWeekCount_();
+  if (jkWeekIdx_ > weeks - 1) jkWeekIdx_ = weeks - 1;
+  if (jkWeekIdx_ < 0) jkWeekIdx_ = 0;
+  var startMs = jkMondayMs_(todayDateStr_()) + jkWeekIdx_ * 7 * 86400000;
+  var endMs = startMs + 6 * 86400000;
+
+  var nav = document.createElement('div');
+  nav.className = 'jk-cal-nav';
+  var prev = document.createElement('button');
+  prev.type = 'button'; prev.className = 'jk-cal-navbtn'; prev.setAttribute('aria-label', 'Minggu sebelumnya');
+  prev.innerHTML = mdIcon('chevronLeft', 22); prev.disabled = jkWeekIdx_ === 0;
+  prev.addEventListener('click', function () { jkWeekIdx_--; jkRender_(); });
+  var next = document.createElement('button');
+  next.type = 'button'; next.className = 'jk-cal-navbtn'; next.setAttribute('aria-label', 'Minggu berikutnya');
+  next.innerHTML = mdIcon('chevronRight', 22); next.disabled = jkWeekIdx_ >= weeks - 1;
+  next.addEventListener('click', function () { jkWeekIdx_++; jkRender_(); });
+  var label = document.createElement('div');
+  label.className = 'jk-cal-label';
+  label.textContent = jkShortDate_(startMs) + ' – ' + jkShortDate_(endMs) + (jkWeekIdx_ === 0 ? ' · Minggu ini' : '');
+  nav.appendChild(prev); nav.appendChild(label); nav.appendChild(next);
+  cal.appendChild(nav);
+
+  var byDay = {};
+  list.forEach(function (e) { (byDay[e.tanggal] = byDay[e.tanggal] || []).push(e); });
+  var allByDay = {};
+  jkWindowList_.forEach(function (e) { (allByDay[e.tanggal] = allByDay[e.tanggal] || []).push(e); });
+  var filtered = !!(jkFilter_.mine || jkFilter_.user);
+  var today = todayDateStr_();
+  var dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+
+  for (var i = 0; i < 7; i++) {
+    var ms = startMs + i * 86400000;
+    var ds = jkYmd_(ms);
+    var dow = new Date(ms).getUTCDay();
+    var row = document.createElement('div');
+    row.className = 'jk-cal-day' + (ds === today ? ' is-today' : '') + (dow === 0 || dow === 6 ? ' is-weekend' : '') + (ds < today ? ' is-past' : '');
+
+    var dateCol = document.createElement('div');
+    dateCol.className = 'jk-cal-date';
+    var dn = document.createElement('span'); dn.className = 'dn'; dn.textContent = dayNames[dow];
+    var dd = document.createElement('span'); dd.className = 'dd'; dd.textContent = new Date(ms).getUTCDate();
+    dateCol.appendChild(dn); dateCol.appendChild(dd);
+    row.appendChild(dateCol);
+
+    var items = document.createElement('div');
+    items.className = 'jk-cal-items';
+    var entries = (byDay[ds] || []).slice().sort(jkSortEntries_);
+    // "Tim Lengkap" (sama aturan dengan Carousel): hari kerja Senin–Jumat, belum lewat, tanpa
+    // ketidakhadiran/libur pengganti dan bukan libur nasional. Tidak ditampilkan saat filter aktif
+    // (data tim disaring sehingga tidak bisa dipastikan).
+    var showLengkap = !filtered && ds >= today && dow >= 1 && dow <= 5 && !(allByDay[ds] || []).some(function (e) {
+      return jkKubuOfJenis_(e.jenis) === 'absen' || e.jenis === 'piket_libur_nasional';
+    });
+    if (showLengkap) {
+      var ok = document.createElement('span');
+      ok.className = 'jk-chip jk-chip-ok';
+      ok.innerHTML = mdIcon('personCheck', 16);
+      var okt = document.createElement('b'); okt.textContent = 'Tim Lengkap';
+      ok.appendChild(okt);
+      items.appendChild(ok);
+    }
+    if (!entries.length && !showLengkap) {
+      var em = document.createElement('span');
+      em.className = 'jk-cal-empty';
+      em.textContent = ds < today ? '' : '—';
+      items.appendChild(em);
+    }
+    entries.forEach(function (e) {
+      var colors = JADWAL_JENIS_COLOR[e.jenis] || { bg: 'var(--status-neutral-bg)', fg: 'var(--status-neutral-fg)' };
+      var chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'jk-chip';
+      chip.style.background = colors.bg;
+      chip.style.color = colors.fg;
+      var nm = document.createElement('b'); nm.textContent = e.userName;
+      var jn = document.createElement('small'); jn.textContent = e.jenisLabel;
+      chip.appendChild(nm); chip.appendChild(jn);
+      chip.addEventListener('click', function () { openJadwalDetail_(e); });
+      items.appendChild(chip);
+    });
+    row.appendChild(items);
+    cal.appendChild(row);
+  }
+
+  if (!list.length) {
+    var hint = document.createElement('div');
+    hint.className = 'jk-cal-hint';
+    hint.textContent = (jkFilter_.mine || jkFilter_.user) ? 'Tidak ada jadwal yang cocok dengan filter.' : 'Belum ada jadwal dalam beberapa minggu ke depan.';
+    cal.appendChild(hint);
+  }
+}
+
+/** Teks siap tempel ke WhatsApp untuk periode yang sedang dilihat (minggu di Kalender, seluruh jendela di Tabel). */
+function jkBuildShareText_() {
+  var list = jkFiltered_();
+  var title, from = null, to = null;
+  if (jkView_ === 'kalender') {
+    var startMs = jkMondayMs_(todayDateStr_()) + jkWeekIdx_ * 7 * 86400000;
+    from = jkYmd_(startMs); to = jkYmd_(startMs + 6 * 86400000);
+    title = jkShortDate_(startMs) + ' – ' + jkShortDate_(startMs + 6 * 86400000);
+    list = list.filter(function (e) { return e.tanggal >= from && e.tanggal <= to; });
+  } else {
+    var windowDays = (appBootstrap && appBootstrap.scheduleDisplayWindowDays) || 21;
+    title = Math.round(windowDays / 7) + ' minggu ke depan';
+  }
+  var who = jkFilter_.mine ? ' (Jadwal Saya)' : '';
+  if (jkFilter_.user) {
+    var m = list.concat(jkWindowList_).filter(function (e) { return e.userCode === jkFilter_.user; })[0];
+    who = m ? ' (' + m.userName + ')' : '';
+  }
+  if (!list.length) return '';
+
+  var days = {};
+  list.forEach(function (e) { (days[e.tanggal] = days[e.tanggal] || []).push(e); });
+  var lines = ['*Jadwal Kolaborasi' + who + '*', title, ''];
+  Object.keys(days).sort().forEach(function (ds) {
+    lines.push('*' + formatJadwalDateFull_(ds) + '*');
+    var byJenis = {}, order = [];
+    days[ds].slice().sort(jkSortEntries_).forEach(function (e) {
+      if (!byJenis[e.jenis]) { byJenis[e.jenis] = { label: e.jenisLabel, names: [] }; order.push(e.jenis); }
+      byJenis[e.jenis].names.push(e.userName + (e.catatan ? ' (' + String(e.catatan).replace(/\s+/g, ' ').trim() + ')' : ''));
+    });
+    order.forEach(function (j) { lines.push('• ' + byJenis[j].label + ': ' + byJenis[j].names.join(', ')); });
+    lines.push('');
+  });
+  while (lines.length && lines[lines.length - 1] === '') lines.pop();
+  return lines.join('\n');
+}
+
+function jkCopyText_(text, done) {
+  function legacy() {
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text; ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;';
+      document.body.appendChild(ta); ta.select();
+      var ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      done(!!ok);
+    } catch (e) { done(false); }
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function () { done(true); }, legacy);
+  } else { legacy(); }
+}
+
+function jkCopySchedule_() {
+  var text = jkBuildShareText_();
+  if (!text) { showSnackbar('Tidak ada jadwal untuk disalin pada tampilan ini.', 'info'); return; }
+  jkCopyText_(text, function (ok) {
+    showSnackbar(ok ? 'Jadwal disalin. Tempel di WhatsApp.' : 'Gagal menyalin. Coba lagi.', ok ? 'success' : 'error');
+  });
 }
 
 function renderJadwalTable_(list, counts) {
@@ -652,7 +955,8 @@ function renderJadwalTable_(list, counts) {
       container.parentNode.insertBefore(emptyEl, container.nextSibling);
     }
     var windowDays = (appBootstrap && appBootstrap.scheduleDisplayWindowDays) || 21;
-    emptyEl.innerHTML = '<div class="empty-state-icon">' + mdIcon('calendarCheck', 22) + '</div>Belum ada jadwal dalam ' + Math.round(windowDays / 7) + ' minggu ke depan.';
+    emptyEl.innerHTML = '<div class="empty-state-icon">' + mdIcon('calendarCheck', 22) + '</div>' +
+      ((jkFilter_.mine || jkFilter_.user) ? 'Tidak ada jadwal yang cocok dengan filter.' : 'Belum ada jadwal dalam ' + Math.round(windowDays / 7) + ' minggu ke depan.');
     emptyEl.style.display = '';
     return;
   }

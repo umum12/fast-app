@@ -39,16 +39,61 @@ function renderActivityTabs() {
 
 var aktivitasReqSeq_ = 0;
 
+// Chip cepat di bawah kolom cari: Hari ini / 7 hari terakhir (kelompok tanggal) dan Belum selesai (status).
+// Dapat dimatikan dengan mengetuk lagi. Memengaruhi daftar dari server (bukan hanya yang termuat).
+var activityQuick_ = { range: '', status: '' };
+var ACTIVITY_QUICK_ = [
+  { group: 'range', value: 'today', label: 'Hari ini' },
+  { group: 'range', value: '7d', label: '7 hari terakhir' },
+  { group: 'status', value: 'BELUM_SELESAI', label: 'Belum selesai' }
+];
+
+function renderActivityQuick_() {
+  var row = document.getElementById('activity-quick-row');
+  if (!row) return;
+  row.innerHTML = '';
+  ACTIVITY_QUICK_.forEach(function (d) {
+    var active = activityQuick_[d.group] === d.value;
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'rw-chip' + (active ? ' active' : '');
+    b.setAttribute('aria-pressed', active ? 'true' : 'false');
+    b.setAttribute('data-quick', d.value);
+    b.textContent = d.label;
+    b.addEventListener('click', function () {
+      activityQuick_[d.group] = active ? '' : d.value;
+      renderActivityQuick_();
+      renderAktivitasFiltered();
+    });
+    row.appendChild(b);
+  });
+}
+
 function currentAktivitasParams_() {
   var q = (document.getElementById('activity-search').value || '').trim();
   var arah = currentActivityFilter === 'all' ? '' : currentActivityFilter;
-  return { arah: arah, q: q, key: feedKey_(arah, q.toLowerCase()) };
+  var extra = {};
+  if (activityQuick_.status) extra.status = activityQuick_.status;
+  if (activityQuick_.range && typeof riwayatRangeDates_ === 'function') {
+    var r = riwayatRangeDates_(activityQuick_.range);
+    if (r.dateFrom) { extra.dateFrom = r.dateFrom; extra.dateTo = r.dateTo; }
+  }
+  // Kunci cache memuat filter cepat (tanggal memakai nama rentang, bukan tanggal, agar stabil).
+  var qk = (activityQuick_.range || activityQuick_.status) ? '#' + activityQuick_.range + '|' + activityQuick_.status : '';
+  return { arah: arah, q: q, extra: extra, key: feedKey_(arah, q.toLowerCase()) + qk };
+}
+
+function aktivitasFetchParams_(prm, offset) {
+  var p = { view: 'aktivitas', arah: prm.arah, q: prm.q, limit: FEED_PAGE_SIZE_, offset: offset };
+  for (var k in prm.extra) p[k] = prm.extra[k];
+  return p;
 }
 
 function loadPekerjaanAktivitas(force) {
   var session = loadSession();
   if (!session) return;
   renderActivityTabs();
+  renderActivityQuick_();
 
   var prm = currentAktivitasParams_();
   var container = document.getElementById('activity-feed-list');
@@ -72,7 +117,7 @@ function loadPekerjaanAktivitas(force) {
   else if (!cached) renderListSkeleton_('activity-feed-list', 3, prm.q ? 'Mencari aktivitas...' : 'Memuat aktivitas tim...');
 
   var seq = ++aktivitasReqSeq_;
-  fetchFeedPage_({ view: 'aktivitas', arah: prm.arah, q: prm.q, limit: FEED_PAGE_SIZE_, offset: 0 }, function (data) {
+  fetchFeedPage_(aktivitasFetchParams_(prm, 0), function (data) {
     if (seq !== aktivitasReqSeq_) return; // filter/pencarian sudah berganti
     if (isDefault) persistSet_('aktivitas', { list: data.pekerjaan, total: data.total, hasMore: data.hasMore });
     // Tidak berubah -> cukup tandai segar, tanpa gambar ulang (tanpa kedip, scroll tetap).
@@ -93,9 +138,9 @@ function loadPekerjaanAktivitas(force) {
 function renderAktivitasFeed_(entry, prm) {
   document.getElementById('activity-feed-list').dataset.feedKey = prm.key;
   renderFeedList_(document.getElementById('activity-feed-list'), entry,
-    '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('inbox', 26) + '</div>' + (prm.q ? 'Tidak ada aktivitas yang cocok.' : 'Belum ada aktivitas.') + '</div>',
+    '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('inbox', 26) + '</div>' + ((prm.q || activityQuick_.range || activityQuick_.status) ? 'Tidak ada aktivitas yang cocok.' : 'Belum ada aktivitas.') + '</div>',
     function (done, fail) {
-      fetchFeedPage_({ view: 'aktivitas', arah: prm.arah, q: prm.q, limit: FEED_PAGE_SIZE_, offset: entry.list.length }, function (data) {
+      fetchFeedPage_(aktivitasFetchParams_(prm, entry.list.length), function (data) {
         if (pageDataCache.pekerjaanAktivitasByKey[prm.key] !== entry) { return; } // cache sudah diganti
         entry.list = entry.list.concat(data.pekerjaan);
         entry.total = data.total;

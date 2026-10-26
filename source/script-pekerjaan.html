@@ -339,6 +339,13 @@ function initPekerjaanForm() {
   }
 
   attachFormBuatListenersOnce_();
+  attachDraftListenersOnce_();
+  // Draft: pulihkan isian (tampilkan catatan hanya bila form masih kosong = baru dibuka/dimuat ulang).
+  var wasPristine_ = !draftValue_('form-description').trim() && !draftValue_('form-subject').trim() && !draftValue_('form-floor');
+  var draftApplied_ = draftApply_();
+  var noteEl_ = draftNoteEl_();
+  if (noteEl_ && draftApplied_ && wasPristine_) noteEl_.style.display = 'flex';
+  else if (noteEl_ && !draftApplied_) noteEl_.style.display = 'none';
   ['form-floor', 'form-description', 'form-target-user'].forEach(function (id) { clearInlineError_(document.getElementById(id)); });
 
   applyBuatModeUI_();
@@ -349,6 +356,133 @@ function initPekerjaanForm() {
   updateFormProgress();
 }
 
+
+
+// ------------------------------------------------------------
+// DRAFT OTOMATIS form Buat Pekerjaan (disimpan di perangkat ini saja)
+// Isian teks, jenis, lantai, dan penerima tersimpan otomatis supaya tidak hilang bila aplikasi
+// tertutup/jaringan putus. Foto TIDAK ikut disimpan (terlalu besar). Dihapus saat berhasil kirim,
+// saat Hapus draft, saat keluar (logout), dan otomatis setelah 3 hari.
+// ------------------------------------------------------------
+var DRAFT_PREFIX_ = 'fa_draft:v1:';
+var DRAFT_MAX_AGE_MS_ = 3 * 24 * 60 * 60 * 1000;
+var draftApplying_ = false;
+var draftTimer_ = null;
+
+function draftKey_() {
+  var s = (typeof loadSession === 'function') ? loadSession() : null;
+  return (s && s.accessCode) ? DRAFT_PREFIX_ + String(s.accessCode).trim().toUpperCase() : null;
+}
+
+function draftRead_() {
+  try {
+    var k = draftKey_(); if (!k) return null;
+    var raw = localStorage.getItem(k); if (!raw) return null;
+    var o = JSON.parse(raw);
+    if (!o || !o.t || (Date.now() - o.t) > DRAFT_MAX_AGE_MS_) { localStorage.removeItem(k); return null; }
+    return o;
+  } catch (e) { return null; }
+}
+
+function draftRemove_() {
+  try { var k = draftKey_(); if (k) localStorage.removeItem(k); } catch (e) { /* abaikan */ }
+}
+
+function draftClearAll_() {
+  try {
+    var del = [];
+    for (var i = 0; i < localStorage.length; i++) { var key = localStorage.key(i); if (key && key.indexOf(DRAFT_PREFIX_) === 0) del.push(key); }
+    del.forEach(function (key) { localStorage.removeItem(key); });
+  } catch (e) { /* abaikan */ }
+}
+
+function draftValue_(id) { var el = document.getElementById(id); return el ? el.value : ''; }
+
+function draftSaveNow_() {
+  if (draftApplying_ || buatPrefillContext) return;   // bukan saat memulihkan / mode Penyelesaian
+  if (!document.getElementById('form-jenis')) return;
+  var d = {
+    t: Date.now(),
+    jenis: draftValue_('form-jenis'), floor: draftValue_('form-floor'),
+    subject: draftValue_('form-subject'), desc: draftValue_('form-description'),
+    mode: draftValue_('form-assignment-mode'), target: draftValue_('form-target-user')
+  };
+  // Hanya bila ada isian teks/penerima (jenis & lantai saja tidak dihitung sebagai draft).
+  if (!(d.subject.trim() || d.desc.trim() || d.target)) { draftRemove_(); return; }
+  try { var k = draftKey_(); if (k) localStorage.setItem(k, JSON.stringify(d)); } catch (e) { /* kuota/terblokir: abaikan */ }
+}
+
+function draftSaveSoon_() {
+  if (draftApplying_) return;
+  clearTimeout(draftTimer_);
+  draftTimer_ = setTimeout(draftSaveNow_, 500);
+}
+
+/** Terapkan draft ke form (dipanggil setelah opsi Jenis/Lantai/Petugas dibangun). Mengembalikan true bila ada draft diterapkan. */
+function draftApply_() {
+  var d = draftRead_();
+  if (!d) return false;
+  draftApplying_ = true;
+  try {
+    function setSel(id, v) {
+      var el = document.getElementById(id);
+      if (!el || !v) return;
+      for (var i = 0; i < el.options.length; i++) { if (el.options[i].value === v) { el.value = v; return; } }
+    }
+    setSel('form-jenis', d.jenis);
+    setSel('form-floor', d.floor);
+    setSel('form-assignment-mode', d.mode);
+    setSel('form-target-user', d.target);
+    var sub = document.getElementById('form-subject'); if (sub && d.subject) sub.value = String(d.subject).slice(0, 100);
+    var desc = document.getElementById('form-description');
+    if (desc && d.desc) {
+      desc.value = String(d.desc).slice(0, 500);
+      var cnt = document.getElementById('form-description-counter'); if (cnt) cnt.textContent = desc.value.length + '/500';
+    }
+  } finally { draftApplying_ = false; }
+  return true;
+}
+
+function draftNoteEl_() {
+  var note = document.getElementById('form-draft-note');
+  if (note) return note;
+  var card = document.getElementById('buat-form-card');
+  if (!card) return null;
+  note = document.createElement('div');
+  note.id = 'form-draft-note';
+  note.className = 'draft-note';
+  note.style.display = 'none';
+  note.innerHTML = '<span class="draft-note-txt">Draft dipulihkan dari perangkat ini. Foto perlu ditambahkan lagi.</span>' +
+    '<button type="button" class="draft-note-btn">Hapus draft</button>';
+  note.querySelector('.draft-note-btn').addEventListener('click', function () {
+    clearTimeout(draftTimer_);
+    draftRemove_();
+    ['form-subject', 'form-description'].forEach(function (id) { var el = document.getElementById(id); if (el) el.value = ''; });
+    var cnt = document.getElementById('form-description-counter'); if (cnt) cnt.textContent = '0/500';
+    var fl = document.getElementById('form-floor'); if (fl) fl.value = '';
+    var tg = document.getElementById('form-target-user'); if (tg) tg.value = '';
+    note.style.display = 'none';
+    initPekerjaanForm();
+    showSnackbar('Draft dihapus.', 'info');
+  });
+  var header = card.querySelector('.card-header-row');
+  if (header && header.parentNode === card) card.insertBefore(note, header.nextSibling); else card.insertBefore(note, card.firstChild);
+  return note;
+}
+
+var draftListenersAttached_ = false;
+function attachDraftListenersOnce_() {
+  if (draftListenersAttached_) return;
+  draftListenersAttached_ = true;
+  ['form-jenis', 'form-floor', 'form-subject', 'form-description', 'form-assignment-mode', 'form-target-user'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', draftSaveSoon_);
+    el.addEventListener('change', draftSaveSoon_);
+  });
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') { clearTimeout(draftTimer_); draftSaveNow_(); } });
+  window.addEventListener('pagehide', function () { clearTimeout(draftTimer_); draftSaveNow_(); });
+}
 
 function resetBuatPrefillContext_() {
   buatPrefillContext = null;
@@ -661,6 +795,9 @@ var performedAtEl = document.getElementById('form-performed-at');
         return;
       }
       createSubmitKeyValue_ = '';
+      clearTimeout(draftTimer_);
+      draftRemove_();
+      var dn_ = document.getElementById('form-draft-note'); if (dn_) dn_.style.display = 'none';
       selectedPhotos = [];
       renderPhotoSlots();
       document.getElementById('form-subject').value = '';
@@ -1092,6 +1229,8 @@ function resetAllPageDataCache_() {
   pageDataCache.pekerjaanAktivitasByKey = {};
   pageDataCache.jadwalAktif = null;
   persistClearAll_();
+  clearTimeout(draftTimer_);
+  draftClearAll_();
   komentarCache_ = {};
   prefetchDone_ = false;
 }
@@ -1517,6 +1656,88 @@ function formatDetailDateTime_(ddmmyyyyHHmm) {
 }
 
 
+
+// ------------------------------------------------------------
+// GARIS WAKTU di Detail Laporan (dibuat -> diambil -> selesai) + durasi tiap tahap.
+// Murni tampilan dari field yang sudah ada; tidak mengubah data.
+// ------------------------------------------------------------
+var TL_MONTHS_ = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+function tlEsc_(t) {
+  return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; });
+}
+/** "27/10/2026 14:30" (WIB) -> epoch ms; NaN bila tidak valid. */
+function tlParseMs_(s) {
+  var m = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})/.exec(String(s || ''));
+  if (!m) return NaN;
+  return Date.UTC(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]) - 7 * 3600000;
+}
+function tlFmt_(s) {
+  var m = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}):(\d{2})/.exec(String(s || ''));
+  return m ? (+m[1]) + ' ' + TL_MONTHS_[+m[2] - 1] + ' ' + m[3] + ' · ' + m[4] + ':' + m[5] : '';
+}
+/** Selisih ms -> "45 mnt", "3 j 20 mnt", "2 hr 4 j"; '' bila tidak masuk akal. */
+function tlDur_(ms) {
+  if (!isFinite(ms) || ms < 0) return '';
+  var m = Math.round(ms / 60000);
+  if (m < 1) return 'kurang dari 1 mnt';
+  if (m < 60) return m + ' mnt';
+  var h = Math.floor(m / 60), rm = m % 60;
+  if (h < 24) return h + ' j' + (rm ? ' ' + rm + ' mnt' : '');
+  var d = Math.floor(h / 24), rh = h % 24;
+  return d + ' hr' + (rh ? ' ' + rh + ' j' : '');
+}
+
+/** Kembalikan HTML garis waktu, atau '' bila tidak ada tahap yang berarti. */
+function buildDetailTimeline_(p) {
+  var ev = [];
+  var createdMs = tlParseMs_(p.createdAt);
+  var isMandiri = p.arah === 'mandiri';
+  ev.push({ icon: 'add', title: isMandiri ? 'Dicatat' : 'Dibuat', who: p.createdByName, at: p.createdAt, ms: createdMs, done: true });
+
+  if (p.arah === 'mandiri') {
+    if (p.performedAt && p.performedAt !== p.createdAt) {
+      ev.unshift({ icon: 'checkCircle', title: 'Dikerjakan', who: p.createdByName, at: p.performedAt, ms: tlParseMs_(p.performedAt), done: true });
+    }
+  } else {
+    var released = p.status === 'TERBUKA' && p.releasedAt;
+    if (released) {
+      ev.push({ icon: 'close', title: 'Dilepas', who: p.releasedByName || p.releasedBy, at: p.releasedAt, ms: tlParseMs_(p.releasedAt), done: true });
+    }
+    if (p.status !== 'TERBUKA' && p.startedAt) {
+      ev.push({ icon: 'personAdd', title: 'Diambil', who: p.handledByName, at: p.startedAt, ms: tlParseMs_(p.startedAt), done: true });
+    }
+    if (p.status === 'SELESAI' && p.completedAt) {
+      ev.push({ icon: 'checkCircle', title: 'Selesai', who: p.completedByName || p.handledByName, at: p.completedAt, ms: tlParseMs_(p.completedAt), done: true });
+    }
+  }
+  ev.sort(function (a, b) { return (a.ms || 0) - (b.ms || 0); });
+
+  // Tahap yang sedang berjalan (belum ada kejadian berikutnya).
+  var now = Date.now();
+  var last = ev[ev.length - 1];
+  var pending = '';
+  if (p.arah !== 'mandiri') {
+    if (p.status === 'TERBUKA') pending = 'Belum diambil · menunggu ' + tlDur_(now - last.ms);
+    else if (p.status === 'DIKERJAKAN') pending = 'Sedang dikerjakan · ' + tlDur_(now - last.ms);
+  }
+  if (ev.length < 2 && !pending) return '';
+
+  var html = '<div class="detail-block detail-timeline"><div class="detail-block-label">' + mdIcon('reminder', 14) + 'Garis Waktu</div><ol class="tl">';
+  ev.forEach(function (e, i) {
+    var gap = (i > 0 && !isMandiri) ? tlDur_(e.ms - ev[i - 1].ms) : '';
+    if (gap) html += '<li class="tl-gap">' + gap + '</li>';
+    html += '<li class="tl-item"><span class="tl-dot">' + mdIcon(e.icon, 12) + '</span><div class="tl-body"><b>' + tlEsc_(e.title) + '</b>' +
+      '<small>' + tlEsc_((e.who ? e.who + ' · ' : '') + tlFmt_(e.at)) + '</small></div></li>';
+  });
+  if (pending) html += '<li class="tl-item tl-now"><span class="tl-dot tl-dot-now"></span><div class="tl-body"><b>' + tlEsc_(pending) + '</b></div></li>';
+  // Total waktu hingga selesai.
+  if (p.status === 'SELESAI' && ev.length > 1 && !isMandiri) {
+    var total = tlDur_(ev[ev.length - 1].ms - createdMs);
+    if (total) html += '<li class="tl-total">Total: ' + total + ' sejak dibuat</li>';
+  }
+  return html + '</ol></div>';
+}
+
 function openPekerjaanDetail(p, opts) {
   opts = opts || {};
   var jenisInfo = JENIS_PEKERJAAN_BADGE[p.jenis] || { label: p.jenis, cls: 'badge-neutral' };
@@ -1564,6 +1785,7 @@ function openPekerjaanDetail(p, opts) {
     (p.subject ? '<div class="detail-block detail-block-subject"><div class="detail-block-label">' + mdIcon('bookmark', 14) + 'Subjek</div><div class="detail-subject">' + p.subject + '</div></div>' : '') +
     '<div class="detail-block detail-block-desc"><div class="detail-block-label">' + mdIcon('description', 14) + 'Keterangan</div><div class="activity-detail-desc">' + p.description + '</div></div>' +
     completionNotesHtml +
+    buildDetailTimeline_(p) +
     initialPhotosHtml +
     completionPhotosHtml;
 
