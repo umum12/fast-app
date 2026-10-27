@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,500,0..1,0&icon_names=account_circle,add,add_a_photo,add_circle,admin_panel_settings,alarm,apartment,apps,architecture,arrow_back,assignment_turned_in,badge,bar_chart,bookmark,build,build_circle,calculate,calendar_month,calendar_today,chat_bubble,check_circle,chevron_left,chevron_right,cleaning_services,close,cloud_upload,dark_mode,dashboard,database,delete,description,developer_board,download,edit,edit_calendar,edit_note,event_available,event_busy,group,handshake,history,home,image,inbox,info,integration_instructions,inventory_2,key,keyboard_arrow_down,keyboard_arrow_up,landscape,layers,light_mode,lightbulb,list,location_on,lock,login,logout,monitoring,more_horiz,more_vert,notifications,notifications_active,notifications_off,palette,person,person_add,person_check,person_remove,person_search,photo_camera,photo_library,post_add,refresh,save,savings,schedule,search,send,sensors,settings,shield,sync,system_update,task,task_alt,terminal,trophy,tune,upload,verified,verified_user,visibility,warning,work&display=block" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,500,0..1,0&icon_names=account_circle,add,add_a_photo,add_circle,add_to_drive,admin_panel_settings,alarm,apartment,apps,architecture,arrow_back,assignment_turned_in,badge,bar_chart,bookmark,build,build_circle,calculate,calendar_month,calendar_today,chat_bubble,check_circle,chevron_left,chevron_right,cleaning_services,close,cloud_upload,dark_mode,dashboard,database,delete,description,developer_board,download,edit,edit_calendar,edit_note,error,event_available,event_busy,expand_more,file_download,folder_open,group,handshake,history,home,image,inbox,info,integration_instructions,inventory_2,key,keyboard_arrow_down,keyboard_arrow_up,landscape,layers,light_mode,lightbulb,list,location_on,lock,login,logout,monitoring,more_horiz,more_vert,notifications,notifications_active,notifications_off,open_in_new,palette,person,person_add,person_check,person_remove,person_search,photo_camera,photo_library,picture_as_pdf,post_add,refresh,save,savings,schedule,search,send,sensors,settings,shield,sync,system_update,task,task_alt,terminal,trophy,tune,upload,verified,verified_user,visibility,warning,work&display=block" rel="stylesheet">
 <title>Unduh PDF Rekap</title>
 <style>
   :root {
@@ -58,73 +58,91 @@
   }
   .login-icon { display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
 
-  #screen-main { display: none; max-width: 540px; margin: 0 auto; padding: 16px 16px 40px; }
+  body { background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); min-height: 100vh; }
+  .ms { font-family: 'Material Symbols Outlined'; font-weight: normal; font-style: normal; font-size: 20px; line-height: 1;
+        display: inline-block; vertical-align: middle; font-variation-settings: 'FILL' 0, 'wght' 500; flex-shrink: 0; }
 
-  .page-header { display: flex; align-items: center; gap: 10px; padding: 6px 2px 16px; }
-  .page-header h1 { font-size: 18px; margin: 0; flex: 1; }
-  .back-link {
-    color: var(--color-primary); font-size: 13px; font-weight: 600; text-decoration: none;
-    cursor: pointer; white-space: nowrap;
-  }
+  #screen-main { display: none; max-width: 460px; margin: 0 auto; padding: 14px 12px 40px; }
+  .shell { background: #fff; border-radius: 24px; box-shadow: 0 12px 32px rgba(15,23,42,0.10); border: 1px solid #f1f5f9; overflow: hidden; }
 
-  .card {
-    background: var(--color-surface); border-radius: var(--shape-lg); padding: 18px;
-    margin-bottom: 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);
-  }
-  .card h2 { font-size: 14px; margin: 0 0 14px; }
+  /* Header: garis aksen warna logo (biru, hijau, merah) */
+  .page-header { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 20px 18px 14px; border-bottom: 1px solid #f1f5f9; background: #fff; }
+  .page-header::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+    background: linear-gradient(90deg, #1F4E9C 0 33.33%, #9CC247 33.33% 66.66%, #D6312B 66.66% 100%); }
+  .ph-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .ph-icon { width: 38px; height: 38px; border-radius: 12px; background: #fef2f2; color: #D6312B; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .page-header h1 { font-size: 16px; line-height: 1.2; margin: 0; font-weight: 700; color: #1e293b; }
+  .page-header p { margin: 2px 0 0; font-size: 11.5px; color: #94a3b8; }
+  .back-link { display: inline-flex; align-items: center; gap: 4px; color: #1F4E9C; font-size: 12px; font-weight: 600; text-decoration: none;
+    cursor: pointer; white-space: nowrap; background: #eff6ff; padding: 7px 12px; border-radius: 10px; }
+  .back-link:active { background: #dbeafe; }
+  .back-link .ms { font-size: 16px; }
 
-  .form-group { margin-bottom: 14px; }
-  .form-label { display: block; font-size: 13px; color: var(--color-text-muted); margin-bottom: 6px; }
-  .form-input {
-    width: 100%; min-height: var(--touch-min); border: 1.5px solid var(--md-outline);
-    border-radius: var(--shape-sm); padding: 0 14px; font-size: 14px; font-family: inherit;
-    background: #fff; color: var(--color-text);
-  }
-  select.form-input {
-    appearance: none; -webkit-appearance: none;
-    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%236b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
-    background-repeat: no-repeat; background-position: right 12px center; background-size: 18px; padding-right: 38px;
-  }
+  .content { padding: 18px; display: flex; flex-direction: column; gap: 22px; }
+  .sec-title { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; font-weight: 700; color: #64748b; }
+  .sec-title .ms { font-size: 16px; }
 
-  .btn-action {
-    width: 100%; min-height: 54px; border-radius: var(--shape-full); border: none;
-    font-size: 14px; font-weight: 700; cursor: pointer; display: flex; align-items: center;
-    justify-content: center; gap: 10px; margin-bottom: 10px; transition: opacity .15s ease, transform .15s ease;
-  }
-  .btn-action:active { transform: scale(0.98); }
+  .card { background: rgba(248,250,252,.8); border: 1px solid #f1f5f9; border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; }
+  .badge-soft { font-size: 10px; font-weight: 600; background: #e2e8f0; color: #475569; padding: 2px 9px; border-radius: 999px; }
+
+  .form-group { margin: 0; display: flex; flex-direction: column; gap: 5px; }
+  .form-label { display: block; font-size: 12px; font-weight: 600; color: #475569; }
+  .form-input { width: 100%; min-height: 46px; border: 1px solid #e2e8f0; border-radius: 14px; padding: 0 14px; font-size: 13px; font-weight: 500;
+    font-family: inherit; background: #fff; color: #334155; transition: border-color .15s, box-shadow .15s; }
+  .form-input:focus { outline: none; border-color: #1F4E9C; box-shadow: 0 0 0 3px rgba(31,78,156,.18); }
+  select.form-input { appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 38px;
+    background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
+    background-repeat: no-repeat; background-position: right 12px center; background-size: 18px; }
+
+  /* Tanggal: tampilan terformat + input date asli (transparan) di atas ikon kalender */
+  .date-wrap { position: relative; display: flex; align-items: center; }
+  .date-wrap .date-fmt { padding-right: 44px; font-weight: 600; color: #1e293b; cursor: pointer; }
+  .date-wrap .date-fmt.is-empty { font-weight: 500; color: #94a3b8; }
+  .date-wrap .date-ico { position: absolute; right: 14px; color: #1F4E9C; pointer-events: none; }
+  .date-wrap input[type="date"] { position: absolute; right: 0; top: 0; width: 46px; height: 100%; opacity: 0; cursor: pointer; }
+  .date-wrap input[type="date"]::-webkit-calendar-picker-indicator { cursor: pointer; width: 100%; height: 100%; }
+
+  .actions { display: flex; flex-direction: column; gap: 6px; }
+  .btn-action { width: 100%; min-height: 52px; border-radius: 16px; border: none; font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center;
+    justify-content: center; gap: 10px; box-shadow: 0 4px 10px rgba(15,23,42,.14); transition: opacity .15s ease, transform .15s ease, box-shadow .15s ease; font-family: inherit; }
+  .btn-action > span { display: inline-flex; align-items: center; justify-content: center; gap: 10px; }
+  .btn-action:active { transform: scale(0.985); }
   .btn-action:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
-  .btn-action.device { background: var(--color-primary); color: #fff; }
-  .btn-action.drive { background: #16a34a; color: #fff; }
+  .btn-action.device { background: #1F4E9C; color: #fff; }
+  .btn-action.drive { background: #9CC247; color: #1f2d05; }
+  .btn-action.drive .spinner-sm { border-color: rgba(31,45,5,.3); border-top-color: #1f2d05; }
+  .action-hint { font-size: 11px; color: #94a3b8; text-align: center; margin: 0 0 12px; padding: 0 8px; line-height: 1.45; }
 
-  .action-hint { font-size: 11.5px; color: var(--color-text-faint); text-align: center; margin: -4px 0 14px; line-height: 1.4; }
-
-  .status-box {
-    border-radius: var(--shape-sm); padding: 12px 14px; font-size: 13px; margin-top: 4px; display: none;
-  }
+  .status-box { border-radius: 14px; padding: 12px 14px; font-size: 13px; display: none; }
   .status-box.show { display: block; }
-  .status-box.info { background: var(--color-primary-soft); color: #1e40af; }
+  .status-box.info { background: #eff6ff; color: #1e40af; }
   .status-box.success { background: #f0fdf4; color: #15803d; }
   .status-box.error { background: #fef2f2; color: #b91c1c; }
 
-
-  .history-list { display: flex; flex-direction: column; gap: 2px; }
-  .history-row {
-    display: flex; align-items: center; gap: 12px; padding: 11px 4px;
-    border-bottom: 1px solid var(--color-border); cursor: pointer; text-decoration: none; color: inherit;
-  }
-  .history-row:last-child { border-bottom: none; }
-  .history-row:active { background: #f9fafb; }
-  .history-icon {
-    width: 36px; height: 36px; min-width: 36px; border-radius: 10px;
-    background: #fef2f2; color: #b91c1c; display: flex; align-items: center; justify-content: center;
-  }
-  .history-text { flex: 1; min-width: 0; }
-  .history-filename {
-    font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .history-date { font-size: 11.5px; color: var(--color-text-faint); margin-top: 1px; }
-  .history-empty { text-align: center; color: var(--color-text-muted); font-size: 13px; padding: 16px 0; }
-  .history-loading { text-align: center; color: var(--color-text-muted); font-size: 13px; padding: 16px 0; }
+  .history { padding-top: 16px; border-top: 1px solid #f1f5f9; }
+  .history-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+  .history-head .sec-title { color: #334155; }
+  .history-head .sec-title .ms { color: #f59e0b; }
+  .badge-red { font-size: 10px; font-weight: 600; background: #fef2f2; color: #D6312B; border: 1px solid #fecaca; padding: 2px 9px; border-radius: 999px; }
+  .history-sub { font-size: 11px; color: #94a3b8; margin: 0 0 12px; }
+  .history-list { display: flex; flex-direction: column; gap: 8px; }
+  .history-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px; background: #fff; border: 1px solid #f1f5f9;
+    border-radius: 14px; text-decoration: none; color: inherit; transition: background .15s, border-color .15s; }
+  .history-row:hover { background: #f8fafc; border-color: #bfdbfe; }
+  .history-row:active { background: #f1f5f9; }
+  .history-icon { width: 34px; height: 34px; min-width: 34px; border-radius: 10px; background: #fef2f2; color: #D6312B; display: flex; align-items: center; justify-content: center; }
+  .history-left { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1; }
+  .history-text { min-width: 0; }
+  .history-filename { font-size: 12.5px; font-weight: 600; color: #334155; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .history-date { display: flex; align-items: center; gap: 4px; font-size: 10.5px; color: #94a3b8; margin-top: 2px; }
+  .history-date .ms { font-size: 12px; }
+  .tag-auto { font-size: 9.5px; font-weight: 700; color: #4a6a10; background: rgba(156,194,71,.25); padding: 1px 7px; border-radius: 999px; margin-left: 4px; }
+  .history-open { color: #94a3b8; display: flex; }
+  .history-row:hover .history-open { color: #1F4E9C; }
+  .history-empty { text-align: center; color: #64748b; font-size: 13px; padding: 16px 0; }
+  .history-loading { text-align: center; color: #64748b; font-size: 13px; padding: 16px 0; }
 
   .spinner-sm {
     width: 15px; height: 15px; border: 2px solid rgba(255,255,255,0.4);
@@ -175,69 +193,93 @@
   </div>
 
   <div id="screen-main">
+   <div class="shell">
     <div class="page-header">
-      <h1>📄 Unduh PDF Rekap</h1>
-      <a class="back-link" id="btn-back-to-app">← Kembali</a>
+      <div class="ph-left">
+        <div class="ph-icon"><span class="ms">picture_as_pdf</span></div>
+        <div>
+          <h1>Unduh PDF Rekap</h1>
+          <p>Filter &amp; Ekspor Laporan</p>
+        </div>
+      </div>
+      <a class="back-link" id="btn-back-to-app"><span class="ms">arrow_back</span><span>Kembali</span></a>
     </div>
 
-    <div class="card">
-      <h2>Filter Data</h2>
+    <div class="content">
+      <div class="card">
+        <div class="card-head">
+          <h2 class="sec-title"><span class="ms" style="color:#1F4E9C;">tune</span> Filter Data</h2>
+          <span class="badge-soft">Aktif</span>
+        </div>
+
         <div class="form-group" id="filter-scope-group" style="display:none;">
-        <label class="form-label">Cakupan Data</label>
-        <select id="filter-scope" class="form-input">
-          <option value="">Penugasan yang saya buat</option>
-          <option value="all_team">Seluruh aktivitas tim</option>
-        </select>
+          <label class="form-label" for="filter-scope">Cakupan Data</label>
+          <select id="filter-scope" class="form-input">
+            <option value="">Penugasan yang saya buat</option>
+            <option value="all_team">Seluruh aktivitas tim</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="filter-jenis">Jenis Pekerjaan</label>
+          <select id="filter-jenis" class="form-input"><option value="">Semua</option></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="filter-floor">Lantai</label>
+          <select id="filter-floor" class="form-input"><option value="">Semua Lantai</option></select>
+        </div>
+
+        <div class="form-group" id="filter-owner-group">
+          <label class="form-label" for="filter-owner">Petugas (Dibuat oleh)</label>
+          <select id="filter-owner" class="form-input"><option value="">Semua Petugas</option></select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="filter-date-from-fmt">Dari Tanggal</label>
+          <div class="date-wrap">
+            <input id="filter-date-from-fmt" class="form-input date-fmt is-empty" type="text" readonly placeholder="Pilih tanggal">
+            <span class="ms date-ico">calendar_month</span>
+            <input id="filter-date-from" type="date" aria-label="Dari Tanggal">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="filter-date-to-fmt">Sampai Tanggal</label>
+          <div class="date-wrap">
+            <input id="filter-date-to-fmt" class="form-input date-fmt is-empty" type="text" readonly placeholder="Pilih tanggal">
+            <span class="ms date-ico">calendar_month</span>
+            <input id="filter-date-to" type="date" aria-label="Sampai Tanggal">
+          </div>
+        </div>
       </div>
 
-      <div class="form-group">
-        <label class="form-label">Jenis Pekerjaan</label>
-        <select id="filter-jenis" class="form-input"><option value="">Semua</option></select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Lantai</label>
-        <select id="filter-floor" class="form-input"><option value="">Semua Lantai</option></select>
+      <div class="actions">
+        <h2 class="sec-title" style="margin-bottom:6px;"><span class="ms" style="color:#65a30d;">download</span> Pilih Tujuan Unduhan</h2>
+
+        <button class="btn-action device" id="btn-download-device">
+          <span id="device-btn-content"><span class="ms">file_download</span><span>Unduh ke Perangkat</span></span>
+        </button>
+        <p class="action-hint">File PDF langsung tersimpan di perangkat Anda (Downloads). Tidak disimpan ke Google Drive.</p>
+
+        <button class="btn-action drive" id="btn-save-drive">
+          <span id="drive-btn-content"><span class="ms">add_to_drive</span><span>Simpan ke Google Drive</span></span>
+        </button>
+        <p class="action-hint">File tersimpan di folder Drive aplikasi &amp; dapat dibagikan via tautan.</p>
+
+        <div class="status-box" id="status-box"></div>
       </div>
 
-      <div class="form-group" id="filter-owner-group">
-        <label class="form-label">Petugas (Dibuat oleh)</label>
-        <select id="filter-owner" class="form-input"><option value="">Semua Petugas</option></select>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Dari Tanggal</label>
-        <input id="filter-date-from" class="form-input" type="date">
-      </div>
-      <div class="form-group">
-        <label class="form-label">Sampai Tanggal</label>
-        <input id="filter-date-to" class="form-input" type="date">
+      <div class="history">
+        <div class="history-head">
+          <h2 class="sec-title"><span class="ms">folder_open</span> Riwayat PDF Tersimpan</h2>
+          <span class="badge-red">10 file terakhir</span>
+        </div>
+        <p class="history-sub">Termasuk hasil rekap mingguan otomatis</p>
+        <div class="history-list" id="pdf-history-list">
+          <div class="history-loading">Memuat riwayat...</div>
+        </div>
       </div>
     </div>
-
-
-  <div class="card">
-      <h2>Pilih Tujuan Unduhan</h2>
-
-      <button class="btn-action device" id="btn-download-device">
-        <span id="device-btn-content">⬇️ Unduh ke Perangkat</span>
-      </button>
-      <p class="action-hint">File PDF langsung tersimpan di perangkat Anda (Downloads). Tidak disimpan ke Google Drive.</p>
-
-      <button class="btn-action drive" id="btn-save-drive">
-        <span id="drive-btn-content">☁️ Simpan ke Google Drive</span>
-      </button>
-      <p class="action-hint">File tersimpan di folder Drive aplikasi &amp; dapat dibagikan via tautan.</p>
-
-      <div class="status-box" id="status-box"></div>
-    </div>
-
-    <div class="card">
-      <h2>📁 Riwayat PDF Tersimpan</h2>
-      <p style="font-size:12px; color:var(--color-text-faint); margin:-8px 0 12px;">10 file terakhir — termasuk hasil rekap mingguan otomatis</p>
-      <div class="history-list" id="pdf-history-list">
-        <div class="history-loading">Memuat riwayat...</div>
-      </div>
-    </div>
+   </div>
   </div>
 
 <script>
@@ -338,12 +380,23 @@ function bootstrapPage(isManualLogin) {
       row.href = f.url;
       row.target = '_blank';
       row.rel = 'noopener';
-      row.innerHTML =
-        '<span class="history-icon">📄</span>' +
-        '<div class="history-text">' +
-          '<div class="history-filename">' + f.fileName + '</div>' +
-          '<div class="history-date">' + f.createdAt + '</div>' +
-        '</div>';
+
+      var left = document.createElement('div'); left.className = 'history-left';
+      var icon = document.createElement('span'); icon.className = 'history-icon';
+      icon.innerHTML = '<span class="ms">picture_as_pdf</span>';
+      var text = document.createElement('div'); text.className = 'history-text';
+      var nm = document.createElement('div'); nm.className = 'history-filename'; nm.textContent = f.fileName;
+      var dt = document.createElement('div'); dt.className = 'history-date';
+      dt.innerHTML = '<span class="ms">schedule</span>';
+      var dtText = document.createElement('span'); dtText.textContent = f.createdAt; dt.appendChild(dtText);
+      if (/^Laporan-M\d-\d{4}-\d{2}\.pdf$/.test(f.fileName)) {
+        var tag = document.createElement('span'); tag.className = 'tag-auto'; tag.textContent = 'Mingguan'; dt.appendChild(tag);
+      }
+      text.appendChild(nm); text.appendChild(dt);
+      left.appendChild(icon); left.appendChild(text);
+      var open = document.createElement('span'); open.className = 'history-open';
+      open.innerHTML = '<span class="ms" style="font-size:18px;">open_in_new</span>';
+      row.appendChild(left); row.appendChild(open);
       container.appendChild(row);
     });
   }
@@ -396,9 +449,36 @@ function bootstrapPage(isManualLogin) {
     if (isAdminOrDemo && saved.ownerCode) document.getElementById('filter-owner').value = saved.ownerCode;
     if (saved.dateFrom) document.getElementById('filter-date-from').value = saved.dateFrom;
     if (saved.dateTo) document.getElementById('filter-date-to').value = saved.dateTo;
+    updateFormattedDate('filter-date-from');
+    updateFormattedDate('filter-date-to');
   }
 
 
+
+  // Tampilan tanggal terformat (mis. "Selasa, 27 Okt 2026"); nilai asli tetap di input type=date.
+  var DAYS_ID = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  var MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
+
+  function updateFormattedDate(dateId) {
+    var input = document.getElementById(dateId);
+    var fmt = document.getElementById(dateId + '-fmt');
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(input.value || '');
+    if (!m) { fmt.value = ''; fmt.classList.add('is-empty'); return; }
+    var d = new Date(+m[1], +m[2] - 1, +m[3]);
+    fmt.value = DAYS_ID[d.getDay()] + ', ' + String(d.getDate()).padStart(2, '0') + ' ' + MONTHS_ID[d.getMonth()] + ' ' + d.getFullYear();
+    fmt.classList.remove('is-empty');
+  }
+
+  function openDatePicker(dateId) {
+    var input = document.getElementById(dateId);
+    try { if (input.showPicker) { input.showPicker(); return; } } catch (e) { /* abaikan */ }
+    input.focus();
+  }
+
+  ['filter-date-from', 'filter-date-to'].forEach(function (id) {
+    document.getElementById(id).addEventListener('change', function () { updateFormattedDate(id); });
+    document.getElementById(id + '-fmt').addEventListener('click', function () { openDatePicker(id); });
+  });
 
   function getFilters() {
     return {

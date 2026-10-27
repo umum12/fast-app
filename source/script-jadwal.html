@@ -228,13 +228,14 @@ function renderRiwayatFeed_(entry, q, cacheKey) {
 // JADWAL PIKET (Collaborative Schedule) — Patch 10.x Bagian 2
 // ============================================================
 
-var JK_PURPLE_ = { bg: 'var(--status-info-bg)', fg: 'var(--status-info-fg)' };
-var JK_RED_ = { bg: 'var(--status-alert-bg)', fg: 'var(--status-alert-fg)' };
-var JK_GREEN_ = { bg: 'var(--status-completed-bg)', fg: 'var(--status-completed-fg)' };
+// Warna mengikuti logo header: biru (#1F4E9C) untuk Piket, merah (#D6312B) untuk Ketidakhadiran,
+// hijau (#9CC247) untuk Tim Lengkap.
+var JK_PIKET_ = { bg: 'var(--jk-piket-bg)', fg: 'var(--jk-piket-fg)' };
+var JK_ABSEN_ = { bg: 'var(--jk-absen-bg)', fg: 'var(--jk-absen-fg)' };
 var JADWAL_JENIS_COLOR = {
-  piket_sabtu: JK_PURPLE_, piket_minggu: JK_PURPLE_, piket_libur_nasional: JK_PURPLE_, tugas_khusus: JK_PURPLE_,
-  libur_pengganti: JK_GREEN_,
-  cuti: JK_RED_, izin: JK_RED_, sakit: JK_RED_, alpa: JK_RED_
+  piket_sabtu: JK_PIKET_, piket_minggu: JK_PIKET_, piket_libur_nasional: JK_PIKET_, tugas_khusus: JK_PIKET_,
+  libur_pengganti: JK_ABSEN_,
+  cuti: JK_ABSEN_, izin: JK_ABSEN_, sakit: JK_ABSEN_, alpa: JK_ABSEN_
 };
 // Kubu pada form: PIKET vs ABSEN (Libur Pengganti ikut kubu ABSEN)
 var JK_PIKET_JENIS_ = ['piket_sabtu', 'piket_minggu', 'piket_libur_nasional', 'tugas_khusus'];
@@ -428,7 +429,7 @@ function jkOpenPicker_(selectId, title) {
   document.getElementById('jk-picker-title').textContent = title;
   var list = document.getElementById('jk-picker-list');
   list.innerHTML = '';
-  list.className = 'jk-picker-list' + (selectId === 'jadwal-form-jenis' && jkKubuJenis === 'absen' ? ' theme-rose' : '');
+  list.className = 'jk-picker-list' + (selectId === 'jadwal-form-jenis' ? (jkKubuJenis === 'absen' ? ' theme-red' : ' theme-blue') : '');
   Array.prototype.forEach.call(sel.options, function (opt) {
     if (!opt.value) return;
     if (selectId === 'jadwal-form-jenis' && jkKubuOfJenis_(opt.value) !== jkKubuJenis) return;
@@ -608,17 +609,32 @@ function loadJadwalAktif(force) {
     .getJadwalAktif(session.accessCode);
 }
 
+function jkDateStrOffset_(days) {
+  var d = new Date();
+  d.setDate(d.getDate() + days);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+function jkWindowDays_() { return (appBootstrap && appBootstrap.scheduleDisplayWindowDays) || 28; }
+function jkArchiveDays_() { return (appBootstrap && appBootstrap.scheduleArchiveDays) || 30; }
+
+/** Jadwal ke depan saja (hari ini s.d. 4 minggu) — dipakai Tabel, ringkasan, dan hitungan. */
 function filterJadwalDalamJendela_(list) {
   var today = todayDateStr_();
-  var windowDays = (appBootstrap && appBootstrap.scheduleDisplayWindowDays) || 21;
-  var end = new Date();
-  end.setDate(end.getDate() + windowDays);
-  var endStr = end.getFullYear() + '-' + String(end.getMonth() + 1).padStart(2, '0') + '-' + String(end.getDate()).padStart(2, '0');
+  var endStr = jkDateStrOffset_(jkWindowDays_());
   return (list || []).filter(function (e) { return e.tanggal >= today && e.tanggal <= endStr; });
+}
+
+/** Jadwal 1 bulan ke belakang (arsip, hanya-baca di Kalender) + 4 minggu ke depan. */
+function filterJadwalDenganArsip_(list) {
+  var startStr = jkDateStrOffset_(-jkArchiveDays_());
+  var endStr = jkDateStrOffset_(jkWindowDays_());
+  return (list || []).filter(function (e) { return e.tanggal >= startStr && e.tanggal <= endStr; });
 }
 
 function renderJadwalPiket_(fullList) {
   jkWindowList_ = filterJadwalDalamJendela_(fullList);
+  jkAllList_ = filterJadwalDenganArsip_(fullList);
   jkRender_();
 }
 
@@ -630,7 +646,8 @@ function renderJadwalPiket_(fullList) {
 var jkView_ = 'kalender';          // 'kalender' | 'tabel'
 var jkWeekIdx_ = 0;                // minggu ke-n dalam jendela (0 = minggu yang memuat hari ini)
 var jkFilter_ = { mine: false, user: '' };
-var jkWindowList_ = [];            // entri dalam jendela 21 hari (belum difilter)
+var jkWindowList_ = [];            // entri hari ini s.d. 4 minggu ke depan (belum difilter)
+var jkAllList_ = [];               // jkWindowList_ + arsip 1 bulan ke belakang (untuk Kalender)
 try { var jkSavedView_ = localStorage.getItem('fa_jk_view'); if (jkSavedView_ === 'tabel' || jkSavedView_ === 'kalender') jkView_ = jkSavedView_; } catch (e) { /* abaikan */ }
 
 function jkUtc_(s) { var p = String(s).split('-'); return Date.UTC(+p[0], +p[1] - 1, +p[2]); }
@@ -639,9 +656,9 @@ function jkMondayMs_(s) { var ms = jkUtc_(s); var dow = new Date(ms).getUTCDay()
 function jkShortDate_(ms) { var d = new Date(ms); return d.getUTCDate() + ' ' + INDO_MONTH_SHORT_[d.getUTCMonth()]; }
 
 /** Daftar entri setelah filter "Saya"/petugas. */
-function jkFiltered_() {
+function jkFiltered_(withArchive) {
   var me = appBootstrap && appBootstrap.currentUser ? appBootstrap.currentUser.userCode : '';
-  return jkWindowList_.filter(function (e) {
+  return (withArchive ? jkAllList_ : jkWindowList_).filter(function (e) {
     if (jkFilter_.mine) return e.userCode === me;
     if (jkFilter_.user) return e.userCode === jkFilter_.user;
     return true;
@@ -650,10 +667,17 @@ function jkFiltered_() {
 
 /** Jumlah minggu (Senin–Minggu) yang menutupi jendela tampilan. */
 function jkWeekCount_() {
-  var windowDays = (appBootstrap && appBootstrap.scheduleDisplayWindowDays) || 21;
+  var windowDays = jkWindowDays_();
   var start = jkMondayMs_(todayDateStr_());
   var end = jkUtc_(todayDateStr_()) + windowDays * 86400000;
   return Math.max(1, Math.floor((end - start) / (7 * 86400000)) + 1);
+}
+
+/** Indeks minggu paling awal yang boleh dilihat (negatif = arsip). */
+function jkWeekMin_() {
+  var startMs = jkMondayMs_(todayDateStr_());
+  var archMs = jkMondayMs_(jkDateStrOffset_(-jkArchiveDays_()));
+  return -Math.max(0, Math.round((startMs - archMs) / (7 * 86400000)));
 }
 
 function jkSortEntries_(a, b) {
@@ -671,7 +695,7 @@ function jkRender_() {
     else if (jkKubuOfJenis_(e.jenis) === 'piket') counts.piket++;
     else counts.absen++;
   });
-  var windowDays = (appBootstrap && appBootstrap.scheduleDisplayWindowDays) || 21;
+  var windowDays = jkWindowDays_();
   var filtered = jkFilter_.mine || jkFilter_.user;
   document.getElementById('jadwal-piket-summary').innerHTML =
     '<div class="jk-info">' +
@@ -692,7 +716,7 @@ function jkRender_() {
     if (emptyEl) emptyEl.style.display = 'none';
     jkRenderCounts_(list.length ? counts : null, tableWrap);
     cal.style.display = '';
-    jkRenderCalendar_(list);
+    jkRenderCalendar_(jkFiltered_(true));
   }
 }
 
@@ -788,7 +812,8 @@ function jkRenderCalendar_(list) {
   cal.innerHTML = '';
   var weeks = jkWeekCount_();
   if (jkWeekIdx_ > weeks - 1) jkWeekIdx_ = weeks - 1;
-  if (jkWeekIdx_ < 0) jkWeekIdx_ = 0;
+  var minIdx = jkWeekMin_();
+  if (jkWeekIdx_ < minIdx) jkWeekIdx_ = minIdx;
   var startMs = jkMondayMs_(todayDateStr_()) + jkWeekIdx_ * 7 * 86400000;
   var endMs = startMs + 6 * 86400000;
 
@@ -796,7 +821,7 @@ function jkRenderCalendar_(list) {
   nav.className = 'jk-cal-nav';
   var prev = document.createElement('button');
   prev.type = 'button'; prev.className = 'jk-cal-navbtn'; prev.setAttribute('aria-label', 'Minggu sebelumnya');
-  prev.innerHTML = mdIcon('chevronLeft', 22); prev.disabled = jkWeekIdx_ === 0;
+  prev.innerHTML = mdIcon('chevronLeft', 22); prev.disabled = jkWeekIdx_ <= minIdx;
   prev.addEventListener('click', function () { jkWeekIdx_--; jkRender_(); });
   var next = document.createElement('button');
   next.type = 'button'; next.className = 'jk-cal-navbtn'; next.setAttribute('aria-label', 'Minggu berikutnya');
@@ -804,7 +829,7 @@ function jkRenderCalendar_(list) {
   next.addEventListener('click', function () { jkWeekIdx_++; jkRender_(); });
   var label = document.createElement('div');
   label.className = 'jk-cal-label';
-  label.textContent = jkShortDate_(startMs) + ' – ' + jkShortDate_(endMs) + (jkWeekIdx_ === 0 ? ' · Minggu ini' : '');
+  label.textContent = jkShortDate_(startMs) + ' – ' + jkShortDate_(endMs) + (jkWeekIdx_ === 0 ? ' · Minggu ini' : (jkWeekIdx_ < 0 ? ' · Arsip' : ''));
   nav.appendChild(prev); nav.appendChild(label); nav.appendChild(next);
   cal.appendChild(nav);
 
@@ -857,7 +882,7 @@ function jkRenderCalendar_(list) {
       var colors = JADWAL_JENIS_COLOR[e.jenis] || { bg: 'var(--status-neutral-bg)', fg: 'var(--status-neutral-fg)' };
       var chip = document.createElement('button');
       chip.type = 'button';
-      chip.className = 'jk-chip';
+      chip.className = 'jk-chip ' + (jkKubuOfJenis_(e.jenis) === 'piket' ? 'k-piket' : 'k-absen');
       chip.style.background = colors.bg;
       chip.style.color = colors.fg;
       var nm = document.createElement('b'); nm.textContent = e.userName;
@@ -870,7 +895,19 @@ function jkRenderCalendar_(list) {
     cal.appendChild(row);
   }
 
-  if (!list.length) {
+  var weekHas = list.some(function (e) { return e.tanggal >= jkYmd_(startMs) && e.tanggal <= jkYmd_(endMs); });
+  if (!weekHas && jkWeekIdx_ < 0) {
+    var ah = document.createElement('div');
+    ah.className = 'jk-cal-hint';
+    ah.textContent = 'Tidak ada jadwal pada minggu arsip ini.';
+    cal.appendChild(ah);
+  } else if (jkWeekIdx_ < 0) {
+    var an = document.createElement('div');
+    an.className = 'jk-cal-hint';
+    an.textContent = 'Arsip: jadwal yang sudah lewat (hanya dilihat).';
+    cal.appendChild(an);
+  }
+  if (!list.length && jkWeekIdx_ >= 0) {
     var hint = document.createElement('div');
     hint.className = 'jk-cal-hint';
     hint.textContent = (jkFilter_.mine || jkFilter_.user) ? 'Tidak ada jadwal yang cocok dengan filter.' : 'Belum ada jadwal dalam beberapa minggu ke depan.';
@@ -886,14 +923,14 @@ function jkBuildShareText_() {
     var startMs = jkMondayMs_(todayDateStr_()) + jkWeekIdx_ * 7 * 86400000;
     from = jkYmd_(startMs); to = jkYmd_(startMs + 6 * 86400000);
     title = jkShortDate_(startMs) + ' – ' + jkShortDate_(startMs + 6 * 86400000);
-    list = list.filter(function (e) { return e.tanggal >= from && e.tanggal <= to; });
+    list = jkFiltered_(true).filter(function (e) { return e.tanggal >= from && e.tanggal <= to; });
   } else {
-    var windowDays = (appBootstrap && appBootstrap.scheduleDisplayWindowDays) || 21;
+    var windowDays = jkWindowDays_();
     title = Math.round(windowDays / 7) + ' minggu ke depan';
   }
   var who = jkFilter_.mine ? ' (Jadwal Saya)' : '';
   if (jkFilter_.user) {
-    var m = list.concat(jkWindowList_).filter(function (e) { return e.userCode === jkFilter_.user; })[0];
+    var m = list.concat(jkAllList_).filter(function (e) { return e.userCode === jkFilter_.user; })[0];
     who = m ? ' (' + m.userName + ')' : '';
   }
   if (!list.length) return '';
@@ -954,7 +991,7 @@ function renderJadwalTable_(list, counts) {
       emptyEl.className = 'empty-state';
       container.parentNode.insertBefore(emptyEl, container.nextSibling);
     }
-    var windowDays = (appBootstrap && appBootstrap.scheduleDisplayWindowDays) || 21;
+    var windowDays = (appBootstrap && appBootstrap.scheduleDisplayWindowDays) || 28;
     emptyEl.innerHTML = '<div class="empty-state-icon">' + mdIcon('calendarCheck', 22) + '</div>' +
       ((jkFilter_.mine || jkFilter_.user) ? 'Tidak ada jadwal yang cocok dengan filter.' : 'Belum ada jadwal dalam ' + Math.round(windowDays / 7) + ' minggu ke depan.');
     emptyEl.style.display = '';

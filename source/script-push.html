@@ -122,6 +122,7 @@ var PushUI = (function () {
     if (!dot) return;
     dot.classList.toggle('is-on', state === 'on');
     dot.classList.toggle('is-off', state === 'off');
+    dot.classList.toggle('is-wait', state === 'wait');
     dot.title = title || '';
   }
   var healing = false;
@@ -183,10 +184,20 @@ var PushUI = (function () {
   }
 
   var unknownRetries = 0;
+  var UNKNOWN_RETRY_MS = [2500, 5000, 9000];
   function refreshIndicator() {
     var seq = ++indicatorSeq;
     detectState().then(function (state) {
       if (seq !== indicatorSeq) return;
+      // Service worker belum siap: status belum diketahui -> JANGAN merah; coba lagi beberapa kali.
+      if (state === 'unknown') {
+        setDot('wait', 'Memeriksa notifikasi...');
+        renderCard('unknown');
+        if (unknownRetries < UNKNOWN_RETRY_MS.length) setTimeout(refreshIndicator, UNKNOWN_RETRY_MS[unknownRetries++]);
+        else { unknownRetries = 0; setDot('off', 'Notifikasi tidak dapat diperiksa'); renderCard('off'); }
+        return;
+      }
+      unknownRetries = 0;
       if (state === 'adopt') {
         ls(LS_ON, '1');
         lastHealAt = 0; healing = false;
@@ -276,6 +287,7 @@ var PushUI = (function () {
     card.style.display = '';
 
     show('btn-push-enable', false); show('btn-push-test', false); show('btn-push-disable', false);
+    if (state === 'unknown') { setStatus('Memeriksa status notifikasi perangkat ini...'); return; }
 
     if (!browserSupports()) {
       if (isIos() && !isStandalone()) {
