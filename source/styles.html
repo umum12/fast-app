@@ -3965,3 +3965,11 @@ html[data-theme="dark"] .jk-picker-list.theme-blue .jk-picker-item.selected { co
 
 /* Indikator notifikasi: status belum diketahui (memeriksa) — abu-abu, bukan hijau/merah */
 .header-status .status-dot.is-wait { background: #9ca3af; animation: none; }
+
+/* Tombol Kembali di menu Akun — gaya sama dengan tombol Kembali halaman Unduh PDF Rekap */
+.akun-back { display: inline-flex; align-items: center; gap: 4px; background: #eff6ff; color: #1F4E9C; font-size: 12px; font-weight: 600;
+  padding: 7px 12px; margin-bottom: 10px; border: none; border-radius: 10px; cursor: pointer; text-decoration: none; white-space: nowrap; }
+.akun-back:active { background: #dbeafe; }
+.akun-back svg { width: 16px; height: 16px; }
+html[data-theme="dark"] .akun-back { background: rgba(90,140,230,.18); color: #9fbcf2; }
+html[data-theme="dark"] .akun-back:active { background: rgba(90,140,230,.28); }
