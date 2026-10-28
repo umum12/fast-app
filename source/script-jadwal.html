@@ -524,6 +524,14 @@ document.getElementById('btn-submit-jadwal').addEventListener('click', function 
   var bad = false;
   if (!data.tanggal) { jkSetErr_(document.getElementById('jk-date-wrap'), 'jadwal-err-date', 'Tanggal wajib diisi.'); bad = true; }
   if (!data.userCode) { jkSetErr_(document.getElementById('jk-open-user'), 'jadwal-err-user', 'Petugas wajib dipilih.'); bad = true; }
+  var hariWajib = { piket_sabtu: [6, 'Sabtu'], piket_minggu: [0, 'Minggu'] }[data.jenis];
+  if (!bad && hariWajib) {
+    var dp = data.tanggal.split('-');
+    if (new Date(+dp[0], +dp[1] - 1, +dp[2]).getDay() !== hariWajib[0]) {
+      jkSetErr_(document.getElementById('jk-date-wrap'), 'jadwal-err-date', 'Piket ' + hariWajib[1] + ' harus dipilih pada hari ' + hariWajib[1] + '.');
+      bad = true;
+    }
+  }
   if (bad) return;
 
   var session = loadSession();
@@ -1060,7 +1068,9 @@ function renderJadwalTable_(list, counts) {
 
 function openJadwalDetail_(entry) {
   var colors = JADWAL_JENIS_COLOR[entry.jenis] || { bg: 'var(--status-neutral-bg)', fg: 'var(--status-neutral-fg)' };
-  var canEdit = appBootstrap.currentUser.role !== 'demo';
+  // Hanya pembuat entri atau Administrator yang boleh ubah/hapus.
+  var canEdit = appBootstrap.currentUser.role !== 'demo' &&
+    (appBootstrap.currentUser.role === 'admin' || entry.createdBy === appBootstrap.currentUser.userCode);
   var dateLong = formatJadwalDateLong_(entry.tanggal);
 
   var body = document.getElementById('jk-detail-body');

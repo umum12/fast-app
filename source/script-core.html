@@ -547,6 +547,7 @@ function renderNav(navItems) {
     sBtn.addEventListener('click', function () { goToPage(item.key); });
     sidebarContainer.appendChild(sBtn);
   });
+  if (typeof updatePekerjaanNavBadge_ === 'function') updatePekerjaanNavBadge_();
 }
 
 /**

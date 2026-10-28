@@ -3973,3 +3973,13 @@ html[data-theme="dark"] .jk-picker-list.theme-blue .jk-picker-item.selected { co
 .akun-back svg { width: 16px; height: 16px; }
 html[data-theme="dark"] .akun-back { background: rgba(90,140,230,.18); color: #9fbcf2; }
 html[data-theme="dark"] .akun-back:active { background: rgba(90,140,230,.28); }
+
+/* Badge jumlah pekerjaan yang belum diambil pada menu Pekerjaan (navbar bawah & sidebar) */
+.nav-item[data-page="pekerjaan"] .nav-icon { position: relative; }
+.nav-badge { position: absolute; top: -5px; left: calc(50% + 3px); min-width: 20px; height: 20px; padding: 0 4px;
+  box-sizing: border-box; border-radius: 10px; background: #D6312B; color: #fff; font-size: 11px; font-weight: 700;
+  line-height: 16px; text-align: center; border: 2px solid var(--color-surface, #fff);
+  pointer-events: none; font-variant-numeric: tabular-nums; }
+.nav-badge[hidden] { display: none; }
+aside.sidebar .nav-item[data-page="pekerjaan"] .nav-icon { position: relative; }
+aside.sidebar .nav-badge { top: -7px; left: 14px; }

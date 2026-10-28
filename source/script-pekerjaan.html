@@ -1826,7 +1826,7 @@ function openPekerjaanDetail(p, opts) {
     body.appendChild(primaryWrap);
   }
 
-          if (p.canLepas || p.canUbah || p.canHapus || p.canUbahPenuntasan || p.canBatalkanPenuntasan) {
+          if (p.canLepas || p.canAlihkan || p.canUbah || p.canHapus || p.canUbahPenuntasan || p.canBatalkanPenuntasan) {
     var actionsWrap = document.createElement('div');
     actionsWrap.style.marginTop = '20px';
     actionsWrap.style.display = 'flex';
@@ -1847,6 +1847,19 @@ function openPekerjaanDetail(p, opts) {
         doLepasPekerjaan(p.pekerjaanId);
       });
       actionsWrap.appendChild(lepasBtn);
+    }
+
+    // Alihkan Pekerjaan (reassign) — hanya Administrator, Penugasan yang belum selesai.
+    if (p.canAlihkan) {
+      var alihkanBtn = document.createElement('button');
+      alihkanBtn.className = 'btn-outlined primary';
+      alihkanBtn.style.display = 'inline-flex';
+      alihkanBtn.style.alignItems = 'center';
+      alihkanBtn.style.justifyContent = 'center';
+      alihkanBtn.style.gap = '8px';
+      alihkanBtn.innerHTML = mdIcon('personAdd', 16) + '<span>Alihkan ke Petugas Lain</span>';
+      alihkanBtn.addEventListener('click', function () { openAlihkanForm_(p); });
+      actionsWrap.appendChild(alihkanBtn);
     }
 
         // PATCH — Edit/Batalkan Laporan Penuntasan (HANYA Penugasan SELESAI).
@@ -2112,6 +2125,67 @@ function openPenuntasanEditForm_(p) {
         showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error');
       })
       .ubahPenuntasanPekerjaan(session.accessCode, p.pekerjaanId, { completionNotes: notesEl.value });
+  });
+}
+
+
+/**
+ * Form Alihkan Pekerjaan (Administrator). Memilih petugas FS tujuan lalu
+ * memanggil alihkanPekerjaan. Petugas yang sedang memegang/ditujukan
+ * tidak ditampilkan sebagai pilihan.
+ */
+function openAlihkanForm_(p) {
+  var body = document.getElementById('activity-detail-body');
+  var current = (p.status === 'DIKERJAKAN') ? p.handledBy : p.targetUserCode;
+  var currentName = (p.status === 'DIKERJAKAN') ? p.handledByName : p.targetUserName;
+  body.innerHTML =
+    '<p class="card-header-title" style="margin:0 0 6px;">Alihkan ke Petugas Lain</p>' +
+    '<p class="md-body-sm" style="margin:0 0 14px;"></p>' +
+    '<div class="form-group">' +
+      '<label class="form-label" for="alihkan-target">Petugas tujuan</label>' +
+      '<select id="alihkan-target" class="form-input"><option value="">Pilih petugas</option></select>' +
+    '</div>' +
+    '<div class="form-actions-row">' +
+      '<button class="btn-outlined" id="btn-cancel-alihkan" type="button">Batal</button>' +
+      '<button class="btn-primary" id="btn-submit-alihkan" type="button">Alihkan</button>' +
+    '</div>' +
+    '<div class="form-error" id="alihkan-error"></div>';
+  body.querySelector('p.md-body-sm').textContent = currentName
+    ? 'Saat ini: ' + currentName + '. Pekerjaan akan berpindah ke petugas yang Anda pilih.'
+    : 'Pekerjaan akan berpindah ke petugas yang Anda pilih.';
+
+  var sel = document.getElementById('alihkan-target');
+  ((appBootstrap && appBootstrap.master && appBootstrap.master.fsUsers) || []).forEach(function (u) {
+    if (u.userCode === current) return;
+    var opt = document.createElement('option');
+    opt.value = u.userCode;
+    opt.textContent = u.displayName;
+    sel.appendChild(opt);
+  });
+
+  document.getElementById('btn-cancel-alihkan').addEventListener('click', function () { openPekerjaanDetail(p); });
+  document.getElementById('btn-submit-alihkan').addEventListener('click', function () {
+    var errorEl = document.getElementById('alihkan-error');
+    errorEl.textContent = '';
+    if (!sel.value) { errorEl.textContent = 'Pilih petugas tujuan.'; return; }
+    var session = loadSession();
+    var submitBtn = document.getElementById('btn-submit-alihkan');
+    beginAction(submitBtn, 'Mengalihkan...');
+    google.script.run
+      .withSuccessHandler(function (response) {
+        endAction(submitBtn);
+        if (!response.success) { errorEl.textContent = response.error; showSnackbar(response.error, 'error'); return; }
+        showSnackbar('Pekerjaan berhasil dialihkan.', 'success');
+        closeActivityDetail();
+        invalidateAllPekerjaanCaches_();
+        refreshCurrentPekerjaanPage_();
+      })
+      .withFailureHandler(function () {
+        endAction(submitBtn);
+        errorEl.textContent = 'Gagal terhubung ke server. Coba lagi.';
+        showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error');
+      })
+      .alihkanPekerjaan(session.accessCode, p.pekerjaanId, sel.value);
   });
 }
 
@@ -2383,6 +2457,53 @@ function stopPekerjaanAutoRefresh() {
 // Riwayat ikut dianggap basi supaya kunjungan berikutnya mengambil data baru.
 var pekerjaanKnownVersion_ = null;
 
+// ------------------------------------------------------------
+// BADGE menu Pekerjaan: jumlah pekerjaan yang belum diambil (dan boleh diambil
+// pengguna ini = flag canAmbil dari server). Dihitung dari daftar inbox yang
+// sudah ada; di luar halaman Pekerjaan diperbarui lewat pemeriksaan versi ringan.
+// ------------------------------------------------------------
+var PEKERJAAN_BADGE_POLL_MS = 60000;
+
+function updatePekerjaanNavBadge_(list) {
+  var data = Array.isArray(list) ? list : pageDataCache.pekerjaanInbox;
+  if (!Array.isArray(data)) return;
+  var n = data.filter(function (p) { return p && p.canAmbil; }).length;
+  var label = n > 99 ? '99+' : String(n);
+  var navs = document.querySelectorAll('.nav-item[data-page="pekerjaan"]');
+  Array.prototype.forEach.call(navs, function (item) {
+    var badge = item.querySelector('.nav-badge');
+    if (!n) { if (badge) badge.hidden = true; return; }
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'nav-badge';
+      var host = item.querySelector('.nav-icon') || item;
+      host.appendChild(badge);
+    }
+    badge.hidden = false;
+    badge.textContent = label;
+    item.setAttribute('aria-label', 'Pekerjaan, ' + n + ' belum diambil');
+  });
+  if (!n) {
+    Array.prototype.forEach.call(navs, function (item) { item.removeAttribute('aria-label'); });
+  }
+}
+
+/** Ambil ulang inbox di latar belakang HANYA untuk memperbarui badge (halaman lain terbuka). */
+function refreshPekerjaanBadge_() {
+  var session = loadSession();
+  if (!session || typeof google === 'undefined') return;
+  google.script.run
+    .withSuccessHandler(function (r) {
+      if (!r || !r.success) return;
+      pageDataCache.pekerjaanInbox = r.data.pekerjaan;
+      persistSet_('inbox', r.data.pekerjaan);
+      if (r.data.version) pekerjaanKnownVersion_ = r.data.version;
+      updatePekerjaanNavBadge_(r.data.pekerjaan);
+    })
+    .withFailureHandler(function () {})
+    .getPekerjaanList(session.accessCode, { view: 'inbox' });
+}
+
 function checkPekerjaanVersion_() {
   var session = loadSession();
   if (!session || typeof google === 'undefined') return;
@@ -2396,7 +2517,7 @@ function checkPekerjaanVersion_() {
       pageDataCache.pekerjaanAktivitasByKey = {};
       pageDataCache.pekerjaanRiwayatByKey = {};
       persistRemove_(['inbox', 'aktivitas', 'riwayat']);
-      if (currentPage === 'pekerjaan') loadPekerjaanInbox(true);
+      if (currentPage === 'pekerjaan') loadPekerjaanInbox(true); else refreshPekerjaanBadge_();
     })
     .withFailureHandler(function () { /* diam — coba lagi pada siklus berikut */ })
     .getPekerjaanVersion(session.accessCode);
@@ -2413,10 +2534,18 @@ function startPekerjaanAutoRefresh() {
 }
 
 document.addEventListener('visibilitychange', function () {
-  if (document.visibilityState === 'visible' && currentPage === 'pekerjaan') {
+  if (document.visibilityState === 'visible' && appBootstrap) {
     checkPekerjaanVersion_();
   }
 });
+
+// Di halaman selain Pekerjaan, badge diperiksa tiap PEKERJAAN_BADGE_POLL_MS
+// (halaman Pekerjaan punya pemeriksaan 30 dtk sendiri). Hanya saat tab terlihat.
+setInterval(function () {
+  if (appBootstrap && currentPage !== 'pekerjaan' && document.visibilityState === 'visible') {
+    checkPekerjaanVersion_();
+  }
+}, PEKERJAAN_BADGE_POLL_MS);
 
 var currentPekerjaanFilter = 'all';
 var PEKERJAAN_FILTERS = [
@@ -2481,7 +2610,7 @@ function loadPekerjaanInbox(force) {
   if (!cached && !force) {
     // Salinan tersimpan dari kunjungan sebelumnya: tampilkan dulu, lalu perbarui dari server.
     var persisted = persistGet_('inbox');
-    if (persisted) { cached = persisted; stale = true; }
+    if (persisted) { cached = persisted; stale = true; updatePekerjaanNavBadge_(persisted); }
   }
 
   if (cached && !force && !stale) {
@@ -2511,6 +2640,7 @@ function loadPekerjaanInbox(force) {
       }
       pageDataCache.pekerjaanInbox = response.data.pekerjaan;
       persistSet_('inbox', response.data.pekerjaan);
+      updatePekerjaanNavBadge_(response.data.pekerjaan);
       if (response.data.version) pekerjaanKnownVersion_ = response.data.version;
       if (!(stale && sameFeedList_(cached, response.data.pekerjaan))) {
         renderPekerjaanInboxList(response.data.pekerjaan);
@@ -2549,6 +2679,7 @@ function applyStartupBundle_(bundle) {
   if (bundle.inbox) {
     pageDataCache.pekerjaanInbox = bundle.inbox.pekerjaan;
     persistSet_('inbox', bundle.inbox.pekerjaan);
+    updatePekerjaanNavBadge_(bundle.inbox.pekerjaan);
     if (bundle.inbox.version) pekerjaanKnownVersion_ = bundle.inbox.version;
   }
   if (bundle.aktivitas) {
@@ -2585,6 +2716,7 @@ function prefetchTabs_() {
         if (!r || !r.success || pageDataCache.pekerjaanInbox) return;
         pageDataCache.pekerjaanInbox = r.data.pekerjaan;
         persistSet_('inbox', r.data.pekerjaan);
+        updatePekerjaanNavBadge_(r.data.pekerjaan);
         if (r.data.version) pekerjaanKnownVersion_ = r.data.version;
       }).withFailureHandler(function () {}).getPekerjaanList(session.accessCode, { view: 'inbox' });
     }
