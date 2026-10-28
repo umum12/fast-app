@@ -196,7 +196,7 @@ function main() {
   //              dan service worker lama TETAP aktif (rollback otomatis).
   //   optional = dicoba semampunya.
   const critical = ['./', 'config.js', 'api-adapter.js', 'manifest.json'].concat(builtPages);
-  const optional = ['firebase-config.js', 'pwa-install.js', 'pwa-update.js', 'icons/icon-192.png', 'icons/icon-512.png'];
+  const optional = ['firebase-config.js', 'pwa-install.js', 'pwa-update.js', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/badge-96.png'];
   const swPath = path.join(OUT, 'sw.js');
   fs.writeFileSync(swPath, fs.readFileSync(swPath, 'utf8')
     .replace(/__BUILD_ID__/g, buildId)
