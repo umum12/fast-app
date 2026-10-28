@@ -96,7 +96,7 @@ self.addEventListener('push', (e) => {
   const options = {
     body: d.body || '',
     icon: 'icons/icon-192.png',
-    badge: 'icons/icon-192.png',
+    badge: 'icons/badge-96.png',
     tag: d.tag || 'fastapp',
     renotify: true,
     data: { url: d.url || '' }
