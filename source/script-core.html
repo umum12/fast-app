@@ -709,14 +709,61 @@ function pushBackGuard_() {
   try { history.pushState({ faGuard: true }, '', location.href); } catch (e) {}
 }
 
+function isOurHistoryState_(st) { return !!(st && (st.faGuard || st.faBase)); }
+
+/**
+ * Keluar dari aplikasi: mundur melewati SEMUA entri milik kita (dasar + penjaga, termasuk
+ * entri sisa dari versi lama yang menumpuk saat halaman dimuat ulang), sehingga satu kali
+ * "Ya" cukup. Bila ternyata masih di sini setelah 1,5 dtk (mis. riwayat diblokir peramban),
+ * penanda keluar dibatalkan dan penjaga dipasang lagi supaya Back berikutnya tetap bertanya.
+ */
+function exitAppNow_() {
+  exitingApp_ = true;
+  try { history.back(); } catch (e) {}
+  setTimeout(function () {
+    if (!exitingApp_) return;
+    exitingApp_ = false;
+    var st = null;
+    try { st = history.state; } catch (e) {}
+    if (!st || !st.faGuard) pushBackGuard_();
+  }, 1500);
+}
+
 function installBackNavigation_() {
   if (backNavInstalled_) return;
   backNavInstalled_ = true;
-  try { history.replaceState({ faBase: true }, '', location.href); } catch (e) {}
-  pushBackGuard_();
+
+  // Muat ulang / dipulihkan Android: entri riwayat saat ini bisa saja sudah berupa "penjaga"
+  // buatan sesi sebelumnya. Jangan menimpanya & menambah entri baru (itu yang membuat entri
+  // menumpuk dan "Ya" tidak langsung keluar). Cukup pakai apa adanya.
+  var cur = null;
+  try { cur = history.state; } catch (e) {}
+  if (!(cur && cur.faGuard)) {
+    try { history.replaceState({ faBase: true }, '', location.href); } catch (e) {}
+    // Peramban (Chrome) melewati entri riwayat yang dibuat tanpa interaksi pengguna saat Back
+    // ditekan -> Back langsung keluar tanpa popup. Bila belum ada interaksi sama sekali
+    // (mis. aplikasi dibuka dari sesi tersimpan), pasang penjaga pada sentuhan pertama.
+    var active = true;
+    try { active = !navigator.userActivation || navigator.userActivation.hasBeenActive; } catch (e) {}
+    if (active) {
+      pushBackGuard_();
+    } else {
+      var arm = function () {
+        ['pointerdown', 'touchstart', 'keydown', 'click'].forEach(function (ev) { window.removeEventListener(ev, arm, true); });
+        try { var st = history.state; if (!st || !st.faGuard) pushBackGuard_(); } catch (e) {}
+      };
+      ['pointerdown', 'touchstart', 'keydown', 'click'].forEach(function (ev) { window.addEventListener(ev, arm, true); });
+    }
+  }
 
   window.addEventListener('popstate', function () {
-    if (exitingApp_) { exitingApp_ = false; history.back(); return; } // lanjutkan keluar
+    if (exitingApp_) {
+      // Lanjut mundur selama masih di entri milik kita; berhenti begitu keluar dari tumpukan kita.
+      var st = null;
+      try { st = history.state; } catch (e) {}
+      if (isOurHistoryState_(st)) { try { history.back(); } catch (e2) {} } else { exitingApp_ = false; }
+      return;
+    }
     // Hanya jalan saat sudah login (aplikasi tampil).
     if (!appBootstrap) return;
     if (closeTopLayer_()) { pushBackGuard_(); return; }
@@ -731,8 +778,7 @@ function installBackNavigation_() {
     // Di halaman utama: tanya dulu. "Tidak" (atau Back lagi) menutup dialog; aplikasi & data tetap.
     pushBackGuard_();
     showConfirmModal('Keluar dari aplikasi?', function () {
-      exitingApp_ = true;
-      history.go(-1); // ke entri dasar; popstate berikutnya meneruskan keluar
+      exitAppNow_();
     }, 'logout', false, null, { confirm: 'Ya', cancel: 'Tidak' });
   });
 }
