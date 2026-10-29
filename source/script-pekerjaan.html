@@ -134,22 +134,96 @@ function enhanceSelectWithSheet_(selectEl, iconFor) {
   });
 }
 
-/** Overlay "Mengirim data ke server" (form Buat & Penyelesaian). */
-function showSendingOverlay_(text) {
+/**
+ * Overlay "Mengirim Laporan" (form Buat & Penyelesaian): ponsel -> amplop terbang -> server,
+ * persentase + bar. Apps Script tidak melaporkan progres unggah, jadi persen adalah ESTIMASI
+ * yang melambat mendekati ~94% selama menunggu, lalu melompat ke 100% saat server menjawab
+ * (finishSendingOverlay_). Gagal: hideSendingOverlay_() menutup seketika tanpa 100%.
+ * opts: { title, hasPhotos } ; string = subjudul lama (kompatibel).
+ */
+var sendingTimer_ = null;
+var sendingPct_ = 0;
+var sendingStartMs_ = 0;
+var sendingHasPhotos_ = false;
+
+function sendingStageText_(pct, elapsedMs) {
+  if (elapsedMs > 25000) return 'Masih berjalan, mohon jangan tutup halaman...';
+  if (sendingHasPhotos_) {
+    if (pct < 25) return 'Menyiapkan laporan...';
+    if (pct < 75) return 'Mengunggah foto...';
+    return 'Menyimpan ke server...';
+  }
+  return pct < 40 ? 'Menyiapkan laporan...' : 'Menyimpan ke server...';
+}
+
+function setSendingProgress_(pct) {
+  sendingPct_ = pct;
+  var shown = Math.min(100, Math.round(pct));
+  var pctEl = document.getElementById('sending-pct');
+  var fill = document.getElementById('sending-fill');
+  var bar = document.getElementById('sending-bar');
+  if (pctEl) pctEl.textContent = shown + '%';
+  if (fill) fill.style.width = shown + '%';
+  if (bar) bar.setAttribute('aria-valuenow', String(shown));
+  var sub = document.getElementById('sending-sub');
+  if (sub) sub.textContent = shown >= 100 ? 'Selesai' : sendingStageText_(pct, Date.now() - sendingStartMs_);
+}
+
+function showSendingOverlay_(opts) {
+  if (typeof opts === 'string') opts = { sub: opts };
+  opts = opts || {};
   var ov = document.getElementById('sending-overlay');
   if (!ov) {
     ov = document.createElement('div');
     ov.id = 'sending-overlay';
-    ov.innerHTML = '<div class="sending-card"><div class="sending-ring"></div><div class="sending-title">Mengirim data ke server</div>' +
-      '<div class="sending-bar"><div class="sending-bar-fill"></div></div><div class="sending-sub" id="sending-sub"></div></div>';
+    ov.setAttribute('role', 'alertdialog');
+    ov.setAttribute('aria-modal', 'true');
+    ov.setAttribute('aria-labelledby', 'sending-title');
+    ov.innerHTML =
+      '<div class="sending-card">' +
+        '<div class="sending-flow" aria-hidden="true">' +
+          '<span class="sending-node">' + mdIcon('smartphone', 24) + '</span>' +
+          '<span class="sending-path"><span class="sending-mail">' + mdIcon('mail', 20) + '</span></span>' +
+          '<span class="sending-node">' + mdIcon('cloud_upload', 24) + '</span>' +
+        '</div>' +
+        '<div class="sending-title" id="sending-title"></div>' +
+        '<div class="sending-meta"><span class="sending-chip"><span class="sending-dot"></span>Proses Pengiriman</span>' +
+          '<span class="sending-pct" id="sending-pct">0%</span></div>' +
+        '<div class="sending-bar" id="sending-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">' +
+          '<div class="sending-bar-fill" id="sending-fill"></div></div>' +
+        '<div class="sending-sub" id="sending-sub" aria-live="polite"></div>' +
+      '</div>';
     document.body.appendChild(ov);
   }
-  document.getElementById('sending-sub').textContent = text || 'Mengunggah laporan & melampirkan foto...';
+  document.getElementById('sending-title').textContent = opts.title || 'Mengirim Laporan';
+  sendingHasPhotos_ = !!opts.hasPhotos;
+  sendingStartMs_ = Date.now();
+  if (sendingTimer_) clearInterval(sendingTimer_);
+  var fill = document.getElementById('sending-fill');
+  if (fill) fill.style.transition = 'none';
+  setSendingProgress_(0);
+  void (fill && fill.offsetWidth);
+  if (fill) fill.style.transition = '';
+  sendingTimer_ = setInterval(function () {
+    // melambat mendekati batas ~94% (tidak pernah 100% sebelum server menjawab)
+    setSendingProgress_(Math.min(94, sendingPct_ + (94 - sendingPct_) * 0.035 + 0.15));
+  }, 120);
   ov.classList.add('show');
 }
+
 function hideSendingOverlay_() {
+  if (sendingTimer_) { clearInterval(sendingTimer_); sendingTimer_ = null; }
   var ov = document.getElementById('sending-overlay');
   if (ov) ov.classList.remove('show');
+}
+
+/** Sukses: isi bar ke 100%, tahan sebentar, tutup overlay lalu jalankan lanjutan (kartu sukses). */
+function finishSendingOverlay_(next) {
+  var ov = document.getElementById('sending-overlay');
+  if (!ov || !ov.classList.contains('show')) { if (next) next(); return; }
+  if (sendingTimer_) { clearInterval(sendingTimer_); sendingTimer_ = null; }
+  setSendingProgress_(100);
+  setTimeout(function () { hideSendingOverlay_(); if (next) next(); }, 380);
 }
 
 
@@ -784,12 +858,12 @@ var performedAtEl = document.getElementById('form-performed-at');
   var session = loadSession();
   var submitBtn = document.getElementById('btn-submit-report');
   beginAction(submitBtn, 'Menyimpan...');
-  showSendingOverlay_('Mengunggah laporan & melampirkan foto...');
+  showSendingOverlay_({ title: isPenugasan ? 'Mengirim Penugasan' : 'Mengirim Laporan', hasPhotos: data.photos.length > 0 });
   google.script.run
     .withSuccessHandler(function (response) {
       endAction(submitBtn);
-      hideSendingOverlay_();
       if (!response.success) {
+        hideSendingOverlay_();
         errorEl.textContent = response.error;
         showSnackbar(response.error, 'error');
         return;
@@ -808,7 +882,7 @@ var performedAtEl = document.getElementById('form-performed-at');
 
       invalidateAllPekerjaanCaches_();
 
-      showPekerjaanSuccessCard(jenis);
+      finishSendingOverlay_(function () { showPekerjaanSuccessCard(jenis); });
     })
     .withFailureHandler(function () {
       endAction(submitBtn);
@@ -1025,12 +1099,12 @@ function submitSelesaiForm_() {
   var session = loadSession();
   var submitBtn = document.getElementById('btn-selesai-submit');
   beginAction(submitBtn, 'Mengirim...');
-  showSendingOverlay_('Mengunggah penuntasan & melampirkan foto...');
+  showSendingOverlay_({ title: 'Mengirim Laporan Penuntasan', hasPhotos: data.photos.length > 0 });
   google.script.run
     .withSuccessHandler(function (response) {
       endAction(submitBtn);
-      hideSendingOverlay_();
       if (!response.success) {
+        hideSendingOverlay_();
         errorEl.textContent = response.error;
         showSnackbar(response.error, 'error');
         return;
@@ -1038,7 +1112,7 @@ function submitSelesaiForm_() {
       resetBuatPrefillContext_();
       selesaiPhotos = [];
       invalidateAllPekerjaanCaches_();
-      showLaporanSuccessCard_(pekerjaanId);
+      finishSendingOverlay_(function () { showLaporanSuccessCard_(pekerjaanId); });
     })
     .withFailureHandler(function () {
       endAction(submitBtn);
