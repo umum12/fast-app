@@ -6,7 +6,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,500,0..1,0&icon_names=account_circle,add,add_a_photo,add_circle,admin_panel_settings,alarm,apartment,apps,architecture,arrow_back,assignment_turned_in,badge,bar_chart,bookmark,build,build_circle,calculate,calendar_month,calendar_today,chat_bubble,check,check_circle,chevron_left,chevron_right,cleaning_services,close,cloud_upload,content_copy,dark_mode,dashboard,database,delete,description,developer_board,download,edit,edit_calendar,edit_note,event_available,event_busy,group,handshake,history,home,image,inbox,info,integration_instructions,inventory_2,key,keyboard_arrow_down,keyboard_arrow_up,landscape,layers,light_mode,lightbulb,list,location_on,lock,login,logout,mail,monitoring,more_horiz,more_vert,notifications,notifications_active,notifications_off,palette,person,person_add,person_check,person_remove,person_search,photo_camera,photo_library,post_add,refresh,save,savings,schedule,search,send,sensors,settings,shield,smartphone,sync,system_update,task,task_alt,terminal,trophy,tune,upload,verified,verified_user,visibility,warning,work&display=block" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,500,0..1,0&icon_names=account_circle,add,add_a_photo,add_circle,admin_panel_settings,alarm,apartment,apps,architecture,arrow_back,assignment_turned_in,badge,bar_chart,bookmark,build,build_circle,calculate,calendar_month,calendar_today,chat_bubble,check,check_circle,chevron_left,chevron_right,cleaning_services,close,cloud_upload,content_copy,dark_mode,dashboard,database,delete,description,developer_board,download,edit,edit_calendar,edit_note,event_available,event_busy,forum,group,handshake,history,home,image,inbox,info,integration_instructions,inventory_2,key,keyboard_arrow_down,keyboard_arrow_up,landscape,layers,light_mode,lightbulb,list,location_on,lock,login,logout,mail,monitoring,more_horiz,more_vert,notifications,notifications_active,notifications_off,palette,person,person_add,person_check,person_remove,person_search,photo_camera,photo_library,post_add,refresh,save,savings,schedule,search,send,sensors,settings,shield,smartphone,sync,system_update,task,task_alt,terminal,trophy,tune,upload,verified,verified_user,visibility,warning,work&display=block" rel="stylesheet">
 <title>Facility Support</title>
 <script>
 (function () {
@@ -82,6 +82,18 @@
               <div id="jk-toolbar" class="jk-toolbar" style="display:none;"></div>
               <div id="jadwal-piket-table" class="jk-table-wrap"></div>
               <div id="jadwal-piket-cal" class="jk-cal" style="display:none;"></div>
+            </div>
+
+            <div class="card chat-card" id="chat-card" role="button" tabindex="0" aria-label="Buka Ruang Diskusi">
+              <div class="card-header-row" style="margin-bottom:0;">
+                <div class="card-header-icon" id="chat-card-icon"></div>
+                <div class="card-header-text">
+                  <p class="card-header-title" style="text-transform:uppercase; letter-spacing:0.02em;">Ruang Diskusi</p>
+                  <p class="card-header-subtitle" id="chat-card-sub">Ngobrol dan koordinasi tim</p>
+                </div>
+                <span class="chat-unread" id="chat-unread" style="display:none;" aria-label="Ada pesan baru"></span>
+                <span class="chat-card-go" id="chat-card-go" aria-hidden="true"></span>
+              </div>
             </div>
 
             <div class="card" id="admin-content-card" style="display:none;">
@@ -518,6 +530,23 @@
         <button class="btn-cancel" id="confirm-modal-cancel">Batal</button>
         <button class="btn-confirm" id="confirm-modal-confirm">Ya, Lanjutkan</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Ruang Diskusi: modal chat grup -->
+  <div class="jk-overlay" id="chat-overlay">
+    <div class="jk-modal chat-modal" role="dialog" aria-modal="true" aria-labelledby="chat-title">
+      <div class="chat-head">
+        <div class="chat-head-ico" id="chat-head-ico"></div>
+        <div class="chat-head-text"><h3 id="chat-title">Ruang Diskusi</h3><p>25 pesan terbaru</p></div>
+        <button class="jk-close" type="button" id="chat-close" aria-label="Tutup"></button>
+      </div>
+      <div class="chat-list" id="chat-list" aria-live="polite"></div>
+      <div class="chat-compose" id="chat-compose">
+        <input class="chat-input" id="chat-input" type="text" maxlength="200" placeholder="Tulis pesan..." autocomplete="off" enterkeyhint="send">
+        <button class="chat-send" id="chat-send" type="button" aria-label="Kirim"></button>
+      </div>
+      <p class="chat-note" id="chat-note"></p>
     </div>
   </div>
 

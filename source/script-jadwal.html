@@ -2157,3 +2157,164 @@ function buildPekerjaanListCard_(p, opts) {
 }
 
 </script>
+<script>
+// ============================================================
+// RUANG DISKUSI — chat grup sederhana (chat.gs). Build First, Harden Later:
+// polling 8 dtk hanya saat modal terbuka & tab terlihat; cek "pesan baru"
+// ringan tiap 90 dtk di luar modal (balasan kecil lewat sinceTs).
+// ============================================================
+(function () {
+  var card = document.getElementById('chat-card');
+  var overlay = document.getElementById('chat-overlay');
+  if (!card || !overlay) return;
+  var listEl = document.getElementById('chat-list');
+  var inputEl = document.getElementById('chat-input');
+  var sendBtn = document.getElementById('chat-send');
+  var noteEl = document.getElementById('chat-note');
+  var composeEl = document.getElementById('chat-compose');
+  var dotEl = document.getElementById('chat-unread');
+  var SEEN_KEY = 'fa_chat_seen_ts';
+  var POLL_OPEN_MS = 8000, POLL_IDLE_MS = 90000;
+  var lastTs = 0, hasRender = false, inFlight = false, pollTimer = null, idleTimer = null, sending = false;
+
+  document.getElementById('chat-card-icon').innerHTML = mdIcon('forum', 22);
+  document.getElementById('chat-head-ico').innerHTML = mdIcon('forum', 22);
+  document.getElementById('chat-close').innerHTML = mdIcon('close', 18);
+  document.getElementById('chat-card-go').innerHTML = mdIcon('chevronRight', 22);
+  sendBtn.innerHTML = mdIcon('send', 20);
+
+  function seenTs_() { try { return Number(localStorage.getItem(SEEN_KEY)) || 0; } catch (e) { return 0; } }
+  function markSeen_(ts) { try { if (ts) localStorage.setItem(SEEN_KEY, String(ts)); } catch (e) {} dotEl.style.display = 'none'; }
+  function isOpen_() { return overlay.classList.contains('show'); }
+  function ac_() { var s = loadSession(); return s && s.accessCode; }
+
+  function fmtTime_(ts) { var d = new Date(ts); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+  function dayKey_(ts) { var d = new Date(ts); return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate(); }
+  function dayLabel_(ts) {
+    var d = new Date(ts), n = new Date();
+    if (dayKey_(ts) === dayKey_(n.getTime())) return 'Hari ini';
+    if (dayKey_(ts) === dayKey_(n.getTime() - 86400000)) return 'Kemarin';
+    return ('0' + d.getDate()).slice(-2) + '/' + ('0' + (d.getMonth() + 1)).slice(-2) + '/' + d.getFullYear();
+  }
+
+  function render_(msgs, forceBottom) {
+    var nearBottom = (listEl.scrollHeight - listEl.scrollTop - listEl.clientHeight) < 80;
+    listEl.textContent = '';
+    if (!msgs.length) {
+      var em = document.createElement('div'); em.className = 'chat-empty'; em.textContent = 'Belum ada pesan. Mulai percakapan!';
+      listEl.appendChild(em);
+    }
+    var prevDay = '';
+    msgs.forEach(function (m) {
+      var dk = dayKey_(m.ts);
+      if (dk !== prevDay) {
+        prevDay = dk;
+        var dl = document.createElement('div'); dl.className = 'chat-day'; dl.textContent = dayLabel_(m.ts); listEl.appendChild(dl);
+      }
+      var row = document.createElement('div'); row.className = 'chat-msg' + (m.mine ? ' mine' : '');
+      if (!m.mine) { var nm = document.createElement('span'); nm.className = 'chat-name'; nm.textContent = m.name || m.userCode; row.appendChild(nm); }
+      var b = document.createElement('div'); b.className = 'chat-bubble'; b.textContent = m.text; row.appendChild(b);
+      var t = document.createElement('span'); t.className = 'chat-time'; t.textContent = fmtTime_(m.ts); row.appendChild(t);
+      listEl.appendChild(row);
+    });
+    if (forceBottom || nearBottom || !hasRender) listEl.scrollTop = listEl.scrollHeight;
+    hasRender = true;
+  }
+
+  function applyCanSend_(can) {
+    composeEl.style.display = can ? 'flex' : 'none';
+    noteEl.textContent = can ? '' : 'Akun Demo hanya dapat membaca.';
+  }
+
+  function handle_(res, forceBottom) {
+    if (!res || !res.success) return false;
+    var d = res.data;
+    applyCanSend_(d.canSend);
+    if (d.changed) { render_(d.messages || [], forceBottom); }
+    lastTs = d.lastTs || lastTs;
+    if (isOpen_()) markSeen_(lastTs);
+    return true;
+  }
+
+  function fetch_(forceBottom) {
+    var ac = ac_(); if (!ac || inFlight) return;
+    inFlight = true;
+    google.script.run
+      .withSuccessHandler(function (res) { inFlight = false; handle_(res, forceBottom); })
+      .withFailureHandler(function () { inFlight = false; })
+      .getGroupChatMessages(ac, hasRender ? lastTs : null);
+  }
+
+  function schedulePoll_() {
+    clearTimeout(pollTimer);
+    if (!isOpen_()) return;
+    pollTimer = setTimeout(function () {
+      if (document.visibilityState === 'visible') fetch_(false);
+      schedulePoll_();
+    }, POLL_OPEN_MS);
+  }
+
+  function open_() {
+    if (!ac_()) return;
+    overlay.classList.add('show');
+    hasRender = false; // render penuh saat dibuka
+    listEl.textContent = '';
+    var l = document.createElement('div'); l.className = 'chat-empty'; l.textContent = 'Memuat...'; listEl.appendChild(l);
+    fetch_(true); schedulePoll_();
+  }
+  function close_() {
+    overlay.classList.remove('show');
+    clearTimeout(pollTimer);
+    markSeen_(lastTs);
+  }
+
+  function send_() {
+    if (sending) return;
+    var text = inputEl.value.trim();
+    if (!text) return;
+    var ac = ac_(); if (!ac) return;
+    sending = true; sendBtn.disabled = true; noteEl.textContent = '';
+    google.script.run
+      .withSuccessHandler(function (res) {
+        sending = false; sendBtn.disabled = false;
+        if (res && res.success) { inputEl.value = ''; handle_(res, true); inputEl.focus(); }
+        else noteEl.textContent = (res && res.error) || 'Gagal mengirim pesan.';
+      })
+      .withFailureHandler(function () { sending = false; sendBtn.disabled = false; noteEl.textContent = 'Gagal mengirim pesan. Periksa koneksi.'; })
+      .sendGroupChatMessage(ac, text);
+  }
+
+  // Titik merah "pesan baru" (ringan; hanya saat terlihat dan sudah login).
+  function idleCheck_() {
+    if (isOpen_() || document.visibilityState !== 'visible') return;
+    var ac = ac_(); if (!ac) return;
+    try { idleCall_(ac); } catch (e) {}
+  }
+  function idleCall_(ac) {
+    google.script.run
+      .withSuccessHandler(function (res) {
+        if (!res || !res.success || isOpen_()) return;
+        var d = res.data;
+        if (d.lastTs) { lastTs = d.lastTs; }
+        var seen = seenTs_();
+        if (!seen && d.lastTs) { /* pengguna baru: jangan tandai merah untuk riwayat lama */ markSeen_(d.lastTs); return; }
+        dotEl.style.display = (d.lastTs && d.lastTs > seen) ? '' : 'none';
+      })
+      .withFailureHandler(function () {})
+      .getGroupChatMessages(ac, seenTs_() || null);
+  }
+  setTimeout(idleCheck_, 3500);
+  idleTimer = setInterval(idleCheck_, POLL_IDLE_MS);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'visible') return;
+    if (isOpen_()) { fetch_(false); schedulePoll_(); } else idleCheck_();
+  });
+
+  card.addEventListener('click', open_);
+  card.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open_(); } });
+  document.getElementById('chat-close').addEventListener('click', close_);
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) close_(); });
+  sendBtn.addEventListener('click', send_);
+  inputEl.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); send_(); } });
+})();
+</script>

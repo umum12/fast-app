@@ -430,6 +430,7 @@ var MD_SYMBOLS = {
   moon: 'dark_mode',
   checkCircle: 'check_circle',
   check: 'check',
+  forum: 'forum',
   addCircle: 'add_circle',
   activity: 'monitoring',
   inbox: 'inbox',
@@ -695,7 +696,7 @@ function closeTopLayer_() {
     return true;
   }
   if (isShown('bottom-sheet-overlay')) { closeBottomSheet(); return true; }
-  var jkIds = ['jk-picker-overlay', 'jk-form-overlay', 'jk-detail-overlay', 'about-overlay', 'philosophy-overlay'];
+  var jkIds = ['chat-overlay', 'jk-picker-overlay', 'jk-form-overlay', 'jk-detail-overlay', 'about-overlay', 'philosophy-overlay'];
   for (var i = 0; i < jkIds.length; i++) {
     if (isShown(jkIds[i])) {
       var closeBtn = document.getElementById(jkIds[i]).querySelector('.jk-close');
