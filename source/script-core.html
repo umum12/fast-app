@@ -81,14 +81,59 @@ function showConfirmModal(message, onConfirm, iconName, busyMode, busyLabel, lab
   confirmModalIsBusyMode = !!busyMode;
   confirmModalBusyLabel = busyLabel || 'Memproses...';
   document.getElementById('confirm-modal-icon').innerHTML = mdIcon(iconName || 'delete', 24);
-  document.getElementById('confirm-modal-message').textContent = message;
+  var msgEl = document.getElementById('confirm-modal-message');
+  msgEl.textContent = message || '';
+  msgEl.style.display = message ? '' : 'none';
   document.getElementById('confirm-modal-cancel').disabled = false;
   document.getElementById('confirm-modal-cancel').innerHTML = '<span>' + (labels.cancel || 'Batal') + '</span>';
   var confirmBtn = document.getElementById('confirm-modal-confirm');
   confirmBtn.disabled = false;
   confirmBtn.innerHTML = mdIcon('checkCircle', 18) + '<span>' + (labels.confirm || 'Ya, Lanjutkan') + '</span>';
+
+  // Mode "rich" (opsional): judul, daftar dampak, dan kotak centang persetujuan.
+  // Tombol konfirmasi baru aktif setelah kotak dicentang. Dipakai Hapus Pekerjaan.
+  var card = document.querySelector('#confirm-modal-overlay .confirm-modal-card');
+  var titleEl = document.getElementById('confirm-modal-title');
+  var pointsEl = document.getElementById('confirm-modal-points');
+  var checkWrap = document.getElementById('confirm-modal-check');
+  var checkbox = document.getElementById('confirm-modal-checkbox');
+  var rich = !!(labels.title || labels.points || labels.checkText);
+  card.classList.toggle('rich', rich);
+  titleEl.style.display = labels.title ? '' : 'none';
+  titleEl.textContent = labels.title || '';
+  pointsEl.style.display = 'none'; pointsEl.textContent = '';
+  if (labels.points && labels.points.length) {
+    var cap = document.createElement('p'); cap.className = 'confirm-points-caption'; cap.textContent = labels.pointsCaption || 'Dampak tindakan ini:';
+    pointsEl.appendChild(cap);
+    labels.points.forEach(function (pt) {
+      var row = document.createElement('div'); row.className = 'confirm-point';
+      var ic = document.createElement('span'); ic.className = 'confirm-point-ico'; ic.innerHTML = mdIcon(pt.icon || 'warning', 18);
+      var tx = document.createElement('span');
+      (pt.parts || []).forEach(function (part) {
+        if (part[1]) { var b = document.createElement('strong'); b.textContent = part[0]; tx.appendChild(b); }
+        else tx.appendChild(document.createTextNode(part[0]));
+      });
+      row.appendChild(ic); row.appendChild(tx); pointsEl.appendChild(row);
+    });
+    pointsEl.style.display = '';
+  }
+  checkbox.checked = false;
+  checkbox.disabled = false;
+  checkWrap.style.display = labels.checkText ? '' : 'none';
+  document.getElementById('confirm-modal-check-text').textContent = labels.checkText || '';
+  document.getElementById('confirm-modal-checkbox-box').innerHTML = mdIcon('check', 16);
+  confirmModalNeedsCheck_ = !!labels.checkText;
+  confirmBtn.disabled = confirmModalNeedsCheck_;
+  card.classList.toggle('needs-check', confirmModalNeedsCheck_);
+
   document.getElementById('confirm-modal-overlay').classList.add('show');
 }
+
+var confirmModalNeedsCheck_ = false;
+document.getElementById('confirm-modal-checkbox').addEventListener('change', function () {
+  if (confirmModalIsBusyMode && document.getElementById('confirm-modal-cancel').disabled) return; // sedang memproses
+  document.getElementById('confirm-modal-confirm').disabled = confirmModalNeedsCheck_ && !this.checked;
+});
 
 function hideConfirmModal() {
   document.getElementById('confirm-modal-overlay').classList.remove('show');
@@ -99,6 +144,7 @@ function hideConfirmModal() {
 document.getElementById('confirm-modal-cancel').addEventListener('click', hideConfirmModal);
 document.getElementById('confirm-modal-confirm').addEventListener('click', function () {
   var cb = pendingConfirmCallback;
+  if (confirmModalNeedsCheck_ && !document.getElementById('confirm-modal-checkbox').checked) return;
 
   if (!confirmModalIsBusyMode) {
     // Perilaku LAMA (default) — tutup modal dulu, baru jalankan
@@ -116,6 +162,7 @@ document.getElementById('confirm-modal-confirm').addEventListener('click', funct
   var cancelBtn = document.getElementById('confirm-modal-cancel');
   confirmBtn.disabled = true;
   cancelBtn.disabled = true;
+  document.getElementById('confirm-modal-checkbox').disabled = true;
   confirmBtn.innerHTML = '<span class="btn-loading-dots"><span></span><span></span><span></span></span><span>' + confirmModalBusyLabel + '</span>';
 
   if (cb) cb();
@@ -683,6 +730,7 @@ var exitingApp_ = false;
 
 function closeTopLayer_() {
   function isShown(id) { var el = document.getElementById(id); return !!(el && el.classList.contains('show')); }
+  if (typeof FaDatePicker !== 'undefined' && FaDatePicker.isOpen()) { FaDatePicker.close(); return true; }
   if (isShown('photo-viewer')) { closePhotoViewer(); return true; }
   // Sedang mengirim / memuat ulang: Back diabaikan (proses tidak boleh ditinggalkan di tengah jalan).
   if (isShown('sending-overlay') || isShown('reload-overlay')) {
@@ -1351,5 +1399,156 @@ if (btnReloadClose) btnReloadClose.addEventListener('click', closeReloadOverlay_
   window.addEventListener('offline', function () { show_(true); });
   window.addEventListener('online', function () { show_(false); });
   if (navigator.onLine === false) show_(true);
+})();
+</script>
+<script>
+// ============================================================
+// FaDatePicker — pemilih tanggal kustom pengganti pemilih bawaan peramban.
+// Awal pekan Senin, Sabtu/Minggu merah, modal di tengah. Nilai tetap ISO
+// "YYYY-MM-DD" di <input> (jadi kode lama yang membaca/menulis .value tidak berubah).
+//   FaDatePicker.attach(input, { trigger, clearable, title })
+//   - trigger: elemen yang membuka picker (bila kosong dibuat otomatis, memakai class form-input)
+//   - FaDatePicker.setVisible(input, bool): tampil/sembunyikan trigger otomatis
+// ============================================================
+var FaDatePicker = (function () {
+  var MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  var MON_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+  var DAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  var WEEK = [['S', 0], ['S', 0], ['R', 0], ['K', 0], ['J', 0], ['S', 1], ['M', 1]];
+  var ov = null, els = {}, cur = null; // cur: { input, opts, temp, view }
+  var valueDesc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+
+  function pad(n) { return ('0' + n).slice(-2); }
+  function iso(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function parse(s) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || '');
+    if (!m) return null;
+    var d = new Date(+m[1], +m[2] - 1, +m[3]);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  function same(a, b) { return !!a && !!b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
+  function longText(d) { return DAYS[d.getDay()] + ', ' + d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear(); }
+  function icon(name, size) {
+    var s = document.createElement('span');
+    s.className = 'material-symbols-outlined ms'; s.setAttribute('aria-hidden', 'true');
+    s.style.fontSize = (size || 20) + 'px'; s.textContent = name; return s;
+  }
+
+  function build() {
+    if (ov) return;
+    ov = document.createElement('div');
+    ov.className = 'fa-date-overlay'; ov.id = 'fa-date-overlay';
+    ov.innerHTML =
+      '<div class="fa-date-card" role="dialog" aria-modal="true" aria-label="Pilih tanggal">' +
+        '<div class="fa-date-head"><small>Pilih Tanggal</small><div class="fa-date-head-row"><div class="fa-date-selected" id="fa-date-selected"></div>' +
+        '<button type="button" class="fa-date-today" id="fa-date-today"><span class="material-symbols-outlined ms" style="font-size:16px" aria-hidden="true">today</span>Hari Ini</button></div></div>' +
+        '<div class="fa-date-nav"><button type="button" id="fa-date-prev" aria-label="Bulan sebelumnya"><span class="material-symbols-outlined ms" style="font-size:22px" aria-hidden="true">chevron_left</span></button>' +
+        '<span class="fa-date-month" id="fa-date-month"></span>' +
+        '<button type="button" id="fa-date-next" aria-label="Bulan berikutnya"><span class="material-symbols-outlined ms" style="font-size:22px" aria-hidden="true">chevron_right</span></button></div>' +
+        '<div class="fa-date-week" id="fa-date-week"></div>' +
+        '<div class="fa-date-grid" id="fa-date-grid"></div>' +
+        '<div class="fa-date-foot"><button type="button" class="fa-date-btn-clear" id="fa-date-clear">Hapus</button><span class="fa-spacer"></span>' +
+        '<button type="button" class="fa-date-btn-cancel" id="fa-date-cancel">Batal</button><button type="button" class="fa-date-btn-ok" id="fa-date-ok">Oke</button></div>' +
+      '</div>';
+    document.body.appendChild(ov);
+    ['selected', 'today', 'prev', 'next', 'month', 'week', 'grid', 'clear', 'cancel', 'ok'].forEach(function (k) { els[k] = document.getElementById('fa-date-' + k); });
+    WEEK.forEach(function (w) { var s = document.createElement('span'); s.textContent = w[0]; if (w[1]) s.className = 'red'; els.week.appendChild(s); });
+    els.prev.addEventListener('click', function () { cur.view = new Date(cur.view.getFullYear(), cur.view.getMonth() - 1, 1); render(); });
+    els.next.addEventListener('click', function () { cur.view = new Date(cur.view.getFullYear(), cur.view.getMonth() + 1, 1); render(); });
+    els.today.addEventListener('click', function () { var n = new Date(); cur.temp = new Date(n.getFullYear(), n.getMonth(), n.getDate()); cur.view = new Date(n.getFullYear(), n.getMonth(), 1); render(); });
+    els.cancel.addEventListener('click', close);
+    els.clear.addEventListener('click', function () { commit(''); });
+    els.ok.addEventListener('click', function () { commit(cur.temp ? iso(cur.temp) : ''); });
+    ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && isOpen()) { e.stopPropagation(); close(); } }, true);
+  }
+
+  function render() {
+    var y = cur.view.getFullYear(), m = cur.view.getMonth();
+    els.month.textContent = MONTHS[m] + ' ' + y;
+    els.selected.textContent = cur.temp ? (cur.temp.getDate() + ' ' + MON_SHORT[cur.temp.getMonth()] + ' ' + cur.temp.getFullYear()) : 'Belum dipilih';
+    els.grid.textContent = '';
+    var lead = (new Date(y, m, 1).getDay() + 6) % 7; // Senin = 0
+    var dim = new Date(y, m + 1, 0).getDate();
+    var prevDim = new Date(y, m, 0).getDate();
+    var i, today = new Date();
+    for (i = lead - 1; i >= 0; i--) { var o = document.createElement('div'); o.className = 'fa-date-out'; o.textContent = prevDim - i; els.grid.appendChild(o); }
+    for (var day = 1; day <= dim; day++) {
+      (function (day) {
+        var d = new Date(y, m, day), dow = d.getDay();
+        var b = document.createElement('button'); b.type = 'button'; b.textContent = day;
+        b.className = 'fa-date-day' + ((dow === 0 || dow === 6) ? ' red' : '') + (same(d, today) ? ' is-today' : '') + (same(d, cur.temp) ? ' is-sel' : '');
+        b.setAttribute('aria-label', longText(d)); b.setAttribute('aria-pressed', same(d, cur.temp) ? 'true' : 'false');
+        b.addEventListener('click', function () { cur.temp = d; render(); });
+        els.grid.appendChild(b);
+      })(day);
+    }
+    var total = lead + dim, slots = (total > 35 ? 42 : 35) - total;
+    for (i = 1; i <= slots; i++) { var n = document.createElement('div'); n.className = 'fa-date-out'; n.textContent = i; els.grid.appendChild(n); }
+  }
+
+  function isOpen() { return !!ov && ov.classList.contains('show'); }
+  function close() { if (ov) ov.classList.remove('show'); cur && cur.trigger && cur.trigger.focus && cur.trigger.focus({ preventScroll: true }); }
+
+  function setVal(input, v) { valueDesc.set.call(input, v); }
+  function commit(v) {
+    var input = cur.input;
+    input.value = v; // lewat setter terpasang -> label ikut diperbarui
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    if (cur.opts.onChange) { try { cur.opts.onChange(v); } catch (e) {} }
+    close();
+  }
+
+  function open(input, opts, trigger) {
+    build();
+    var d = parse(input.value);
+    var base = d || new Date();
+    cur = { input: input, opts: opts, trigger: trigger, temp: d, view: new Date(base.getFullYear(), base.getMonth(), 1) };
+    els.clear.style.display = opts.clearable ? '' : 'none';
+    render();
+    ov.classList.add('show');
+    var sel = els.grid.querySelector('.is-sel') || els.grid.querySelector('.is-today');
+    try { (sel || els.ok).focus({ preventScroll: true }); } catch (e) {}
+  }
+
+  function attach(input, opts) {
+    if (!input || input._faDate) return;
+    opts = opts || {};
+    input._faDate = true;
+    var trigger = opts.trigger, auto = null;
+    if (input.type === 'date') input.type = 'hidden';
+    if (!trigger) {
+      auto = document.createElement('div');
+      auto.className = 'form-input fa-date-trigger is-empty';
+      auto.setAttribute('role', 'button'); auto.tabIndex = 0;
+      var tx = document.createElement('span'); tx.className = 'fa-date-text';
+      auto.appendChild(tx);
+      var ic = document.createElement('span'); ic.className = 'fa-date-ico'; ic.appendChild(icon('calendar_month', 20)); auto.appendChild(ic);
+      if (input.style.marginTop) auto.style.marginTop = input.style.marginTop;
+      if (input.style.display === 'none') auto.style.display = 'none';
+      input.parentNode.insertBefore(auto, input);
+      trigger = auto; input._faTrigger = auto;
+    }
+    function refresh() {
+      if (!auto) return;
+      var d = parse(input.value);
+      auto.querySelector('.fa-date-text').textContent = d ? longText(d) : (opts.placeholder || 'Pilih tanggal');
+      auto.classList.toggle('is-empty', !d);
+    }
+    Object.defineProperty(input, 'value', {
+      configurable: true,
+      get: function () { return valueDesc.get.call(this); },
+      set: function (v) { valueDesc.set.call(this, v); refresh(); }
+    });
+    function go(e) { if (e) e.preventDefault(); open(input, opts, trigger); }
+    trigger.addEventListener('click', go);
+    trigger.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') go(e); });
+    refresh();
+  }
+
+  function setVisible(input, show) { if (input && input._faTrigger) input._faTrigger.style.display = show ? '' : 'none'; }
+
+  return { attach: attach, setVisible: setVisible, close: close, isOpen: isOpen };
 })();
 </script>

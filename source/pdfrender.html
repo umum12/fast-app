@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,500,0..1,0&icon_names=account_circle,add,add_a_photo,add_circle,add_to_drive,admin_panel_settings,alarm,apartment,apps,architecture,arrow_back,assignment_turned_in,badge,bar_chart,bookmark,build,build_circle,calculate,calendar_month,calendar_today,chat_bubble,check_circle,chevron_left,chevron_right,cleaning_services,close,cloud_upload,dark_mode,dashboard,database,delete,description,developer_board,download,edit,edit_calendar,edit_note,error,event_available,event_busy,expand_more,file_download,folder_open,group,handshake,history,home,image,inbox,info,integration_instructions,inventory_2,key,keyboard_arrow_down,keyboard_arrow_up,landscape,layers,light_mode,lightbulb,list,location_on,lock,login,logout,monitoring,more_horiz,more_vert,notifications,notifications_active,notifications_off,open_in_new,palette,person,person_add,person_check,person_remove,person_search,photo_camera,photo_library,picture_as_pdf,post_add,refresh,save,savings,schedule,search,send,sensors,settings,shield,sync,system_update,task,task_alt,terminal,trophy,tune,upload,verified,verified_user,visibility,warning,work&display=block" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,500,0..1,0&icon_names=account_circle,add,add_a_photo,add_circle,add_to_drive,admin_panel_settings,alarm,apartment,apps,architecture,arrow_back,assignment_turned_in,badge,bar_chart,bookmark,build,build_circle,calculate,calendar_month,calendar_today,chat_bubble,check_circle,chevron_left,chevron_right,cleaning_services,close,cloud_upload,dark_mode,dashboard,database,delete,description,developer_board,download,edit,edit_calendar,edit_note,error,event_available,event_busy,expand_more,file_download,folder_open,group,handshake,history,home,image,inbox,info,integration_instructions,inventory_2,key,keyboard_arrow_down,keyboard_arrow_up,landscape,layers,light_mode,lightbulb,list,location_on,lock,login,logout,monitoring,more_horiz,more_vert,notifications,notifications_active,notifications_off,open_in_new,palette,person,person_add,person_check,person_remove,person_search,photo_camera,photo_library,picture_as_pdf,post_add,refresh,save,savings,schedule,search,send,sensors,settings,shield,sync,system_update,task,task_alt,terminal,today,trophy,tune,upload,verified,verified_user,visibility,warning,work&display=block" rel="stylesheet">
 <title>Unduh PDF Rekap</title>
 <style>
   :root {
@@ -151,6 +151,62 @@
     animation: spin .8s linear infinite; flex-shrink: 0;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ===== Pemilih tanggal kustom (FaDatePicker): awal pekan Senin, Sabtu/Minggu merah, modal di tengah ===== */
+.fa-date-trigger { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; text-align: left; -webkit-tap-highlight-color: transparent; }
+.fa-date-trigger .fa-date-text { font-weight: 600; color: var(--color-text, #1e293b); }
+.fa-date-trigger.is-empty .fa-date-text { font-weight: 500; color: var(--color-text-muted, #94a3b8); }
+.fa-date-trigger .fa-date-ico { display: inline-flex; color: var(--color-primary, #2563eb); flex: none; }
+.fa-date-overlay { position: fixed; inset: 0; z-index: 330; background: rgba(2,6,23,.6); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; padding: 16px; opacity: 0; visibility: hidden; transition: opacity .22s ease, visibility 0s linear .22s; }
+.fa-date-overlay.show { opacity: 1; visibility: visible; transition: opacity .22s ease; }
+.fa-date-card { width: 100%; max-width: 384px; background: #fff; color: #1e293b; border-radius: 24px; overflow: hidden; border: 1px solid #f1f5f9; box-shadow: 0 25px 50px -12px rgba(0,0,0,.35); display: flex; flex-direction: column; font-family: inherit; transform: translateY(20px) scale(.96); opacity: 0; transition: transform .3s cubic-bezier(.1,.9,.2,1), opacity .25s ease; }
+.fa-date-overlay.show .fa-date-card { transform: none; opacity: 1; }
+.fa-date-head { padding: 18px 24px 14px; background: #f8fafc; border-bottom: 1px solid #f1f5f9; }
+.fa-date-head small { display: block; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #94a3b8; }
+.fa-date-head-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
+.fa-date-selected { font-size: 20px; font-weight: 800; letter-spacing: -.01em; color: #0f172a; }
+.fa-date-today { display: inline-flex; align-items: center; gap: 4px; border: 0; font: inherit; font-size: 12px; font-weight: 700; color: #1d4ed8; background: #eff6ff; padding: 6px 12px; border-radius: 999px; cursor: pointer; text-transform: none; }
+.fa-date-today:active { background: #dbeafe; }
+.fa-date-nav { display: flex; align-items: center; justify-content: space-between; padding: 12px 24px; }
+.fa-date-nav button { width: 36px; height: 36px; border-radius: 50%; border: 0; background: transparent; color: #334155; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.fa-date-nav button:active { background: #f1f5f9; transform: scale(.9); }
+.fa-date-month { font-size: 16px; font-weight: 800; color: #1e293b; }
+.fa-date-week, .fa-date-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; padding: 0 20px; text-align: center; }
+.fa-date-week { margin-bottom: 6px; }
+.fa-date-week span { font-size: 12px; font-weight: 800; color: #64748b; }
+.fa-date-week span.red { color: #ef4444; }
+.fa-date-grid { padding-bottom: 14px; min-height: 240px; align-content: start; }
+.fa-date-out { display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; color: #cbd5e1; height: 36px; }
+.fa-date-day { width: 36px; height: 36px; margin: 0 auto; border-radius: 50%; border: 2px solid transparent; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #334155; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; transition: background .15s, transform .15s; -webkit-tap-highlight-color: transparent; }
+.fa-date-day:active { transform: scale(.9); }
+.fa-date-day.red { color: #ef4444; }
+.fa-date-day:hover { background: #f1f5f9; }
+.fa-date-day.red:hover { background: #fef2f2; }
+.fa-date-day.is-today { border-color: #3b82f6; background: rgba(239,246,255,.6); color: #2563eb; }
+.fa-date-day.is-today.red { color: #ef4444; }
+.fa-date-day.is-sel, .fa-date-day.is-sel:hover { background: #1d4ed8; border-color: #1d4ed8; color: #fff; box-shadow: 0 6px 14px rgba(37,99,235,.35); animation: faDatePop .3s ease-out; }
+@keyframes faDatePop { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+.fa-date-foot { display: flex; align-items: center; gap: 10px; padding: 14px 20px; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+.fa-date-foot .fa-spacer { flex: 1; }
+.fa-date-foot button { min-height: 42px; padding: 0 20px; border-radius: 12px; border: 0; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; text-transform: none; }
+.fa-date-foot button:active { transform: scale(.96); }
+.fa-date-btn-clear { background: transparent; color: #dc2626; padding: 0 12px !important; }
+.fa-date-btn-cancel { background: transparent; color: #475569; }
+.fa-date-btn-ok { background: #1d4ed8; color: #fff; box-shadow: 0 6px 14px rgba(37,99,235,.25); }
+html[data-theme="dark"] .fa-date-card { background: #151c2d; color: #e6ebf5; border-color: rgba(255,255,255,.08); }
+html[data-theme="dark"] .fa-date-head, html[data-theme="dark"] .fa-date-foot { background: #101726; border-color: rgba(255,255,255,.07); }
+html[data-theme="dark"] .fa-date-selected, html[data-theme="dark"] .fa-date-month { color: #f1f5f9; }
+html[data-theme="dark"] .fa-date-today { background: rgba(90,140,230,.18); color: #9fbcf2; }
+html[data-theme="dark"] .fa-date-nav button { color: #cbd5e1; }
+html[data-theme="dark"] .fa-date-nav button:active, html[data-theme="dark"] .fa-date-day:hover { background: rgba(255,255,255,.07); }
+html[data-theme="dark"] .fa-date-day { color: #dbe3f1; }
+html[data-theme="dark"] .fa-date-day.red, html[data-theme="dark"] .fa-date-week span.red { color: #f87171; }
+html[data-theme="dark"] .fa-date-day.is-today { background: rgba(90,140,230,.12); color: #9fbcf2; border-color: #5a8ce6; }
+html[data-theme="dark"] .fa-date-day.is-sel { background: #2f5fd0; border-color: #2f5fd0; color: #fff; }
+html[data-theme="dark"] .fa-date-out { color: #3b465f; }
+html[data-theme="dark"] .fa-date-btn-cancel { color: #a9b4c9; }
+html[data-theme="dark"] .fa-date-btn-ok { background: #2f5fd0; }
+@media (prefers-reduced-motion: reduce) { .fa-date-card, .fa-date-overlay { transition: none; } .fa-date-day.is-sel { animation: none; } }
 </style>
 </head>
 <body>
@@ -283,6 +339,157 @@
    </div>
   </div>
 
+<script>
+// ============================================================
+// FaDatePicker — pemilih tanggal kustom pengganti pemilih bawaan peramban.
+// Awal pekan Senin, Sabtu/Minggu merah, modal di tengah. Nilai tetap ISO
+// "YYYY-MM-DD" di <input> (jadi kode lama yang membaca/menulis .value tidak berubah).
+//   FaDatePicker.attach(input, { trigger, clearable, title })
+//   - trigger: elemen yang membuka picker (bila kosong dibuat otomatis, memakai class form-input)
+//   - FaDatePicker.setVisible(input, bool): tampil/sembunyikan trigger otomatis
+// ============================================================
+var FaDatePicker = (function () {
+  var MONTHS = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
+  var MON_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+  var DAYS = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  var WEEK = [['S', 0], ['S', 0], ['R', 0], ['K', 0], ['J', 0], ['S', 1], ['M', 1]];
+  var ov = null, els = {}, cur = null; // cur: { input, opts, temp, view }
+  var valueDesc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+
+  function pad(n) { return ('0' + n).slice(-2); }
+  function iso(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
+  function parse(s) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || '');
+    if (!m) return null;
+    var d = new Date(+m[1], +m[2] - 1, +m[3]);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  function same(a, b) { return !!a && !!b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
+  function longText(d) { return DAYS[d.getDay()] + ', ' + d.getDate() + ' ' + MONTHS[d.getMonth()] + ' ' + d.getFullYear(); }
+  function icon(name, size) {
+    var s = document.createElement('span');
+    s.className = 'material-symbols-outlined ms'; s.setAttribute('aria-hidden', 'true');
+    s.style.fontSize = (size || 20) + 'px'; s.textContent = name; return s;
+  }
+
+  function build() {
+    if (ov) return;
+    ov = document.createElement('div');
+    ov.className = 'fa-date-overlay'; ov.id = 'fa-date-overlay';
+    ov.innerHTML =
+      '<div class="fa-date-card" role="dialog" aria-modal="true" aria-label="Pilih tanggal">' +
+        '<div class="fa-date-head"><small>Pilih Tanggal</small><div class="fa-date-head-row"><div class="fa-date-selected" id="fa-date-selected"></div>' +
+        '<button type="button" class="fa-date-today" id="fa-date-today"><span class="material-symbols-outlined ms" style="font-size:16px" aria-hidden="true">today</span>Hari Ini</button></div></div>' +
+        '<div class="fa-date-nav"><button type="button" id="fa-date-prev" aria-label="Bulan sebelumnya"><span class="material-symbols-outlined ms" style="font-size:22px" aria-hidden="true">chevron_left</span></button>' +
+        '<span class="fa-date-month" id="fa-date-month"></span>' +
+        '<button type="button" id="fa-date-next" aria-label="Bulan berikutnya"><span class="material-symbols-outlined ms" style="font-size:22px" aria-hidden="true">chevron_right</span></button></div>' +
+        '<div class="fa-date-week" id="fa-date-week"></div>' +
+        '<div class="fa-date-grid" id="fa-date-grid"></div>' +
+        '<div class="fa-date-foot"><button type="button" class="fa-date-btn-clear" id="fa-date-clear">Hapus</button><span class="fa-spacer"></span>' +
+        '<button type="button" class="fa-date-btn-cancel" id="fa-date-cancel">Batal</button><button type="button" class="fa-date-btn-ok" id="fa-date-ok">Oke</button></div>' +
+      '</div>';
+    document.body.appendChild(ov);
+    ['selected', 'today', 'prev', 'next', 'month', 'week', 'grid', 'clear', 'cancel', 'ok'].forEach(function (k) { els[k] = document.getElementById('fa-date-' + k); });
+    WEEK.forEach(function (w) { var s = document.createElement('span'); s.textContent = w[0]; if (w[1]) s.className = 'red'; els.week.appendChild(s); });
+    els.prev.addEventListener('click', function () { cur.view = new Date(cur.view.getFullYear(), cur.view.getMonth() - 1, 1); render(); });
+    els.next.addEventListener('click', function () { cur.view = new Date(cur.view.getFullYear(), cur.view.getMonth() + 1, 1); render(); });
+    els.today.addEventListener('click', function () { var n = new Date(); cur.temp = new Date(n.getFullYear(), n.getMonth(), n.getDate()); cur.view = new Date(n.getFullYear(), n.getMonth(), 1); render(); });
+    els.cancel.addEventListener('click', close);
+    els.clear.addEventListener('click', function () { commit(''); });
+    els.ok.addEventListener('click', function () { commit(cur.temp ? iso(cur.temp) : ''); });
+    ov.addEventListener('click', function (e) { if (e.target === ov) close(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && isOpen()) { e.stopPropagation(); close(); } }, true);
+  }
+
+  function render() {
+    var y = cur.view.getFullYear(), m = cur.view.getMonth();
+    els.month.textContent = MONTHS[m] + ' ' + y;
+    els.selected.textContent = cur.temp ? (cur.temp.getDate() + ' ' + MON_SHORT[cur.temp.getMonth()] + ' ' + cur.temp.getFullYear()) : 'Belum dipilih';
+    els.grid.textContent = '';
+    var lead = (new Date(y, m, 1).getDay() + 6) % 7; // Senin = 0
+    var dim = new Date(y, m + 1, 0).getDate();
+    var prevDim = new Date(y, m, 0).getDate();
+    var i, today = new Date();
+    for (i = lead - 1; i >= 0; i--) { var o = document.createElement('div'); o.className = 'fa-date-out'; o.textContent = prevDim - i; els.grid.appendChild(o); }
+    for (var day = 1; day <= dim; day++) {
+      (function (day) {
+        var d = new Date(y, m, day), dow = d.getDay();
+        var b = document.createElement('button'); b.type = 'button'; b.textContent = day;
+        b.className = 'fa-date-day' + ((dow === 0 || dow === 6) ? ' red' : '') + (same(d, today) ? ' is-today' : '') + (same(d, cur.temp) ? ' is-sel' : '');
+        b.setAttribute('aria-label', longText(d)); b.setAttribute('aria-pressed', same(d, cur.temp) ? 'true' : 'false');
+        b.addEventListener('click', function () { cur.temp = d; render(); });
+        els.grid.appendChild(b);
+      })(day);
+    }
+    var total = lead + dim, slots = (total > 35 ? 42 : 35) - total;
+    for (i = 1; i <= slots; i++) { var n = document.createElement('div'); n.className = 'fa-date-out'; n.textContent = i; els.grid.appendChild(n); }
+  }
+
+  function isOpen() { return !!ov && ov.classList.contains('show'); }
+  function close() { if (ov) ov.classList.remove('show'); cur && cur.trigger && cur.trigger.focus && cur.trigger.focus({ preventScroll: true }); }
+
+  function setVal(input, v) { valueDesc.set.call(input, v); }
+  function commit(v) {
+    var input = cur.input;
+    input.value = v; // lewat setter terpasang -> label ikut diperbarui
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    if (cur.opts.onChange) { try { cur.opts.onChange(v); } catch (e) {} }
+    close();
+  }
+
+  function open(input, opts, trigger) {
+    build();
+    var d = parse(input.value);
+    var base = d || new Date();
+    cur = { input: input, opts: opts, trigger: trigger, temp: d, view: new Date(base.getFullYear(), base.getMonth(), 1) };
+    els.clear.style.display = opts.clearable ? '' : 'none';
+    render();
+    ov.classList.add('show');
+    var sel = els.grid.querySelector('.is-sel') || els.grid.querySelector('.is-today');
+    try { (sel || els.ok).focus({ preventScroll: true }); } catch (e) {}
+  }
+
+  function attach(input, opts) {
+    if (!input || input._faDate) return;
+    opts = opts || {};
+    input._faDate = true;
+    var trigger = opts.trigger, auto = null;
+    if (input.type === 'date') input.type = 'hidden';
+    if (!trigger) {
+      auto = document.createElement('div');
+      auto.className = 'form-input fa-date-trigger is-empty';
+      auto.setAttribute('role', 'button'); auto.tabIndex = 0;
+      var tx = document.createElement('span'); tx.className = 'fa-date-text';
+      auto.appendChild(tx);
+      var ic = document.createElement('span'); ic.className = 'fa-date-ico'; ic.appendChild(icon('calendar_month', 20)); auto.appendChild(ic);
+      if (input.style.marginTop) auto.style.marginTop = input.style.marginTop;
+      if (input.style.display === 'none') auto.style.display = 'none';
+      input.parentNode.insertBefore(auto, input);
+      trigger = auto; input._faTrigger = auto;
+    }
+    function refresh() {
+      if (!auto) return;
+      var d = parse(input.value);
+      auto.querySelector('.fa-date-text').textContent = d ? longText(d) : (opts.placeholder || 'Pilih tanggal');
+      auto.classList.toggle('is-empty', !d);
+    }
+    Object.defineProperty(input, 'value', {
+      configurable: true,
+      get: function () { return valueDesc.get.call(this); },
+      set: function (v) { valueDesc.set.call(this, v); refresh(); }
+    });
+    function go(e) { if (e) e.preventDefault(); open(input, opts, trigger); }
+    trigger.addEventListener('click', go);
+    trigger.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') go(e); });
+    refresh();
+  }
+
+  function setVisible(input, show) { if (input && input._faTrigger) input._faTrigger.style.display = show ? '' : 'none'; }
+
+  return { attach: attach, setVisible: setVisible, close: close, isOpen: isOpen };
+})();
+</script>
 <script>
   var SESSION_KEY = 'fs_session';
 
@@ -470,15 +677,11 @@ function bootstrapPage(isManualLogin) {
     fmt.classList.remove('is-empty');
   }
 
-  function openDatePicker(dateId) {
-    var input = document.getElementById(dateId);
-    try { if (input.showPicker) { input.showPicker(); return; } } catch (e) { /* abaikan */ }
-    input.focus();
-  }
-
+  // Pemilih tanggal kustom (awal pekan Senin, Sabtu/Minggu merah) menggantikan pemilih bawaan peramban.
   ['filter-date-from', 'filter-date-to'].forEach(function (id) {
-    document.getElementById(id).addEventListener('change', function () { updateFormattedDate(id); });
-    document.getElementById(id + '-fmt').addEventListener('click', function () { openDatePicker(id); });
+    var input = document.getElementById(id);
+    input.addEventListener('change', function () { updateFormattedDate(id); });
+    FaDatePicker.attach(input, { trigger: input.parentNode, clearable: true });
   });
 
   function getFilters() {

@@ -1712,11 +1712,21 @@ function pilihFotoKartu_(p) {
 
 function confirmHapusPekerjaan(pekerjaanId, onMutated) {
   showConfirmModal(
-    'Hapus pekerjaan ini secara PERMANEN? Foto terkait akan ikut terhapus dari Drive, dan data ini akan hilang dari statistik & rekap. Tindakan ini TIDAK DAPAT DIBATALKAN.',
+    '',
     function () { doHapusPekerjaan(pekerjaanId, onMutated); },
-    'delete',
+    'warning',
     true,
-    'Menghapus...'
+    'Menghapus...',
+    {
+      title: 'Hapus Pekerjaan Permanen?',
+      points: [
+        { icon: 'cloud_off', parts: [['Foto dan berkas terkait di ', 0], ['Google Drive', 1], [' akan terhapus.', 0]] },
+        { icon: 'analytics', parts: [['Data pekerjaan hilang dari ', 0], ['statistik & rekap', 1], ['.', 0]] },
+        { icon: 'block', parts: [['Tindakan ini ', 0], ['tidak dapat dibatalkan', 1], [' setelah dikonfirmasi.', 0]] }
+      ],
+      checkText: 'Saya memahami konsekuensinya dan ingin menghapus pekerjaan ini secara permanen.',
+      confirm: 'Ya, Lanjutkan Penghapusan'
+    }
   );
 }
 

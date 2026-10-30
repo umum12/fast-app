@@ -459,9 +459,11 @@ document.getElementById('jk-kubu-absen').addEventListener('click', function () {
 document.getElementById('jk-kubu-saya').addEventListener('click', function () { jkSetKubuPetugas_('saya'); });
 document.getElementById('jk-kubu-lain').addEventListener('click', function () { jkSetKubuPetugas_('lain'); });
 document.getElementById('jadwal-form-date').addEventListener('input', jkSyncLabels_);
-document.getElementById('jadwal-form-date').addEventListener('click', function () {
-  try { if (this.showPicker) this.showPicker(); } catch (e) {}
-});
+// Pemilih tanggal kustom (awal pekan Senin, Sabtu/Minggu merah) menggantikan pemilih bawaan peramban.
+FaDatePicker.attach(document.getElementById('jadwal-form-date'), { trigger: document.getElementById('jk-date-wrap') });
+FaDatePicker.attach(document.getElementById('content-form-rule-date'));
+FaDatePicker.attach(document.getElementById('content-form-start'));
+FaDatePicker.attach(document.getElementById('content-form-end'));
 document.getElementById('jk-date-ico').innerHTML = mdIcon('calendar', 16);
 
 document.getElementById('jk-open-jenis').addEventListener('click', function () { jkOpenPicker_('jadwal-form-jenis', 'Pilih Jenis Jadwal'); });
@@ -1464,7 +1466,7 @@ function attachContentFormListenersOnce_() {
   });
   document.getElementById('content-form-rule-type').addEventListener('change', function () {
     document.getElementById('content-form-rule-day').style.display = this.value === 'WEEKLY' ? 'block' : 'none';
-    document.getElementById('content-form-rule-date').style.display = this.value === 'DATE' ? 'block' : 'none';
+    FaDatePicker.setVisible(document.getElementById('content-form-rule-date'), this.value === 'DATE');
   });
 
   document.getElementById('content-image-file-input').addEventListener('change', function (e) {
@@ -1633,7 +1635,7 @@ function openContentForm_(entry) {
   document.getElementById('content-form-schedule-mode').value = scheduleMode;
   document.getElementById('content-form-rule-group').style.display = scheduleMode === 'scheduled' ? 'block' : 'none';
   document.getElementById('content-form-rule-day').style.display = 'none';
-  document.getElementById('content-form-rule-date').style.display = 'none';
+  FaDatePicker.setVisible(document.getElementById('content-form-rule-date'), false);
   document.getElementById('content-form-rule-type').value = 'DAILY';
   if (scheduleMode === 'scheduled') {
     var rule = entry.scheduleRule;
@@ -1644,7 +1646,7 @@ function openContentForm_(entry) {
     } else if (rule.indexOf('DATE:') === 0) {
       document.getElementById('content-form-rule-type').value = 'DATE';
       document.getElementById('content-form-rule-date').value = rule.split(':')[1];
-      document.getElementById('content-form-rule-date').style.display = 'block';
+      FaDatePicker.setVisible(document.getElementById('content-form-rule-date'), true);
     }
   }
 

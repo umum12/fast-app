@@ -4096,3 +4096,80 @@ html[data-theme="dark"] .success-btn-secondary { background: rgba(255,255,255,.0
 @media (max-width: 480px) { .chat-modal { height: 88vh; height: 88dvh; } }
 html[data-theme="dark"] .chat-bubble { background: #1a2233; }
 html[data-theme="dark"] .chat-msg.mine .chat-bubble { background: #2f5fd0; }
+
+/* ===== Konfirmasi "rich" (Hapus Pekerjaan Permanen): judul, daftar dampak, centang persetujuan ===== */
+.confirm-modal-card.rich { max-width: 420px; border-radius: 28px; padding: 26px 24px 22px; }
+.confirm-modal-card.rich .confirm-modal-icon { width: 56px; height: 56px; box-shadow: 0 0 0 8px rgba(254,242,242,.9); margin-bottom: 18px; }
+.confirm-modal-title { margin: 0 0 14px; font-size: 20px; font-weight: 800; letter-spacing: -.01em; color: var(--color-text); text-align: center; }
+.confirm-modal-points { text-align: left; background: var(--md-surface-container); border: 1px solid var(--color-border); border-radius: 16px; padding: 14px; margin-bottom: 16px; }
+.confirm-modal-card .confirm-modal-points .confirm-points-caption { margin: 0 0 10px; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--color-text-muted); line-height: 1.2; text-align: left; }
+.confirm-point { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.45; color: var(--color-text); }
+.confirm-point + .confirm-point { margin-top: 10px; }
+.confirm-point-ico { color: var(--color-danger); display: inline-flex; flex: none; margin-top: 1px; }
+.confirm-modal-check { display: flex; align-items: flex-start; gap: 12px; text-align: left; font-size: 13px; line-height: 1.5; font-weight: 600; color: var(--color-text); cursor: pointer; margin-bottom: 18px; -webkit-tap-highlight-color: transparent; }
+.confirm-modal-check input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.confirm-modal-checkbox-box { flex: none; width: 22px; height: 22px; margin-top: 1px; border: 2px solid var(--md-outline, #94a3b8); border-radius: 7px; display: inline-flex; align-items: center; justify-content: center; color: transparent; transition: background .15s, border-color .15s, color .15s; }
+.confirm-modal-check input:checked + .confirm-modal-checkbox-box { background: var(--color-danger); border-color: var(--color-danger); color: #fff; }
+.confirm-modal-check input:focus-visible + .confirm-modal-checkbox-box { box-shadow: 0 0 0 3px rgba(220,38,38,.3); }
+.confirm-modal-card.needs-check .btn-confirm:disabled { background: #e2e8f0; color: #94a3b8; opacity: 1; box-shadow: none; }
+.confirm-modal-card.needs-check .btn-confirm:not(:disabled) { box-shadow: 0 8px 18px rgba(220,38,38,.3); }
+html[data-theme="dark"] .confirm-modal-card.rich .confirm-modal-icon { box-shadow: 0 0 0 8px rgba(220,38,38,.12); }
+html[data-theme="dark"] .confirm-modal-card.needs-check .btn-confirm:disabled { background: #1f2941; color: #5b6784; }
+html[data-theme="dark"] .confirm-point-ico { color: #f87171; }
+
+/* ===== Pemilih tanggal kustom (FaDatePicker): awal pekan Senin, Sabtu/Minggu merah, modal di tengah ===== */
+.fa-date-trigger { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; text-align: left; -webkit-tap-highlight-color: transparent; }
+.fa-date-trigger .fa-date-text { font-weight: 600; color: var(--color-text, #1e293b); }
+.fa-date-trigger.is-empty .fa-date-text { font-weight: 500; color: var(--color-text-muted, #94a3b8); }
+.fa-date-trigger .fa-date-ico { display: inline-flex; color: var(--color-primary, #2563eb); flex: none; }
+.fa-date-overlay { position: fixed; inset: 0; z-index: 330; background: rgba(2,6,23,.6); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px); display: flex; align-items: center; justify-content: center; padding: 16px; opacity: 0; visibility: hidden; transition: opacity .22s ease, visibility 0s linear .22s; }
+.fa-date-overlay.show { opacity: 1; visibility: visible; transition: opacity .22s ease; }
+.fa-date-card { width: 100%; max-width: 384px; background: #fff; color: #1e293b; border-radius: 24px; overflow: hidden; border: 1px solid #f1f5f9; box-shadow: 0 25px 50px -12px rgba(0,0,0,.35); display: flex; flex-direction: column; font-family: inherit; transform: translateY(20px) scale(.96); opacity: 0; transition: transform .3s cubic-bezier(.1,.9,.2,1), opacity .25s ease; }
+.fa-date-overlay.show .fa-date-card { transform: none; opacity: 1; }
+.fa-date-head { padding: 18px 24px 14px; background: #f8fafc; border-bottom: 1px solid #f1f5f9; }
+.fa-date-head small { display: block; font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #94a3b8; }
+.fa-date-head-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
+.fa-date-selected { font-size: 20px; font-weight: 800; letter-spacing: -.01em; color: #0f172a; }
+.fa-date-today { display: inline-flex; align-items: center; gap: 4px; border: 0; font: inherit; font-size: 12px; font-weight: 700; color: #1d4ed8; background: #eff6ff; padding: 6px 12px; border-radius: 999px; cursor: pointer; text-transform: none; }
+.fa-date-today:active { background: #dbeafe; }
+.fa-date-nav { display: flex; align-items: center; justify-content: space-between; padding: 12px 24px; }
+.fa-date-nav button { width: 36px; height: 36px; border-radius: 50%; border: 0; background: transparent; color: #334155; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.fa-date-nav button:active { background: #f1f5f9; transform: scale(.9); }
+.fa-date-month { font-size: 16px; font-weight: 800; color: #1e293b; }
+.fa-date-week, .fa-date-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; padding: 0 20px; text-align: center; }
+.fa-date-week { margin-bottom: 6px; }
+.fa-date-week span { font-size: 12px; font-weight: 800; color: #64748b; }
+.fa-date-week span.red { color: #ef4444; }
+.fa-date-grid { padding-bottom: 14px; min-height: 240px; align-content: start; }
+.fa-date-out { display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 500; color: #cbd5e1; height: 36px; }
+.fa-date-day { width: 36px; height: 36px; margin: 0 auto; border-radius: 50%; border: 2px solid transparent; background: transparent; font: inherit; font-size: 14px; font-weight: 600; color: #334155; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; transition: background .15s, transform .15s; -webkit-tap-highlight-color: transparent; }
+.fa-date-day:active { transform: scale(.9); }
+.fa-date-day.red { color: #ef4444; }
+.fa-date-day:hover { background: #f1f5f9; }
+.fa-date-day.red:hover { background: #fef2f2; }
+.fa-date-day.is-today { border-color: #3b82f6; background: rgba(239,246,255,.6); color: #2563eb; }
+.fa-date-day.is-today.red { color: #ef4444; }
+.fa-date-day.is-sel, .fa-date-day.is-sel:hover { background: #1d4ed8; border-color: #1d4ed8; color: #fff; box-shadow: 0 6px 14px rgba(37,99,235,.35); animation: faDatePop .3s ease-out; }
+@keyframes faDatePop { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+.fa-date-foot { display: flex; align-items: center; gap: 10px; padding: 14px 20px; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+.fa-date-foot .fa-spacer { flex: 1; }
+.fa-date-foot button { min-height: 42px; padding: 0 20px; border-radius: 12px; border: 0; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; text-transform: none; }
+.fa-date-foot button:active { transform: scale(.96); }
+.fa-date-btn-clear { background: transparent; color: #dc2626; padding: 0 12px !important; }
+.fa-date-btn-cancel { background: transparent; color: #475569; }
+.fa-date-btn-ok { background: #1d4ed8; color: #fff; box-shadow: 0 6px 14px rgba(37,99,235,.25); }
+html[data-theme="dark"] .fa-date-card { background: #151c2d; color: #e6ebf5; border-color: rgba(255,255,255,.08); }
+html[data-theme="dark"] .fa-date-head, html[data-theme="dark"] .fa-date-foot { background: #101726; border-color: rgba(255,255,255,.07); }
+html[data-theme="dark"] .fa-date-selected, html[data-theme="dark"] .fa-date-month { color: #f1f5f9; }
+html[data-theme="dark"] .fa-date-today { background: rgba(90,140,230,.18); color: #9fbcf2; }
+html[data-theme="dark"] .fa-date-nav button { color: #cbd5e1; }
+html[data-theme="dark"] .fa-date-nav button:active, html[data-theme="dark"] .fa-date-day:hover { background: rgba(255,255,255,.07); }
+html[data-theme="dark"] .fa-date-day { color: #dbe3f1; }
+html[data-theme="dark"] .fa-date-day.red, html[data-theme="dark"] .fa-date-week span.red { color: #f87171; }
+html[data-theme="dark"] .fa-date-day.is-today { background: rgba(90,140,230,.12); color: #9fbcf2; border-color: #5a8ce6; }
+html[data-theme="dark"] .fa-date-day.is-sel { background: #2f5fd0; border-color: #2f5fd0; color: #fff; }
+html[data-theme="dark"] .fa-date-out { color: #3b465f; }
+html[data-theme="dark"] .fa-date-btn-cancel { color: #a9b4c9; }
+html[data-theme="dark"] .fa-date-btn-ok { background: #2f5fd0; }
+@media (prefers-reduced-motion: reduce) { .fa-date-card, .fa-date-overlay { transition: none; } .fa-date-day.is-sel { animation: none; } }
+.jk-date { cursor: pointer; }
