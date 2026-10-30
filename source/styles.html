@@ -4018,3 +4018,49 @@ html[data-theme="dark"] .sending-mail, html[data-theme="dark"] .sending-pct { co
 html[data-theme="dark"] .sending-path::before { border-top-color: rgba(159,188,242,.4); }
 html[data-theme="dark"] .sending-chip { color: #9fbcf2; background: rgba(90,140,230,.16); border-color: rgba(90,140,230,.28); }
 html[data-theme="dark"] .sending-bar { background: #1f2941; border-color: rgba(255,255,255,.06); }
+
+/* ===== Kartu sukses (setelah buat pekerjaan / kirim laporan) — di tengah layar ===== */
+.page-section.active.is-success {
+  display: flex; flex-direction: column; justify-content: center;
+  /* header 69 + padding main 32 + padding bawah #screen-app 72 = 173 (tanpa scroll halaman);
+     padding-top 15px menyeimbangkan selisih tinggi nav (57) vs padding (72) agar benar-benar di tengah */
+  box-sizing: border-box; padding-top: 15px;
+  min-height: calc(100vh - 173px);
+  min-height: calc(100dvh - 173px);
+}
+@media (min-width: 768px) {
+  .page-section.active.is-success { padding-top: 0; min-height: calc(100vh - 69px - 48px); min-height: calc(100dvh - 69px - 48px); }
+}
+.success-card { position: relative; overflow: hidden; text-align: center; max-width: 420px; width: 100%; margin: 0 auto;
+  padding: 32px 24px 24px; border-radius: 24px; box-shadow: 0 20px 40px -14px rgba(15,23,42,.18); }
+.success-blur { position: absolute; width: 128px; height: 128px; border-radius: 50%; filter: blur(32px); opacity: .6; pointer-events: none; }
+.success-blur-a { top: -48px; right: -48px; background: #dbeafe; }
+.success-blur-b { bottom: -48px; left: -48px; background: #d1fae5; }
+.success-badge { position: relative; width: 96px; height: 96px; margin: 0 auto 16px; border-radius: 50%; background: #ecfdf5;
+  display: flex; align-items: center; justify-content: center; animation: successPulse 3s ease-in-out infinite; }
+.success-badge-core { width: 72px; height: 72px; border-radius: 50%; color: #fff; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(45deg, #10b981, #2dd4bf); box-shadow: 0 8px 18px rgba(16,185,129,.4);
+  animation: successPop .6s cubic-bezier(.175,.885,.32,1.275) both; }
+.success-badge-core svg, .success-badge-core .material-symbols-outlined { width: 40px; height: 40px; font-size: 40px; font-weight: 700; }
+.success-card .success-title { position: relative; line-height: 1.3; text-transform: none; margin: 0 0 8px; font-size: 21px; font-weight: 800; letter-spacing: -.01em; color: var(--color-text, #0f172a); }
+.success-card .success-sub { text-align: center; position: relative; margin: 0 auto; max-width: 300px; font-size: 13px; line-height: 1.6; color: var(--color-text-muted, #64748b); }
+.success-hl-strong { font-weight: 700; color: var(--color-text, #334155); }
+.success-hl-ok { font-weight: 700; color: #059669; }
+.success-actions { position: relative; display: flex; flex-direction: column; gap: 12px; margin-top: 28px; }
+.success-btn-primary, .success-btn-secondary { width: 100%; min-height: 48px; padding: 12px 16px; border-radius: 16px; font: inherit; font-size: 14px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; transition: transform .15s, background .15s; text-transform: none; }
+.success-btn-primary:active, .success-btn-secondary:active { transform: scale(.98); }
+.success-btn-secondary { background: var(--md-surface-container, #f8fafc); border: 1px solid var(--color-border, #e2e8f0); color: var(--color-text, #334155); }
+.success-btn-secondary .success-btn-icon { color: var(--color-primary); }
+.success-btn-primary { background: var(--color-primary); border: 0; color: #fff; box-shadow: 0 8px 18px rgba(37,99,235,.3); letter-spacing: .02em; }
+.success-btn-icon { display: inline-flex; line-height: 0; text-transform: none; }
+.success-btn-primary .success-btn-label { text-transform: uppercase; }
+@keyframes successPop { 0% { transform: scale(.3); opacity: 0; } 50% { transform: scale(1.1); opacity: 1; } 70% { transform: scale(.95); } 100% { transform: scale(1); opacity: 1; } }
+@keyframes successPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+html[data-theme="dark"] .success-card { box-shadow: 0 20px 40px -14px rgba(0,0,0,.6); }
+html[data-theme="dark"] .success-blur-a { background: #1e3a8a; opacity: .35; }
+html[data-theme="dark"] .success-blur-b { background: #064e3b; opacity: .4; }
+html[data-theme="dark"] .success-badge { background: rgba(16,185,129,.14); }
+html[data-theme="dark"] .success-hl-ok { color: #34d399; }
+html[data-theme="dark"] .success-btn-secondary { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.1); }
+@media (prefers-reduced-motion: reduce) { .success-badge, .success-badge-core { animation: none; } }

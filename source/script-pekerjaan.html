@@ -908,6 +908,8 @@ function showBuatMode_(isSelesai) {
   if (wrap) wrap.style.display = isSelesai ? 'block' : 'none';
   if (formCard) formCard.style.display = isSelesai ? 'none' : 'block';
   if (okCard) okCard.style.display = 'none';
+  var secBuat = document.querySelector('.page-section[data-page="buat"]');
+  if (secBuat) secBuat.classList.remove('is-success');
 }
 
 function selesaiRow_(label, value) {
@@ -1130,23 +1132,43 @@ var JENIS_MANDIRI_SET_ = ['kebersihan', 'perbaikan', 'lainnya'];
 function setSuccessButtons_(isSelesai) {
   lastSuccessWasSelesai_ = isSelesai;
   var again = document.getElementById('btn-buat-laporan-lagi');
-  if (again) again.textContent = isSelesai ? 'Kembali ke Pekerjaan' : 'Buat Pekerjaan Lain';
+  var lbl = again && again.querySelector('.success-btn-label');
+  if (lbl) lbl.textContent = isSelesai ? 'Kembali ke Pekerjaan' : 'Buat Pekerjaan Lain';
+}
+
+// Subteks kartu sukses: potongan [teks, 'strong'|'ok'|''] dirangkai aman (tanpa innerHTML).
+function setSuccessSub_(parts) {
+  var el = document.getElementById('buat-success-subtext');
+  if (!el) return;
+  el.textContent = '';
+  parts.forEach(function (pt) {
+    if (!pt[1]) { el.appendChild(document.createTextNode(pt[0])); return; }
+    var sp = document.createElement('span');
+    sp.className = 'success-hl-' + pt[1];
+    sp.textContent = pt[0];
+    el.appendChild(sp);
+  });
+}
+
+function setSuccessCentered_(on) {
+  var sec = document.querySelector('.page-section[data-page="buat"]');
+  if (sec) sec.classList.toggle('is-success', !!on);
 }
 
 function showPekerjaanSuccessCard(jenis) {
   setSuccessButtons_(false);
   document.getElementById('buat-form-card').style.display = 'none';
   var isMandiri = JENIS_MANDIRI_SET_.indexOf(jenis) !== -1;
-  document.getElementById('buat-success-message').textContent = 'Pekerjaan berhasil dibuat.';
-  var subtextEl = document.getElementById('buat-success-subtext');
-  if (subtextEl) {
-    subtextEl.textContent = isMandiri
-      ? 'Pekerjaan ini bersifat mandiri dan otomatis ditandai selesai.'
-      : (jenis === 'penugasan'
-        ? 'Belum diambil oleh Facility Support terkait.'
-        : 'Menunggu ditindaklanjuti oleh Administrator.');
+  document.getElementById('buat-success-message').textContent = 'Pekerjaan Berhasil Dibuat!';
+  if (isMandiri) {
+    setSuccessSub_([['Pekerjaan ini bersifat ', ''], ['mandiri', 'strong'], [' dan otomatis ditandai ', ''], ['selesai', 'ok'], ['.', '']]);
+  } else if (jenis === 'penugasan') {
+    setSuccessSub_([['Belum diambil oleh Facility Support terkait.', '']]);
+  } else {
+    setSuccessSub_([['Menunggu ditindaklanjuti oleh Administrator.', '']]);
   }
   document.getElementById('buat-success-card').style.display = 'block';
+  setSuccessCentered_(true);
 }
 
 function showLaporanSuccessCard_(pekerjaanId) {
@@ -1154,13 +1176,14 @@ function showLaporanSuccessCard_(pekerjaanId) {
   var wrap = document.getElementById('buat-selesai-wrap');
   if (wrap) wrap.style.display = 'none';
   document.getElementById('buat-form-card').style.display = 'none';
-  document.getElementById('buat-success-message').textContent = 'Laporan berhasil dikirim.';
-  var subtextEl = document.getElementById('buat-success-subtext');
-  if (subtextEl) subtextEl.textContent = 'Pekerjaan ' + pekerjaanId + ' telah ditandai selesai.';
+  document.getElementById('buat-success-message').textContent = 'Laporan Berhasil Dikirim!';
+  setSuccessSub_([['Pekerjaan ', ''], [String(pekerjaanId), 'strong'], [' telah ditandai ', ''], ['selesai', 'ok'], ['.', '']]);
   document.getElementById('buat-success-card').style.display = 'block';
+  setSuccessCentered_(true);
 }
 
 function hidePekerjaanSuccessCard() {
+  setSuccessCentered_(false);
   document.getElementById('buat-success-card').style.display = 'none';
   document.getElementById('buat-form-card').style.display = 'block';
 }
