@@ -454,8 +454,6 @@ var MD_SYMBOLS = {
   calendar: 'calendar_today',
   description: 'description',
   photoCamera: 'photo_camera',
-  cameraSwitch: 'cameraswitch',
-  replay: 'replay',
   refresh: 'refresh',
   visibility: 'visibility',
   search: 'search',
@@ -736,7 +734,6 @@ function closeTopLayer_() {
   function isShown(id) { var el = document.getElementById(id); return !!(el && el.classList.contains('show')); }
   if (typeof FaDatePicker !== 'undefined' && FaDatePicker.isOpen()) { FaDatePicker.close(); return true; }
   if (window.FASTAPP_UPDATE && window.FASTAPP_UPDATE.dismiss && window.FASTAPP_UPDATE.dismiss()) return true; // dialog pembaruan (GitHub Pages): Back = "Nanti saja"
-  if (isShown('cam-overlay') && window.FaCamera) { FaCamera.close(); return true; }
   if (isShown('photo-viewer')) { closePhotoViewer(); return true; }
   // Sedang mengirim / memuat ulang: Back diabaikan (proses tidak boleh ditinggalkan di tengah jalan).
   if (isShown('sending-overlay') || isShown('reload-overlay')) {
