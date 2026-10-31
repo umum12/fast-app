@@ -862,7 +862,9 @@ function renderApp(bootstrap, session) {
   document.getElementById('akun-nama').textContent = user.displayName;
   var avatarEl = document.getElementById('akun-avatar');
   if (avatarEl) avatarEl.textContent = ((user.displayName || user.userCode || '?').trim().charAt(0) || '?').toUpperCase();
-  document.getElementById('akun-kode').textContent = user.userCode;
+  document.getElementById('akun-kode').textContent = user.userCode;   // Kode User (ID permanen)
+  var loginCodeEl = document.getElementById('akun-login-code');       // Password Login (login_code yang dipakai masuk)
+  if (loginCodeEl) loginCodeEl.textContent = (session && session.accessCode) || ((loadSession() || {}).accessCode) || '—';
   document.getElementById('akun-role').textContent = ROLE_LABELS[user.role] || user.role;
 
 
@@ -1144,7 +1146,7 @@ document.getElementById('input-access-code').addEventListener('keydown', functio
 });
 (function setupAkunExtras_() {
   var lo = document.getElementById('btn-logout');
-  if (lo) lo.innerHTML = mdIcon('logout', 24);
+  if (lo) lo.innerHTML = mdIcon('logout', 28);
   var ov = document.getElementById('about-overlay');
   var more = document.getElementById('btn-about-more');
   var closeB = document.getElementById('btn-about-close');
