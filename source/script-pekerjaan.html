@@ -719,6 +719,21 @@ function openPhotoSourceSheet(targetInputId) {
 
 function triggerPhotoFileInput_(useCamera, targetInputId) {
   var input = document.getElementById(targetInputId || 'photo-file-input');
+  // Kamera internal (getUserMedia, hasil persegi 1:1). Bila tidak didukung / izin ditolak /
+  // gagal, otomatis kembali ke kamera bawaan perangkat (input capture) seperti sebelumnya.
+  if (useCamera && window.FaCamera && FaCamera.supported()) {
+    FaCamera.open(function (file) {
+      var ok = false;
+      try {
+        var dt = new DataTransfer(); dt.items.add(file);
+        input.files = dt.files;
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        ok = true;
+      } catch (e) { ok = false; }
+      if (!ok) { input.setAttribute('capture', 'environment'); input.click(); }
+    }, function () { input.setAttribute('capture', 'environment'); input.click(); });
+    return;
+  }
   if (useCamera) {
     input.setAttribute('capture', 'environment');
   } else {
@@ -3096,5 +3111,123 @@ function executeLepasPekerjaan(pekerjaanId) {
 
 </script>
 
+<script>
+// ============================================================
+// KAMERA INTERNAL PWA (getUserMedia) — hasil foto PERSEGI 1:1.
+// - Pratinjau persegi = hasil jepretan (center-crop dari bingkai video), jadi "apa yang dilihat = yang didapat".
+// - Ringan: resolusi diminta ideal 1280, hasil maks 1280x1280, stream dimatikan saat ditutup /
+//   aplikasi di latar belakang. Tanpa pustaka tambahan.
+// - Foto dari GALERI tidak lewat sini: rasio & bentuk asli dipertahankan (compressImage hanya
+//   memperkecil proporsional bila terlalu besar, tanpa crop).
+// - Hasil dikirim sebagai File ke alur lama (input change -> compressImage -> upload), tidak ada
+//   perubahan pada mekanisme upload / business rules.
+// ============================================================
+var FaCamera = (function () {
+  var ov = null, video, stage, shot, btnShutter, btnSwitch, btnClose, btnRetake, btnUse, hint, flash;
+  var stream = null, facing = 'environment', token = 0, onFile = null, onFallback = null, blob = null, shotUrl = '';
 
-
+  function supported() {
+    return !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.isSecureContext !== false &&
+      typeof DataTransfer !== 'undefined' && window.HTMLCanvasElement && HTMLCanvasElement.prototype.toBlob);
+  }
+  function build() {
+    if (ov) return;
+    ov = document.createElement('div'); ov.id = 'cam-overlay'; ov.className = 'cam-overlay';
+    ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', 'Kamera');
+    ov.innerHTML =
+      '<div class="cam-top"><button type="button" class="cam-btn cam-close" aria-label="Tutup kamera"></button><span class="cam-title">Foto 1:1</span><span class="cam-btn cam-spacer"></span></div>' +
+      '<div class="cam-stage" id="cam-stage"><video id="cam-video" playsinline muted autoplay></video><img id="cam-shot" alt="Hasil foto" hidden><div class="cam-flash" id="cam-flash"></div></div>' +
+      '<div class="cam-hint" id="cam-hint">Membuka kamera...</div>' +
+      '<div class="cam-bottom">' +
+        '<div class="cam-live"><span class="cam-btn cam-spacer"></span><button type="button" class="cam-shutter" id="cam-shutter" aria-label="Ambil foto"><span></span></button><button type="button" class="cam-btn cam-switch" id="cam-switch" aria-label="Ganti kamera"></button></div>' +
+        '<div class="cam-review" hidden><button type="button" class="cam-pill cam-retake"></button><button type="button" class="cam-pill cam-use primary"></button></div>' +
+      '</div>';
+    document.body.appendChild(ov);
+    video = ov.querySelector('#cam-video'); stage = ov.querySelector('#cam-stage'); shot = ov.querySelector('#cam-shot');
+    hint = ov.querySelector('#cam-hint'); flash = ov.querySelector('#cam-flash');
+    btnShutter = ov.querySelector('#cam-shutter'); btnSwitch = ov.querySelector('#cam-switch'); btnClose = ov.querySelector('.cam-close');
+    btnRetake = ov.querySelector('.cam-retake'); btnUse = ov.querySelector('.cam-use');
+    btnClose.innerHTML = mdIcon('close', 24); btnSwitch.innerHTML = mdIcon('cameraSwitch', 26);
+    btnRetake.innerHTML = mdIcon('replay', 20) + '<span>Ulangi</span>'; btnUse.innerHTML = mdIcon('check', 20) + '<span>Pakai Foto</span>';
+    btnClose.addEventListener('click', function () { close(); });
+    btnShutter.addEventListener('click', capture);
+    btnSwitch.addEventListener('click', function () { facing = facing === 'environment' ? 'user' : 'environment'; start(); });
+    btnRetake.addEventListener('click', function () { showLive(); });
+    btnUse.addEventListener('click', use);
+    document.addEventListener('visibilitychange', function () { if (document.hidden && isOpen()) close(); });
+    window.addEventListener('pagehide', function () { stop(); });
+  }
+  function isOpen() { return !!ov && ov.classList.contains('show'); }
+  function setMode(review) {
+    ov.querySelector('.cam-live').hidden = review; ov.querySelector('.cam-review').hidden = !review;
+    video.hidden = review; shot.hidden = !review;
+  }
+  function stop() {
+    token++;
+    if (stream) { try { stream.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {} stream = null; }
+    if (video) { try { video.pause(); } catch (e) {} video.srcObject = null; }
+  }
+  function revoke() { if (shotUrl) { try { URL.revokeObjectURL(shotUrl); } catch (e) {} shotUrl = ''; } blob = null; if (shot) shot.removeAttribute('src'); }
+  function fail(msg) {
+    var fb = onFallback; close(true);
+    try { showSnackbar(msg, 'info'); } catch (e) {}
+    if (fb) fb();
+  }
+  function start() {
+    stop(); var my = token;
+    hint.textContent = 'Membuka kamera...'; btnShutter.disabled = true;
+    navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 1280 } } })
+      .then(function (s) {
+        if (my !== token || !isOpen()) { s.getTracks().forEach(function (t) { t.stop(); }); return; }
+        stream = s; video.srcObject = s;
+        var p = video.play(); if (p && p.catch) p.catch(function () {});
+        btnShutter.disabled = false; hint.textContent = 'Arahkan kamera, lalu ketuk tombol bulat';
+        if (navigator.mediaDevices.enumerateDevices) {
+          navigator.mediaDevices.enumerateDevices().then(function (ds) {
+            var n = ds.filter(function (d) { return d.kind === 'videoinput'; }).length;
+            btnSwitch.style.visibility = n > 1 ? 'visible' : 'hidden';
+          }).catch(function () {});
+        }
+      })
+      .catch(function (err) {
+        if (my !== token) return;
+        var denied = err && (err.name === 'NotAllowedError' || err.name === 'SecurityError');
+        fail(denied ? 'Izin kamera ditolak. Memakai kamera bawaan perangkat.' : 'Kamera internal tidak tersedia. Memakai kamera bawaan perangkat.');
+      });
+  }
+  function showLive() { revoke(); setMode(false); hint.textContent = 'Arahkan kamera, lalu ketuk tombol bulat'; if (video.paused) { var p = video.play(); if (p && p.catch) p.catch(function () {}); } }
+  function capture() {
+    if (!stream || !video.videoWidth) return;
+    btnShutter.disabled = true;
+    var vw = video.videoWidth, vh = video.videoHeight, side = Math.min(vw, vh);
+    var out = Math.min(side, 1280);
+    var c = document.createElement('canvas'); c.width = out; c.height = out;
+    c.getContext('2d').drawImage(video, Math.round((vw - side) / 2), Math.round((vh - side) / 2), side, side, 0, 0, out, out);
+    flash.classList.remove('go'); void flash.offsetWidth; flash.classList.add('go');
+    c.toBlob(function (b) {
+      c.width = 0; c.height = 0;
+      btnShutter.disabled = false;
+      if (!b) { try { showSnackbar('Gagal mengambil foto. Coba lagi.', 'error'); } catch (e) {} return; }
+      revoke(); blob = b; shotUrl = URL.createObjectURL(b); shot.src = shotUrl;
+      try { video.pause(); } catch (e) {}
+      setMode(true); hint.textContent = 'Foto persegi 1:1';
+    }, 'image/jpeg', 0.92);
+  }
+  function use() {
+    if (!blob) return;
+    var f; try { f = new File([blob], 'kamera_' + Date.now() + '.jpg', { type: 'image/jpeg' }); } catch (e) { f = blob; }
+    var cb = onFile; close(true); if (cb) cb(f);
+  }
+  function open(fileCb, fallbackCb) {
+    build(); onFile = fileCb; onFallback = fallbackCb; facing = 'environment';
+    setMode(false); revoke(); btnSwitch.style.visibility = 'hidden';
+    ov.classList.add('show'); start();
+  }
+  function close(silent) {
+    stop(); revoke();
+    if (ov) ov.classList.remove('show');
+    if (!silent) { onFile = null; onFallback = null; }
+  }
+  return { supported: supported, open: open, close: close, isOpen: isOpen };
+})();
+</script>
