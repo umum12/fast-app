@@ -731,6 +731,7 @@ var exitingApp_ = false;
 function closeTopLayer_() {
   function isShown(id) { var el = document.getElementById(id); return !!(el && el.classList.contains('show')); }
   if (typeof FaDatePicker !== 'undefined' && FaDatePicker.isOpen()) { FaDatePicker.close(); return true; }
+  if (window.FASTAPP_UPDATE && window.FASTAPP_UPDATE.dismiss && window.FASTAPP_UPDATE.dismiss()) return true; // dialog pembaruan (GitHub Pages): Back = "Nanti saja"
   if (isShown('photo-viewer')) { closePhotoViewer(); return true; }
   // Sedang mengirim / memuat ulang: Back diabaikan (proses tidak boleh ditinggalkan di tengah jalan).
   if (isShown('sending-overlay') || isShown('reload-overlay')) {

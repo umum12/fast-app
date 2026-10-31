@@ -487,11 +487,17 @@ document.getElementById('jadwal-form-user').addEventListener('change', function 
   document.getElementById('jadwal-err-user').textContent = '';
 });
 
-function openJadwalForm(entry) {
+// presetDate (opsional, "YYYY-MM-DD"): dipakai saat form dibuka dari kolom tanggal Kalender.
+function openJadwalForm(entry, presetDate) {
   jadwalFormEditId = entry ? entry.jadwalId : null;
   document.getElementById('jadwal-form-heading').textContent = entry ? 'Ubah Jadwal' : 'Tambah Jadwal';
-  document.getElementById('jadwal-form-date').value = entry ? entry.tanggal : todayDateStr_();
+  document.getElementById('jadwal-form-date').value = entry ? entry.tanggal : (presetDate || todayDateStr_());
   var jenisVal = entry ? entry.jenis : JK_PIKET_JENIS_[0];
+  if (!entry && presetDate) {
+    // Jenis awal yang cocok dengan harinya (Piket Sabtu/Minggu hanya valid pada hari itu).
+    var pdow = new Date(presetDate + 'T00:00:00Z').getUTCDay();
+    jenisVal = pdow === 6 ? 'piket_sabtu' : (pdow === 0 ? 'piket_minggu' : 'tugas_khusus');
+  }
   document.getElementById('jadwal-form-jenis').value = jenisVal;
   jkKubuJenis = jkKubuOfJenis_(jenisVal);
   var isSelf = !entry || entry.userCode === jkMe_().userCode;
@@ -850,6 +856,7 @@ function jkRenderCalendar_(list) {
   var filtered = !!(jkFilter_.mine || jkFilter_.user);
   var today = todayDateStr_();
   var dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+  var canAddFromCal = !!(appBootstrap && appBootstrap.currentUser && appBootstrap.currentUser.role !== 'demo');
 
   for (var i = 0; i < 7; i++) {
     var ms = startMs + i * 86400000;
@@ -902,6 +909,21 @@ function jkRenderCalendar_(list) {
       items.appendChild(chip);
     });
     row.appendChild(items);
+    // Klik kolom tanggal -> form Tambah Jadwal dengan tanggal terisi. Tidak untuk Demo dan minggu Arsip (hanya dilihat).
+    if (canAddFromCal && jkWeekIdx_ >= 0) {
+      row.classList.add('is-addable');
+      var addBtn = document.createElement('button');
+      addBtn.type = 'button'; addBtn.className = 'jk-cal-add';
+      addBtn.setAttribute('aria-label', 'Tambah jadwal tanggal ' + ds);
+      addBtn.innerHTML = mdIcon('add', 18);
+      row.appendChild(addBtn);
+      (function (dateStr) {
+        row.addEventListener('click', function (ev) {
+          if (ev.target.closest && ev.target.closest('button.jk-chip')) return; // chip jadwal membuka Detail, bukan form baru (chip "Tim Lengkap" hanya info)
+          openJadwalForm(null, dateStr);
+        });
+      })(ds);
+    }
     cal.appendChild(row);
   }
 
@@ -2101,7 +2123,7 @@ function buildPekerjaanListCard_(p, opts) {
   var badgeRow = document.createElement('div');
   badgeRow.className = 'op-card-top';
   badgeRow.innerHTML =
-    '<span class="badge-pill ' + jenisInfo.cls + '"><span class="dot"></span>' + jenisInfo.label + '</span>' +
+    '<span class="badge-pill lc-jenis ' + jenisInfo.cls + '">' + mdIcon(jenisInfo.icon || 'description', 14) + '<span>' + jenisInfo.label + '</span></span>' +
     '<span class="badge badge-status-pulse ' + statusCls + '"><span class="dot pulse"></span>' + p.statusLabel + '</span>' +
     (p.assignmentMode === 'direct' && p.targetUserCode ? '<span class="badge badge-info">Direct \u2192 ' + escapeHtmlJk_(p.targetUserName || p.targetUserCode) + '</span>' : '');
   main.appendChild(badgeRow);
@@ -2110,20 +2132,20 @@ function buildPekerjaanListCard_(p, opts) {
   var displayDate = (p.arah === 'mandiri' && p.performedAt) ? p.performedAt : (p.completedAt || p.startedAt || p.createdAt);
   var dtParts = String(formatDateTimeFull_(displayDate) || '').split(' | ');
 
-  var dateRow = document.createElement('div');
-  dateRow.className = 'list-card-date-line lc-meta';
-  dateRow.innerHTML = '<span class="icon-slot">' + mdIcon('calendar', 16) + '</span><span>' + escapeHtmlJk_(dtParts[0]) + '</span>' +
-    (dtParts[1] ? '<span class="lc-sep">\u2022</span><span class="lc-time">' + escapeHtmlJk_(dtParts[1]) + ' WIB</span>' : '');
-  main.appendChild(dateRow);
-
-  var personRow = document.createElement('div');
-  personRow.className = 'lc-person';
+  // Petugas (kiri) dan tanggal/jam (kanan) dalam satu baris -> kartu lebih ringkas.
+  var whoRow = document.createElement('div');
+  whoRow.className = 'lc-who';
   var tone = lcAvatarTone_(officer);
-  personRow.innerHTML =
-    '<span class="lc-avatar" style="background:' + tone[0] + ';color:' + tone[1] + ';">' + escapeHtmlJk_(String(officer || '?').trim().charAt(0).toUpperCase() || '?') + '</span>' +
-    '<span class="lc-name">' + escapeHtmlJk_(officer || '') + '</span>' +
-    (floorText ? '<span class="lc-sep">\u2022</span><span class="lc-floor">' + mdIcon('location', 14) + '<span>' + escapeHtmlJk_(floorText) + '</span></span>' : '');
-  main.appendChild(personRow);
+  var dateShort = escapeHtmlJk_(formatAktivitasDateShort_(displayDate) || dtParts[0] || '');
+  var timeText = dtParts[1] ? escapeHtmlJk_(dtParts[1]) + ' WIB' : '';
+  whoRow.innerHTML =
+    '<div class="lc-person">' +
+      '<span class="lc-avatar" style="background:' + tone[0] + ';color:' + tone[1] + ';">' + escapeHtmlJk_(String(officer || '?').trim().charAt(0).toUpperCase() || '?') + '</span>' +
+      '<div class="lc-who-text"><span class="lc-name">' + escapeHtmlJk_(officer || '') + '</span>' +
+      (floorText ? '<span class="lc-floor">' + mdIcon('location', 13) + '<span>' + escapeHtmlJk_(floorText) + '</span></span>' : '') + '</div>' +
+    '</div>' +
+    '<div class="lc-when" title="' + escapeHtmlJk_(dtParts[0] || '') + '"><span class="lc-date">' + dateShort + '</span>' + (timeText ? '<span class="lc-time">' + timeText + '</span>' : '') + '</div>';
+  main.appendChild(whoRow);
 
   var descText = p.completionNotes || p.description || '';
   if (descText) {
