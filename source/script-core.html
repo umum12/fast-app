@@ -1034,7 +1034,8 @@ function handleLogin() {
 
       var user = response.data.currentUser;
       var session = {
-        accessCode: user.userCode,
+        accessCode: code,           // kode LOGIN yang diketik (bisa diganti Admin)
+        userCode: user.userCode,    // ID permanen user (bukan kredensial)
         role: user.role,
         displayName: user.displayName,
         uiState: {}

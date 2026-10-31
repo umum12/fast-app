@@ -445,7 +445,7 @@ var draftTimer_ = null;
 
 function draftKey_() {
   var s = (typeof loadSession === 'function') ? loadSession() : null;
-  return (s && s.accessCode) ? DRAFT_PREFIX_ + String(s.accessCode).trim().toUpperCase() : null;
+  return (s && (s.userCode || s.accessCode)) ? DRAFT_PREFIX_ + String(s.userCode || s.accessCode).trim().toUpperCase() : null;
 }
 
 function draftRead_() {
@@ -1250,7 +1250,7 @@ var FEED_FRESH_MS_ = 60 * 1000; // data memori < 60 dtk dianggap segar (tanpa re
 
 function persistKey_(name) {
   var s = (typeof loadSession === 'function') ? loadSession() : null;
-  return (s && s.accessCode) ? PERSIST_PREFIX_ + String(s.accessCode).trim().toUpperCase() + ':' + name : null;
+  return (s && (s.userCode || s.accessCode)) ? PERSIST_PREFIX_ + String(s.userCode || s.accessCode).trim().toUpperCase() + ':' + name : null;
 }
 
 function persistGet_(name) {
