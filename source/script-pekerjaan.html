@@ -960,6 +960,8 @@ function renderSelesaiDetail_(p) {
       var img = document.createElement('img');
       img.src = ph.thumbUrl || ph.url;
       img.alt = 'Foto awal';
+      img.loading = 'lazy';
+      img.decoding = 'async';
       img.style.cursor = 'pointer';
       img.addEventListener('click', function () {
         if (typeof openPhotoViewer === 'function') openPhotoViewer(photos.map(function (x) { return x.url; }), idx);
@@ -1611,6 +1613,8 @@ function createOpCardV2(cfg) {
     var img = document.createElement('img');
     img.src = cfg.photos[0].thumbUrl || cfg.photos[0].url;
     img.alt = 'Foto dokumentasi';
+    img.loading = 'lazy';
+    img.decoding = 'async';
     img.onerror = function () {
       console.warn('Gagal memuat thumbnail. file_id:', cfg.photos[0].file_id);
       thumbSide.style.display = 'flex';

@@ -613,6 +613,8 @@ function renderNav(navItems) {
  */
 
 function goToPage(pageKey) {
+  // Pindah halaman selalu menutup modal/sheet/picker yang masih terbuka (tidak ada lapisan 'bocor' ke halaman lain).
+  closeAllLayers_(true);
   // Auto-refresh Pekerjaan hanya relevan selama halaman Pekerjaan terbuka.
   if (typeof stopPekerjaanAutoRefresh === 'function') stopPekerjaanAutoRefresh();
 
@@ -1064,10 +1066,77 @@ function handleLogin() {
  * salah satu cache itu di-invalidate lewat aksi atau force-refresh.
  * resetAllPageDataCache_() didefinisikan di script-pekerjaan.html.
  */
+/**
+ * Menutup SEMUA lapisan (modal, sheet, picker, penampil foto, chat). Dipakai di setiap jalur keluar sesi
+ * (Keluar, sesi tidak valid, auto-logout) agar tidak ada overlay tertinggal di atas layar login.
+ * passiveOnly=true (dipakai goToPage): hanya lapisan yang aman ditutup saat pindah halaman — konfirmasi,
+ * "Mengirim", dan "Muat ulang" TIDAK disentuh karena sedang menjalankan proses.
+ */
+function closeAllLayers_(passiveOnly) {
+  function t(fn) { try { fn(); } catch (e) {} }
+  t(function () { if (typeof FaDatePicker !== 'undefined' && FaDatePicker.isOpen()) FaDatePicker.close(); });
+  t(function () { if (window.FaChatUi) FaChatUi.close(); });
+  t(closePhotoViewer);
+  t(closeBottomSheet);
+  t(function () { if (typeof closeJadwalForm === 'function') closeJadwalForm(); });
+  ['jk-picker-overlay', 'jk-form-overlay', 'jk-detail-overlay', 'about-overlay', 'philosophy-overlay',
+   'activity-detail-overlay', 'photo-source-overlay', 'chat-overlay'].forEach(function (id) {
+    var o = document.getElementById(id); if (o) o.classList.remove('show');
+  });
+  if (passiveOnly) return;
+  t(hideConfirmModal);
+  t(function () { if (typeof hideSendingOverlay_ === 'function') hideSendingOverlay_(); });
+  t(closeReloadOverlay_);
+}
+
+/**
+ * Mengosongkan sisa state UI milik sesi sebelumnya (form, foto, pencarian, filter, kalender, chat) agar
+ * akun berikutnya di perangkat yang sama mulai bersih. Dipanggil di setiap jalur keluar sesi.
+ * Tidak menyentuh data di server maupun draft akun lain (draft tersimpan sudah per-akun).
+ */
+function resetUiForNewSession_() {
+  function t(fn) { try { fn(); } catch (e) {} }
+  function val(id, v) { var e = document.getElementById(id); if (e) e.value = v; }
+  closeAllLayers_(false);
+  // Form Buat
+  t(function () {
+    val('form-subject', ''); val('form-description', '');
+    var c = document.getElementById('form-description-counter'); if (c) c.textContent = '0/500';
+    var er = document.getElementById('form-report-error'); if (er) er.textContent = '';
+    selectedPhotos = []; activePhotoSlotIndex = null;
+    if (typeof createSubmitKeyValue_ !== 'undefined') createSubmitKeyValue_ = '';
+    if (typeof collapsePerformedAt_ === 'function') collapsePerformedAt_();
+    if (typeof resetBuatPrefillContext_ === 'function') resetBuatPrefillContext_();
+    if (typeof hidePekerjaanSuccessCard === 'function') hidePekerjaanSuccessCard();
+    if (typeof renderPhotoSlots === 'function') renderPhotoSlots();
+  });
+  // Form Selesaikan Pekerjaan
+  t(function () {
+    val('selesai-notes', ''); selesaiPhotos = []; selesaiActiveSlot = null;
+    var n = document.getElementById('selesai-notes-counter'); if (n) n.textContent = '0/500';
+    if (typeof renderSelesaiPhotoSlots_ === 'function') renderSelesaiPhotoSlots_();
+  });
+  // Pencarian & filter
+  t(function () {
+    val('activity-search', ''); val('reports-search', '');
+    currentActivityFilter = 'all'; activityQuick_ = { range: '', status: '' };
+    currentPekerjaanFilter = 'all';
+    riwayatFilter_ = { jenis: '', floorCode: '', range: '', status: '', peran: '' };
+    if (typeof renderActivityTabs === 'function') renderActivityTabs();
+    if (typeof renderActivityQuick_ === 'function') renderActivityQuick_();
+    if (typeof renderPekerjaanFilter_ === 'function') renderPekerjaanFilter_();
+  });
+  // Kalender / filter Jadwal Kolaborasi
+  t(function () { jkWeekIdx_ = 0; jkFilter_ = { mine: false, user: '' }; });
+  // Ruang Diskusi (titik merah, pesan, polling)
+  t(function () { if (window.FaChatUi) FaChatUi.reset(); });
+}
+
 function handleLogout() {
   stopInactivityTimer();
   clearSession();
   if (typeof resetAllPageDataCache_ === 'function') resetAllPageDataCache_();
+  resetUiForNewSession_();
   appBootstrap = null;
   document.getElementById('screen-app').style.display = 'none';
   document.getElementById('screen-login').style.display = 'flex';
@@ -1081,10 +1150,8 @@ function exitInvalidSession_(msg) {
   stopInactivityTimer();
   clearSession();
   if (typeof resetAllPageDataCache_ === 'function') resetAllPageDataCache_();
+  resetUiForNewSession_();   // tutup semua lapisan + kosongkan sisa state sesi lama
   appBootstrap = null;
-  ['sending-overlay', 'reload-overlay'].forEach(function (id) {
-    var o = document.getElementById(id); if (o) o.classList.remove('show');
-  });
   app.style.display = 'none';
   document.getElementById('screen-login').style.display = 'flex';
   document.getElementById('input-access-code').value = '';
@@ -1121,6 +1188,7 @@ function handleInactivityLogout() {
   stopInactivityTimer();
   clearSession();
   if (typeof resetAllPageDataCache_ === 'function') resetAllPageDataCache_();
+  resetUiForNewSession_();
   appBootstrap = null;
   document.getElementById('screen-app').style.display = 'none';
   document.getElementById('screen-login').style.display = 'flex';

@@ -1457,6 +1457,11 @@ select.form-input {
 }
 .list-card:last-child { margin-bottom: 0; }
 .list-card:active { transform: scale(0.995); }
+/* Performa: kartu di luar layar tidak ikut dihitung style/layout/paint sampai mendekati layar.
+   'auto' membuat browser mengingat tinggi asli kartu yang sudah pernah tampil (scroll tetap stabil). */
+@supports (content-visibility: auto) {
+  .list-card { content-visibility: auto; contain-intrinsic-size: auto 260px; }
+}
 
 .list-card-row {
   flex-direction: row;

@@ -1866,6 +1866,7 @@ function renderContentBanner_(list) {
       img.className = 'content-card-image';
       img.src = c.imageUrl;
       img.alt = c.title;
+      img.decoding = 'async';
       img.addEventListener('click', function () { openPhotoViewer([c.imageUrl], 0); });
       slide.appendChild(img);
     }
@@ -2199,7 +2200,7 @@ function buildPekerjaanListCard_(p, opts) {
   var dotEl = document.getElementById('chat-unread');
   var SEEN_KEY = 'fa_chat_seen_ts';
   var POLL_OPEN_MS = 8000, POLL_IDLE_MS = 90000;
-  var lastTs = 0, hasRender = false, inFlight = false, pollTimer = null, idleTimer = null, sending = false;
+  var lastTs = 0, hasRender = false, inFlight = false, pollTimer = null, idleTimer = null, sending = false, epoch = 0;
 
   document.getElementById('chat-card-icon').innerHTML = mdIcon('forum', 22);
   document.getElementById('chat-head-ico').innerHTML = mdIcon('forum', 22);
@@ -2207,8 +2208,10 @@ function buildPekerjaanListCard_(p, opts) {
   document.getElementById('chat-card-go').innerHTML = mdIcon('chevronRight', 22);
   sendBtn.innerHTML = mdIcon('send', 20);
 
-  function seenTs_() { try { return Number(localStorage.getItem(SEEN_KEY)) || 0; } catch (e) { return 0; } }
-  function markSeen_(ts) { try { if (ts) localStorage.setItem(SEEN_KEY, String(ts)); } catch (e) {} dotEl.style.display = 'none'; }
+  // Kunci "sudah dibaca" per akun (tidak dibagi antar akun di perangkat yang sama).
+  function seenKey_() { var s = loadSession(); var u = s && (s.userCode || s.accessCode); return u ? SEEN_KEY + ':' + String(u).toUpperCase() : ''; }
+  function seenTs_() { try { var k = seenKey_(); return k ? (Number(localStorage.getItem(k)) || 0) : 0; } catch (e) { return 0; } }
+  function markSeen_(ts) { try { var k = seenKey_(); if (ts && k) localStorage.setItem(k, String(ts)); } catch (e) {} dotEl.style.display = 'none'; }
   function isOpen_() { return overlay.classList.contains('show'); }
   function ac_() { var s = loadSession(); return s && s.accessCode; }
 
@@ -2262,10 +2265,10 @@ function buildPekerjaanListCard_(p, opts) {
 
   function fetch_(forceBottom) {
     var ac = ac_(); if (!ac || inFlight) return;
-    inFlight = true;
+    inFlight = true; var my = epoch;
     google.script.run
-      .withSuccessHandler(function (res) { inFlight = false; handle_(res, forceBottom); })
-      .withFailureHandler(function () { inFlight = false; })
+      .withSuccessHandler(function (res) { if (my !== epoch) return; inFlight = false; handle_(res, forceBottom); })
+      .withFailureHandler(function () { if (my === epoch) inFlight = false; })
       .getGroupChatMessages(ac, hasRender ? lastTs : null);
   }
 
@@ -2315,9 +2318,10 @@ function buildPekerjaanListCard_(p, opts) {
     try { idleCall_(ac); } catch (e) {}
   }
   function idleCall_(ac) {
+    var my = epoch;
     google.script.run
       .withSuccessHandler(function (res) {
-        if (!res || !res.success || isOpen_()) return;
+        if (my !== epoch || !res || !res.success || isOpen_()) return;
         var d = res.data;
         if (d.lastTs) { lastTs = d.lastTs; }
         var seen = seenTs_();
@@ -2333,6 +2337,17 @@ function buildPekerjaanListCard_(p, opts) {
     if (document.visibilityState !== 'visible') return;
     if (isOpen_()) { fetch_(false); schedulePoll_(); } else idleCheck_();
   });
+
+  // Dipakai script-core: tutup (saat pindah halaman) dan reset total (saat keluar sesi / ganti akun).
+  window.FaChatUi = {
+    close: function () { if (isOpen_()) close_(); },
+    reset: function () {
+      epoch++; inFlight = false; sending = false; sendBtn.disabled = false;
+      overlay.classList.remove('show'); clearTimeout(pollTimer);
+      lastTs = 0; hasRender = false; listEl.textContent = ''; inputEl.value = ''; noteEl.textContent = '';
+      dotEl.style.display = 'none';
+    }
+  };
 
   card.addEventListener('click', open_);
   card.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open_(); } });
