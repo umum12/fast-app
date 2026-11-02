@@ -50,9 +50,12 @@
         resolve(data);
       }).catch(function (err) {
         if (timer) clearTimeout(timer);
-        reject(new Error(err && err.name === 'AbortError'
+        var timedOut = !!(err && err.name === 'AbortError');
+        var e = new Error(timedOut
           ? 'Server terlalu lama merespons. Coba lagi.'
-          : 'Tidak dapat terhubung ke server. Periksa koneksi internet.'));
+          : 'Tidak dapat terhubung ke server. Periksa koneksi internet.');
+        e.code = timedOut ? 'timeout' : 'network'; // dipakai UI untuk membedakan "mungkin sudah tersimpan" dari "tidak terkirim"
+        reject(e);
       });
     });
   }
