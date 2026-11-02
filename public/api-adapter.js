@@ -15,6 +15,10 @@
   // Permintaan baca/startup dibatasi singkat agar tidak menggantung (mis. koneksi lama mati setelah aplikasi dibuka
   // kembali di Android). Operasi tulis & PDF tetap memakai batas panjang agar tidak terputus di tengah proses.
   var SHORT_TIMEOUT_MS = 25000;
+  // Tulis yang sudah punya kunci anti-ganda (createPekerjaan/selesaikanPekerjaan) tidak perlu menunggu 5,5 menit:
+  // setelah batas ini UI memberi pesan jujur dan kirim ulang aman. Operasi lain (PDF, dsb.) tetap memakai batas panjang.
+  var WRITE_TIMEOUT_MS = CFG.WRITE_TIMEOUT_MS || 120000;
+  var WRITE_FNS = { createPekerjaan: 1, selesaikanPekerjaan: 1 };
   var SHORT_FNS = { getBootstrapData: 1, loginByAccessCode: 1, getHomeBootstrap: 1, getDashboard: 1, getContentAktif: 1,
     getJadwalAktif: 1, getPekerjaanList: 1, getPekerjaanVersion: 1, getKomentarList: 1 };
 
@@ -29,7 +33,7 @@
         reject(new Error('EXEC_URL belum diisi di config.json.')); return;
       }
       var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-      var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, SHORT_FNS[fn] ? Math.min(SHORT_TIMEOUT_MS, TIMEOUT_MS) : TIMEOUT_MS) : null;
+      var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, SHORT_FNS[fn] ? Math.min(SHORT_TIMEOUT_MS, TIMEOUT_MS) : WRITE_FNS[fn] ? Math.min(WRITE_TIMEOUT_MS, TIMEOUT_MS) : TIMEOUT_MS) : null;
 
       fetch(EXEC_URL + '?route=api', {
         method: 'POST',
