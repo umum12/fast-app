@@ -1132,8 +1132,26 @@ function resetUiForNewSession_() {
   t(function () { if (window.FaChatUi) FaChatUi.reset(); });
 }
 
+/**
+ * Pesan untuk kegagalan KIRIM data (laporan/penuntasan). Setelah timeout server mungkin SUDAH menyimpan,
+ * jadi pengguna tidak boleh diberi kesan "gagal total". Kirim ulang aman karena kunci kirim yang sama (isian tidak diubah).
+ * err.code diisi api-adapter.js ('timeout' | 'network'); di Apps Script langsung err tidak punya code -> pesan umum.
+ */
+function sendFailureMessage_(err) {
+  if (err && err.code === 'timeout') {
+    return 'Belum ada konfirmasi dari server. Tekan Kirim lagi tanpa mengubah isian — aman, laporan tidak akan ganda.';
+  }
+  return 'Gagal terhubung ke server. Coba lagi.';
+}
+
+/** Lepas token notifikasi perangkat dari akun yang sedang keluar (script-push.html). Selalu aman dipanggil. */
+function releasePushOnLogout_() {
+  try { if (typeof PushUI !== 'undefined' && PushUI.releaseOnLogout) PushUI.releaseOnLogout(); } catch (e) {}
+}
+
 function handleLogout() {
   stopInactivityTimer();
+  releasePushOnLogout_();   // sebelum clearSession(): kode akses masih dibutuhkan server
   clearSession();
   if (typeof resetAllPageDataCache_ === 'function') resetAllPageDataCache_();
   resetUiForNewSession_();
@@ -1186,6 +1204,7 @@ function resetInactivityTimer() {
 
 function handleInactivityLogout() {
   stopInactivityTimer();
+  releasePushOnLogout_();
   clearSession();
   if (typeof resetAllPageDataCache_ === 'function') resetAllPageDataCache_();
   resetUiForNewSession_();

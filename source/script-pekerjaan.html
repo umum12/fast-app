@@ -465,7 +465,7 @@ function draftRemove_() {
 function draftClearAll_() {
   try {
     var del = [];
-    for (var i = 0; i < localStorage.length; i++) { var key = localStorage.key(i); if (key && key.indexOf(DRAFT_PREFIX_) === 0) del.push(key); }
+    for (var i = 0; i < localStorage.length; i++) { var key = localStorage.key(i); if (key && (key.indexOf(DRAFT_PREFIX_) === 0 || key.indexOf(SUBMITKEY_PREFIX_) === 0)) del.push(key); }
     del.forEach(function (key) { localStorage.removeItem(key); });
   } catch (e) { /* abaikan */ }
 }
@@ -612,6 +612,49 @@ function createSubmitKey_() {
     createSubmitKeyValue_ = Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
   }
   return createSubmitKeyValue_;
+}
+
+// Kunci kirim form Buat bertahan lintas muat ulang aplikasi (audit integritas #1): bila respons hilang lalu aplikasi
+// ditutup/dibuka lagi, draft pulih dan kirim ulang memakai kunci YANG SAMA sehingga server menolak laporan ganda.
+// Kunci hanya dipakai ulang bila ISI TEKS sama (sidik jari); isi berbeda = laporan lain = kunci baru, jadi
+// laporan baru tidak pernah "tertelan" oleh kunci lama. Umur dibatasi di bawah TTL cache server (6 jam).
+var SUBMITKEY_PREFIX_ = 'fa_sk:v1:';
+var SUBMITKEY_MAX_AGE_MS_ = 5 * 60 * 60 * 1000;
+var createSubmitKeyFp_ = '';
+
+function submitKeyStoreKey_() {
+  var s = (typeof loadSession === 'function') ? loadSession() : null;
+  return (s && (s.userCode || s.accessCode)) ? SUBMITKEY_PREFIX_ + String(s.userCode || s.accessCode).trim().toUpperCase() : null;
+}
+
+/** Sidik jari isi teks form Buat (djb2). Foto sengaja tidak ikut: foto tidak ikut dipulihkan saat aplikasi dibuka ulang. */
+function submitFingerprint_(data) {
+  var str = [data.jenis, data.floorCode, String(data.subject || '').trim(), String(data.description || '').trim(),
+    data.assignmentMode, data.targetUserCode, data.performedAt].join('\u0001');
+  var h = 5381;
+  for (var i = 0; i < str.length; i++) { h = ((h << 5) + h + str.charCodeAt(i)) | 0; }
+  return String(h >>> 0) + ':' + str.length;
+}
+
+function createSubmitKeyForContent_(fp) {
+  if (createSubmitKeyValue_ && createSubmitKeyFp_ === fp) return createSubmitKeyValue_;
+  var saved = '';
+  try {
+    var sk = submitKeyStoreKey_();
+    var o = sk ? JSON.parse(localStorage.getItem(sk) || 'null') : null;
+    if (o && o.k && o.fp === fp && (Date.now() - o.t) < SUBMITKEY_MAX_AGE_MS_) saved = o.k;
+  } catch (e) { /* abaikan */ }
+  createSubmitKeyValue_ = saved || (Date.now().toString(36) + Math.random().toString(36).slice(2, 12));
+  createSubmitKeyFp_ = fp;
+  if (!saved) {
+    try { var sk2 = submitKeyStoreKey_(); if (sk2) localStorage.setItem(sk2, JSON.stringify({ k: createSubmitKeyValue_, fp: fp, t: Date.now() })); } catch (e2) { /* abaikan */ }
+  }
+  return createSubmitKeyValue_;
+}
+
+function submitKeyClear_() {
+  createSubmitKeyValue_ = ''; createSubmitKeyFp_ = '';
+  try { var sk = submitKeyStoreKey_(); if (sk) localStorage.removeItem(sk); } catch (e) { /* abaikan */ }
 }
 
 /** Audit #13: slot foto bisa difokus & dioperasikan keyboard/pembaca layar. */
@@ -835,7 +878,7 @@ var performedAtEl = document.getElementById('form-performed-at');
     photos: selectedPhotos.filter(Boolean).map(function (p) {
       return { base64: p.base64, mimeType: p.mimeType };
     }),
-    submitKey: createSubmitKey_(),
+    submitKey: '',
     assignmentMode: assignmentMode,
     targetUserCode: (isPenugasan && assignmentMode === 'direct' && targetEl) ? targetEl.value : '',
     performedAt: (performedAtEl && performedAtEl.offsetParent !== null && performedAtEl.value) ? performedAtEl.value : ''
@@ -855,6 +898,8 @@ var performedAtEl = document.getElementById('form-performed-at');
     return;
   }
 
+  data.submitKey = createSubmitKeyForContent_(submitFingerprint_(data));
+
   var session = loadSession();
   var submitBtn = document.getElementById('btn-submit-report');
   beginAction(submitBtn, 'Menyimpan...');
@@ -868,7 +913,7 @@ var performedAtEl = document.getElementById('form-performed-at');
         showSnackbar(response.error, 'error');
         return;
       }
-      createSubmitKeyValue_ = '';
+      submitKeyClear_();
       clearTimeout(draftTimer_);
       draftRemove_();
       var dn_ = document.getElementById('form-draft-note'); if (dn_) dn_.style.display = 'none';
@@ -884,11 +929,12 @@ var performedAtEl = document.getElementById('form-performed-at');
 
       finishSendingOverlay_(function () { showPekerjaanSuccessCard(jenis); });
     })
-    .withFailureHandler(function () {
+    .withFailureHandler(function (err) {
       endAction(submitBtn);
       hideSendingOverlay_();
-      errorEl.textContent = 'Gagal terhubung ke server. Coba lagi.';
-      showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error');
+      var failMsg_ = sendFailureMessage_(err);
+      errorEl.textContent = failMsg_;
+      showSnackbar(failMsg_, 'error');
     })
     .createPekerjaan(session.accessCode, data);
 });
@@ -1118,11 +1164,12 @@ function submitSelesaiForm_() {
       invalidateAllPekerjaanCaches_();
       finishSendingOverlay_(function () { showLaporanSuccessCard_(pekerjaanId); });
     })
-    .withFailureHandler(function () {
+    .withFailureHandler(function (err) {
       endAction(submitBtn);
       hideSendingOverlay_();
-      errorEl.textContent = 'Gagal terhubung ke server. Coba lagi.';
-      showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error');
+      var failMsg_ = sendFailureMessage_(err);
+      errorEl.textContent = failMsg_;
+      showSnackbar(failMsg_, 'error');
     })
     .selesaikanPekerjaan(session.accessCode, pekerjaanId, data);
 }

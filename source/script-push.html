@@ -439,7 +439,22 @@ var PushUI = (function () {
   }
   var watching = false;
 
-  return { init: init, refreshIndicator: refreshIndicator };
+  /**
+   * Dipanggil saat Keluar / auto-logout (SEBELUM sesi dihapus, supaya server masih menerima kode akses).
+   * Token perangkat dilepas dari akun ini agar perangkat tidak terus menerima notifikasi akun yang sudah keluar.
+   * Pengaturan "notifikasi aktif" di perangkat (fs_push_on, fs_push_token) DIPERTAHANKAN; hanya penanda sinkron
+   * dihapus supaya login berikutnya (akun mana pun) mendaftarkan token lagi tanpa menunggu 24 jam.
+   * Best-effort: bila offline, token lama tetap sampai login berikutnya memindahkannya.
+   */
+  function releaseOnLogout() {
+    try {
+      var token = ls(LS_TOKEN);
+      if (accessCode && token) call('unregisterPushToken', accessCode, token).catch(function () {});
+      ls(LS_SYNC, null);
+    } catch (e) {}
+  }
+
+  return { init: init, refreshIndicator: refreshIndicator, releaseOnLogout: releaseOnLogout };
 })();
 
 // Dipanggil otomatis setelah renderApp (script-core.html) tanpa mengubah file itu.
