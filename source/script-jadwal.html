@@ -545,12 +545,15 @@ document.getElementById('btn-submit-jadwal').addEventListener('click', function 
   var session = loadSession();
   var editId = jadwalFormEditId;
   var submitBtn = document.getElementById('btn-submit-jadwal');
+  // Kunci kirim hanya untuk TAMBAH jadwal: kirim ulang (respons hilang) dengan isian sama tidak membuat entri ganda.
+  if (!editId) data.submitKey = stickyKeyFor_('jdw:new', stickyFp_([data.tanggal, data.jenis, data.userCode, data.catatan]));
   beginAction(submitBtn, 'Menyimpan...');
 
   var call = google.script.run
     .withSuccessHandler(function (response) {
       endAction(submitBtn);
       if (!response.success) { errorEl.textContent = response.error; showSnackbar(response.error, 'error'); return; }
+      if (!editId) stickyKeyClear_('jdw:new');
       showSnackbar(editId ? 'Jadwal berhasil diubah.' : 'Jadwal berhasil ditambahkan.', 'success');
       closeJadwalForm();
       pageDataCache.jadwalAktif = null;
@@ -1741,12 +1744,16 @@ function submitContentForm_() {
   var session = loadSession();
   var editId = contentFormEditId;
   var submitBtn = document.getElementById('btn-submit-content');
+  // Kunci kirim hanya untuk BUAT konten (menghindari konten & file Drive ganda saat kirim ulang).
+  if (!editId) data.submitKey = stickyKeyFor_('cnt:new', stickyFp_([data.contentType, data.title, data.content, data.scheduleRule, data.startDate, data.endDate,
+    data.image ? data.image.base64.length : 0, data.pdf ? data.pdf.base64.length : 0]));
   beginAction(submitBtn, 'Menyimpan...');
 
   var call = google.script.run
     .withSuccessHandler(function (response) {
       endAction(submitBtn);
       if (!response.success) { errorEl.textContent = response.error; showSnackbar(response.error, 'error'); return; }
+      if (!editId) stickyKeyClear_('cnt:new');
       showSnackbar(editId ? 'Konten berhasil diubah.' : 'Konten berhasil ditambahkan.', 'success');
       closeContentForm_();
       pageDataCache.content = null; persistRemove_(['content']);
@@ -2301,14 +2308,15 @@ function buildPekerjaanListCard_(p, opts) {
     if (!text) return;
     var ac = ac_(); if (!ac) return;
     sending = true; sendBtn.disabled = true; noteEl.textContent = '';
+    var rid = stickyKeyFor_('chat', stickyFp_([text])); // kirim ulang isi yang sama tidak menggandakan pesan
     google.script.run
       .withSuccessHandler(function (res) {
         sending = false; sendBtn.disabled = false;
-        if (res && res.success) { inputEl.value = ''; handle_(res, true); inputEl.focus(); }
+        if (res && res.success) { stickyKeyClear_('chat'); inputEl.value = ''; handle_(res, true); inputEl.focus(); }
         else noteEl.textContent = (res && res.error) || 'Gagal mengirim pesan.';
       })
       .withFailureHandler(function () { sending = false; sendBtn.disabled = false; noteEl.textContent = 'Gagal mengirim pesan. Periksa koneksi.'; })
-      .sendGroupChatMessage(ac, text);
+      .sendGroupChatMessage(ac, text, rid);
   }
 
   // Titik merah "pesan baru" (ringan; hanya saat terlihat dan sudah login).

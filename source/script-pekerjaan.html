@@ -146,7 +146,12 @@ var sendingPct_ = 0;
 var sendingStartMs_ = 0;
 var sendingHasPhotos_ = false;
 
+// Setelah selang ini tombol "Tutup, cek nanti" muncul (jaringan lambat): layar boleh ditutup, pengiriman tetap berjalan.
+var SENDING_ESCAPE_AFTER_MS_ = 45000;
+var sendingDismissed_ = false;
+
 function sendingStageText_(pct, elapsedMs) {
+  if (elapsedMs > SENDING_ESCAPE_AFTER_MS_) return 'Jaringan terasa lambat. Anda boleh menutup tampilan ini; pengiriman tetap berjalan (jangan tutup aplikasi).';
   if (elapsedMs > 25000) return 'Masih berjalan, mohon jangan tutup halaman...';
   if (sendingHasPhotos_) {
     if (pct < 25) return 'Menyiapkan laporan...';
@@ -167,6 +172,15 @@ function setSendingProgress_(pct) {
   if (bar) bar.setAttribute('aria-valuenow', String(shown));
   var sub = document.getElementById('sending-sub');
   if (sub) sub.textContent = shown >= 100 ? 'Selesai' : sendingStageText_(pct, Date.now() - sendingStartMs_);
+  var esc = document.getElementById('sending-escape');
+  if (esc && shown < 100 && (Date.now() - sendingStartMs_) >= SENDING_ESCAPE_AFTER_MS_) esc.style.display = '';
+}
+
+/** Tutup layar "Mengirim" tanpa membatalkan permintaan: tombol Kirim tetap terkunci sampai server menjawab. */
+function dismissSendingOverlay_() {
+  sendingDismissed_ = true;
+  hideSendingOverlay_();
+  try { showSnackbar('Pengiriman masih berjalan di latar belakang. Jangan tutup aplikasi sampai ada pemberitahuan.', 'info'); } catch (e) {}
 }
 
 function showSendingOverlay_(opts) {
@@ -192,9 +206,14 @@ function showSendingOverlay_(opts) {
         '<div class="sending-bar" id="sending-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">' +
           '<div class="sending-bar-fill" id="sending-fill"></div></div>' +
         '<div class="sending-sub" id="sending-sub" aria-live="polite"></div>' +
+        '<button type="button" class="btn-outlined sending-escape" id="sending-escape" style="display:none">Tutup, cek nanti</button>' +
       '</div>';
     document.body.appendChild(ov);
+    ov.querySelector('#sending-escape').addEventListener('click', dismissSendingOverlay_);
   }
+  var escBtn = document.getElementById('sending-escape');
+  if (escBtn) escBtn.style.display = 'none';
+  sendingDismissed_ = false;
   document.getElementById('sending-title').textContent = opts.title || 'Mengirim Laporan';
   sendingHasPhotos_ = !!opts.hasPhotos;
   sendingStartMs_ = Date.now();
@@ -220,7 +239,12 @@ function hideSendingOverlay_() {
 /** Sukses: isi bar ke 100%, tahan sebentar, tutup overlay lalu jalankan lanjutan (kartu sukses). */
 function finishSendingOverlay_(next) {
   var ov = document.getElementById('sending-overlay');
-  if (!ov || !ov.classList.contains('show')) { if (next) next(); return; }
+  if (!ov || !ov.classList.contains('show')) {
+    // Layar sudah ditutup pengguna (jaringan lambat): beri tahu bahwa kirim akhirnya berhasil, di halaman mana pun.
+    if (sendingDismissed_) { sendingDismissed_ = false; try { showSnackbar('Berhasil terkirim', 'success'); } catch (e) {} }
+    if (next) next();
+    return;
+  }
   if (sendingTimer_) { clearInterval(sendingTimer_); sendingTimer_ = null; }
   setSendingProgress_(100);
   setTimeout(function () { hideSendingOverlay_(); if (next) next(); }, 380);

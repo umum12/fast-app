@@ -1105,6 +1105,7 @@ function resetUiForNewSession_() {
     var er = document.getElementById('form-report-error'); if (er) er.textContent = '';
     selectedPhotos = []; activePhotoSlotIndex = null;
     if (typeof createSubmitKeyValue_ !== 'undefined') createSubmitKeyValue_ = '';
+    stickyKeys_ = {};
     if (typeof collapsePerformedAt_ === 'function') collapsePerformedAt_();
     if (typeof resetBuatPrefillContext_ === 'function') resetBuatPrefillContext_();
     if (typeof hidePekerjaanSuccessCard === 'function') hidePekerjaanSuccessCard();
@@ -1143,6 +1144,27 @@ function sendFailureMessage_(err) {
   }
   return 'Gagal terhubung ke server. Coba lagi.';
 }
+
+/**
+ * Kunci kirim "lengket" untuk tulis tanpa draft (komentar, chat, jadwal, konten): dipakai ulang selama isian SAMA
+ * (kirim ulang setelah respons hilang tidak menggandakan), diganti baru bila isian berubah, dihapus saat sukses.
+ * Hanya di memori: isian form-form ini memang tidak dipulihkan setelah aplikasi dibuka ulang.
+ */
+var stickyKeys_ = {};
+function stickyFp_(parts) {
+  var str = parts.map(function (p) { return String(p == null ? '' : p).trim(); }).join('\u0001');
+  var h = 5381;
+  for (var i = 0; i < str.length; i++) { h = ((h << 5) + h + str.charCodeAt(i)) | 0; }
+  return String(h >>> 0) + ':' + str.length;
+}
+function stickyKeyFor_(scope, fp) {
+  var s = stickyKeys_[scope];
+  if (s && s.fp === fp) return s.key;
+  var key = Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+  stickyKeys_[scope] = { key: key, fp: fp };
+  return key;
+}
+function stickyKeyClear_(scope) { delete stickyKeys_[scope]; }
 
 /** Lepas token notifikasi perangkat dari akun yang sedang keluar (script-push.html). Selalu aman dipanggil. */
 function releasePushOnLogout_() {
