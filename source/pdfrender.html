@@ -534,6 +534,8 @@ function bootstrapPage(isManualLogin) {
     document.getElementById('screen-login').style.display = 'none';
     document.getElementById('screen-main').style.display = 'block';
 
+    loadPdfHistory(); // paralel dengan bootstrap: riwayat tidak perlu menunggu data filter
+
     google.script.run
       .withSuccessHandler(function (response) {
         if (!response.success) {
@@ -545,7 +547,6 @@ function bootstrapPage(isManualLogin) {
           return;
         }
         populateFilterOptions(response.data);
-        loadPdfHistory();
       })
       .withFailureHandler(function () {
         showStatus('error', 'Gagal terhubung ke server. Muat ulang halaman.');
@@ -557,19 +558,37 @@ function bootstrapPage(isManualLogin) {
   // RIWAYAT PDF TERSIMPAN — 10 file terakhir dari folder Exports
   // ============================================================
 
+  // Salinan tersimpan per akun (hanya nama file, tautan, tanggal): tampil langsung saat halaman dibuka,
+  // lalu diperbarui dari server di latar belakang.
+  function historyCacheKey_() {
+    var str = String(currentAccessCode || ''), h = 5381;
+    for (var i = 0; i < str.length; i++) { h = ((h << 5) + h + str.charCodeAt(i)) | 0; }
+    return 'fs_pdfhist:v1:' + (h >>> 0);
+  }
+  function historyCacheRead_() {
+    try {
+      var o = JSON.parse(localStorage.getItem(historyCacheKey_()) || 'null');
+      return o && Array.isArray(o.files) ? o.files : null;
+    } catch (e) { return null; }
+  }
+  function historyCacheWrite_(files) {
+    try { localStorage.setItem(historyCacheKey_(), JSON.stringify({ t: Date.now(), files: files })); } catch (e) { /* abaikan */ }
+  }
+
   function loadPdfHistory() {
+    var container = document.getElementById('pdf-history-list');
+    var shown = historyCacheRead_();
+    if (shown) renderPdfHistory(shown);
+    function fail() {
+      if (!shown) container.innerHTML = '<div class="history-empty">Gagal memuat riwayat.</div>';
+    }
     google.script.run
       .withSuccessHandler(function (response) {
-        var container = document.getElementById('pdf-history-list');
-        if (!response.success) {
-          container.innerHTML = '<div class="history-empty">Gagal memuat riwayat.</div>';
-          return;
-        }
+        if (!response.success) { fail(); return; }
+        historyCacheWrite_(response.data.files);
         renderPdfHistory(response.data.files);
       })
-      .withFailureHandler(function () {
-        document.getElementById('pdf-history-list').innerHTML = '<div class="history-empty">Gagal memuat riwayat.</div>';
-      })
+      .withFailureHandler(fail)
       .getRecentPdfExports(currentAccessCode);
   }
 
@@ -730,9 +749,8 @@ function bootstrapPage(isManualLogin) {
         }
         try {
           var byteChars = atob(response.data.base64);
-          var byteNumbers = new Array(byteChars.length);
-          for (var i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
-          var byteArray = new Uint8Array(byteNumbers);
+          var byteArray = new Uint8Array(byteChars.length); // langsung Uint8Array: hemat memori untuk PDF besar
+          for (var i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
           var blob = new Blob([byteArray], { type: 'application/pdf' });
           var url = URL.createObjectURL(blob);
 
@@ -773,6 +791,7 @@ function bootstrapPage(isManualLogin) {
         }
         showStatus('success', 'PDF berhasil disimpan ke Drive (' + response.data.totalRows + ' pekerjaan). Membuka tautan...');
         window.open(response.data.pdfUrl, '_blank');
+        loadPdfHistory(); // file baru langsung tampil di Riwayat
       })
       .withFailureHandler(function () {
         setButtonBusy('btn-save-drive', 'drive-btn-content', '', false);
