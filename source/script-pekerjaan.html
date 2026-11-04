@@ -1775,9 +1775,9 @@ function buildPekerjaanActionRow_(p, opts) {
  * Hak akses sebenarnya tetap divalidasi backend.
  */
 var VF_JENIS_ = [
-  { v: 'DEFAULT', label: 'Default', desc: 'Verifikasi umum atau otomatis oleh sistem.' },
-  { v: 'HARIAN', label: 'Harian', desc: 'Verifikasi untuk pekerjaan rutin harian.' },
-  { v: 'PERIODIK', label: 'Periodik', desc: 'Verifikasi untuk pekerjaan berkala, seperti mingguan atau bulanan.' }
+  { v: 'DEFAULT', label: 'Default', icon: 'autoAwesome', desc: 'Pekerjaan di luar kategori Harian dan Periodik.' },
+  { v: 'HARIAN', label: 'Harian', icon: 'dayToday', desc: 'Verifikasi untuk pekerjaan rutin harian.' },
+  { v: 'PERIODIK', label: 'Periodik', icon: 'updateIcon', desc: 'Verifikasi untuk pekerjaan berkala, seperti mingguan atau bulanan.' }
 ];
 
 function vfJenisLabel_(v) {
@@ -1862,35 +1862,78 @@ function buildVerifikasiRow_(p, card, opts) {
   return row;
 }
 
+/** Modal bebas isi: buildFn(card, close) mengisi kartu. Menutup via Esc / klik latar. */
+function vfOpenCustom_(cardCls, buildFn) {
+  var overlay = document.createElement('div');
+  overlay.className = 'vf-overlay vf-modern';
+  var card = document.createElement('div');
+  card.className = 'vf-card ' + cardCls;
+  card.setAttribute('role', 'dialog');
+  card.setAttribute('aria-modal', 'true');
+  function close() {
+    document.removeEventListener('keydown', onKey);
+    if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+  }
+  function onKey(e) { if (e.key === 'Escape') close(); }
+  buildFn(card, close);
+  overlay.appendChild(card);
+  overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+  document.addEventListener('keydown', onKey);
+  document.body.appendChild(overlay);
+  return close;
+}
+
+var VF_LOCK_SVG_ =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path class="vf-shackle" d="M7 11V7a5 5 0 0 1 10 0v4"></path>' +
+  '<rect x="5" y="11" width="14" height="10" rx="2" fill="currentColor" stroke="none"></rect>' +
+  '<circle cx="12" cy="15" r="1.2" fill="#FEF2F2" stroke="none"></circle>' +
+  '<path d="M12 16.2V18" stroke="#FEF2F2" stroke-width="1.8"></path></svg>';
+var VF_KEY_SVG_ =
+  '<svg class="vf-key" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<circle cx="7.5" cy="15.5" r="3.5"></circle><path d="M10 13L19 4"></path><path d="M15.5 7.5L18 10"></path></svg>';
+
 function openVerifikasiTerbatas_() {
-  vfOpenModal_({
-    title: 'Akses Terbatas', icon: 'lock',
-    body: vfText_('Hanya admin yang memiliki akses untuk melakukan verifikasi pekerjaan.'),
-    actions: [{ label: 'Mengerti', cls: 'vf-primary', onClick: function (b, close) { close(); } }]
+  vfOpenCustom_('vf-restricted', function (card, close) {
+    card.innerHTML =
+      '<div class="vf-glow"></div>' +
+      '<div class="vf-r-head"><div class="vf-lock-box">' + VF_LOCK_SVG_ + VF_KEY_SVG_ + '</div><h3>Akses Terbatas</h3></div>' +
+      '<p class="vf-text">Hanya admin yang memiliki akses untuk melakukan verifikasi pekerjaan.</p>' +
+      '<button type="button" class="vf-btn vf-red vf-wide">Mengerti</button>';
+    card.querySelector('button').addEventListener('click', close);
   });
 }
 
 function openVerifikasiPilihJenis_(p) {
-  var wrap = document.createElement('div');
-  wrap.className = 'vf-radios';
-  var name = 'vf-jenis-' + Date.now();
-  VF_JENIS_.forEach(function (j, i) {
-    var lab = document.createElement('label');
-    lab.className = 'vf-radio';
-    lab.innerHTML = '<input type="radio" name="' + name + '" value="' + j.v + '"' + (i === 0 ? ' checked' : '') + '>' +
-      '<span class="vf-radio-text"><b>' + j.label + '</b><small>' + j.desc + '</small></span>';
-    wrap.appendChild(lab);
-  });
-  vfOpenModal_({
-    title: 'Pilih Jenis Verifikasi', icon: 'verified', body: wrap,
-    actions: [
-      { label: 'Batal', cls: 'vf-ghost', onClick: function (b, close) { close(); } },
-      { label: 'Simpan Verifikasi', cls: 'vf-primary', onClick: function (b, close) {
-          if (b.dataset.busy === '1') return;
-          var chosen = wrap.querySelector('input:checked');
-          doVerifikasiPekerjaan_(b, close, p, chosen ? chosen.value : 'DEFAULT');
-        } }
-    ]
+  vfOpenCustom_('vf-choice', function (card, close) {
+    var name = 'vf-jenis-' + Date.now();
+    var opts = VF_JENIS_.map(function (j, i) {
+      return '<label class="vf-opt' + (i === 0 ? ' selected' : '') + '">' +
+        '<input type="radio" name="' + name + '" value="' + j.v + '"' + (i === 0 ? ' checked' : '') + ' class="vf-sr">' +
+        '<span class="vf-opt-ico">' + mdIcon(j.icon, 20) + '</span>' +
+        '<span class="vf-opt-text"><b>' + j.label + '</b><small>' + j.desc + '</small></span>' +
+        '<span class="vf-opt-radio">' + mdIcon('check', 14) + '</span></label>';
+    }).join('');
+    card.innerHTML =
+      '<div class="vf-c-head"><span class="vf-c-ico">' + mdIcon('verified', 22) + '</span>' +
+      '<div class="vf-c-title"><h3>Pilih Jenis Verifikasi</h3><p>Tentukan skema verifikasi yang sesuai</p></div>' +
+      '<button type="button" class="vf-x" aria-label="Tutup">' + mdIcon('close', 18) + '</button></div>' +
+      '<div class="vf-c-body">' + opts + '</div>' +
+      '<div class="vf-c-foot"><button type="button" class="vf-btn vf-ghost vf-cancel">Batal</button>' +
+      '<button type="button" class="vf-btn vf-primary vf-save"><span>Simpan Verifikasi</span>' + mdIcon('arrowForward', 18) + '</button></div>';
+    card.querySelectorAll('.vf-opt input').forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        card.querySelectorAll('.vf-opt').forEach(function (l) { l.classList.toggle('selected', l.querySelector('input').checked); });
+      });
+    });
+    card.querySelector('.vf-x').addEventListener('click', close);
+    card.querySelector('.vf-cancel').addEventListener('click', close);
+    card.querySelector('.vf-save').addEventListener('click', function () {
+      var b = this;
+      if (b.dataset.busy === '1') return;
+      var chosen = card.querySelector('input:checked');
+      doVerifikasiPekerjaan_(b, close, p, chosen ? chosen.value : 'DEFAULT');
+    });
   });
 }
 
@@ -1899,62 +1942,84 @@ function doVerifikasiPekerjaan_(btn, close, p, jenis) {
   if (!session) return;
   btn.dataset.busy = '1';
   btn.disabled = true;
-  btn.textContent = 'Menyimpan...';
-  function reset() { btn.dataset.busy = ''; btn.disabled = false; btn.textContent = 'Simpan Verifikasi'; }
+  var origHtml = btn.innerHTML;
+  btn.innerHTML = '<span>Menyimpan...</span>';
+  function reset() { btn.dataset.busy = ''; btn.disabled = false; btn.innerHTML = origHtml; }
   google.script.run
     .withSuccessHandler(function (res) {
       if (!res || !res.success) { reset(); showSnackbar((res && res.error) || 'Gagal memverifikasi.', 'error'); return; }
       close();
       showSnackbar('Pekerjaan terverifikasi.', 'success');
-      invalidateAllPekerjaanCaches_();
-      if (typeof loadPekerjaanAktivitas === 'function') loadPekerjaanAktivitas(true);
+      refreshVerifikasiFeeds_();
     })
     .withFailureHandler(function () { reset(); showSnackbar('Gagal memverifikasi. Periksa koneksi lalu coba lagi.', 'error'); })
     .verifikasiPekerjaan(session.accessCode, p.pekerjaanId, jenis);
 }
 
+var VF_HARI_ = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+var VF_BULAN_ = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+/** "04/11/2026 17:22:05" -> "Rabu, 4 Nov 2026 • 17:22:05 WIB" (waktu sudah WIB dari server). */
+function vfFormatWaktu_(s) {
+  var m = /^(\d{2})\/(\d{2})\/(\d{4}) (\d{2}:\d{2}(?::\d{2})?)$/.exec(String(s || ''));
+  if (!m) return s || '-';
+  var d = new Date(Date.UTC(+m[3], +m[2] - 1, +m[1]));
+  return VF_HARI_[d.getUTCDay()] + ', ' + (+m[1]) + ' ' + VF_BULAN_[+m[2] - 1] + ' ' + m[3] + ' • ' + m[4] + ' WIB';
+}
+
+function vfEsc_(t) { return escapeHtmlJk_(String(t == null ? '' : t)); }
+
 function openVerifikasiDetail_(p) {
-  var wait = p.verifikasiStatus === 'MENUNGGU';
-  var statusTxt = wait ? 'MENUNGGU VERIFIKASI' : (p.verifikasiStatus === 'OTOMATIS' ? 'TERVERIFIKASI OTOMATIS' : 'TERVERIFIKASI');
-  var by = wait ? '-' : (p.verifikasiStatus === 'OTOMATIS' ? 'Sistem (otomatis)' : (p.verifiedByName || '-'));
-  var body = document.createElement('div');
-  var dl = document.createElement('dl');
-  dl.className = 'vf-dl';
-  [['Status verifikasi', statusTxt], ['Jenis verifikasi', wait ? '-' : vfJenisLabel_(p.verifiedJenis)],
-   ['Diverifikasi oleh', by], ['Tanggal & waktu', wait ? '-' : ((p.verifiedAt || '-') + (p.verifiedAt ? ' WIB' : ''))]
-  ].forEach(function (r) {
-    var dt = document.createElement('dt'); dt.textContent = r[0];
-    var dd = document.createElement('dd'); dd.textContent = r[1];
-    dl.appendChild(dt); dl.appendChild(dd);
-  });
-  body.appendChild(dl);
-
+  var st = p.verifikasiStatus;
+  var wait = st === 'MENUNGGU';
+  var badgeCls = wait ? 'vf-st-wait' : (st === 'OTOMATIS' ? 'vf-st-auto' : 'vf-st-ok');
+  var badgeTxt = wait ? 'MENUNGGU VERIFIKASI' : (st === 'OTOMATIS' ? 'TERVERIFIKASI OTOMATIS' : 'TERVERIFIKASI');
+  var by = wait ? '-' : (st === 'OTOMATIS' ? 'Sistem (otomatis)' : (p.verifiedByName || '-'));
+  var rows = [
+    ['shield', 'Status verifikasi', '<span class="vf-status ' + badgeCls + '">' + mdIcon(wait ? 'schedule' : 'check', 14) + '<span>' + badgeTxt + '</span></span>'],
+    ['refresh', 'Jenis verifikasi', vfEsc_(wait ? '-' : vfJenisLabel_(p.verifiedJenis))],
+    ['personCheck', 'Diverifikasi oleh', vfEsc_(by)],
+    ['schedule', 'Tanggal & waktu', vfEsc_(wait ? '-' : vfFormatWaktu_(p.verifiedAt))]
+  ];
   var hist = p.verifikasiRiwayat || [];
-  if (hist.length) {
-    var h = document.createElement('div');
-    h.className = 'vf-hist';
-    var cap = document.createElement('p'); cap.className = 'vf-hist-cap'; cap.textContent = 'Riwayat audit';
-    h.appendChild(cap);
-    var AKSI = { VERIFIKASI: 'Diverifikasi', BATAL: 'Verifikasi dibatalkan', RESET: 'Direset (penuntasan dibatalkan)' };
-    hist.forEach(function (x) {
-      var li = document.createElement('div'); li.className = 'vf-hist-row';
-      li.textContent = (AKSI[x.aksi] || x.aksi) + (x.jenis && x.aksi === 'VERIFIKASI' ? ' (' + vfJenisLabel_(x.jenis) + ')' : '') +
-        ' · ' + (x.oleh || '-') + ' · ' + (x.waktu || '') + ' WIB';
-      h.appendChild(li);
-    });
-    body.appendChild(h);
-  }
+  var AKSI = { VERIFIKASI: 'Diverifikasi', BATAL: 'Verifikasi dibatalkan', RESET: 'Direset (penuntasan dibatalkan)' };
+  var DOT = { VERIFIKASI: '', BATAL: ' danger', RESET: ' muted' };
+  var histHtml = hist.length ?
+    '<div class="vf-audit"><div class="vf-audit-title">' + mdIcon('history', 14) + '<span>RIWAYAT AUDIT</span></div><div class="vf-timeline">' +
+    hist.map(function (x) {
+      return '<div class="vf-tl-item"><span class="vf-tl-dot' + (DOT[x.aksi] || '') + '"></span><div class="vf-tl-content">' +
+        vfEsc_(AKSI[x.aksi] || x.aksi) + (x.jenis && x.aksi === 'VERIFIKASI' ? ' (' + vfEsc_(vfJenisLabel_(x.jenis)) + ')' : '') +
+        ' · <strong>' + vfEsc_(x.oleh || '-') + '</strong><span class="vf-tl-time">' + vfEsc_(vfFormatWaktu_(x.waktu)) + '</span></div></div>';
+    }).join('') + '</div></div>' : '';
 
-  var actions = [];
-  if (p.canBatalkanVerifikasi) {
-    actions.push({ label: 'Batalkan Verifikasi', cls: 'vf-danger', onClick: function (b, close) {
+  vfOpenCustom_('vf-detail', function (card, close) {
+    card.innerHTML =
+      '<div class="vf-d-head"><div class="vf-d-title"><span class="vf-d-ico">' + mdIcon('checkCircle', 22) + '</span><span>Detail Verifikasi</span></div>' +
+      '<button type="button" class="vf-x" aria-label="Tutup">' + mdIcon('close', 18) + '</button></div>' +
+      '<div class="vf-d-body"><div class="vf-info">' +
+      rows.map(function (r) {
+        return '<div class="vf-info-row"><span class="vf-info-label">' + mdIcon(r[0], 16) + '<span>' + r[1] + '</span></span><span class="vf-info-value">' + r[2] + '</span></div>';
+      }).join('') + '</div>' + histHtml + '</div>' +
+      '<div class="vf-d-foot">' +
+      (p.canBatalkanVerifikasi ? '<button type="button" class="vf-btn vf-outline-danger vf-batal">' + mdIcon('block', 16) + '<span>Batalkan Verifikasi</span></button>' : '') +
+      '<button type="button" class="vf-btn vf-secondary vf-tutup">Tutup</button></div>';
+    card.querySelector('.vf-x').addEventListener('click', close);
+    card.querySelector('.vf-tutup').addEventListener('click', close);
+    var bt = card.querySelector('.vf-batal');
+    if (bt) bt.addEventListener('click', function () {
       showConfirmModal('Status pekerjaan akan kembali menjadi MENUNGGU VERIFIKASI. Informasi verifikasi sebelumnya tetap tersimpan sebagai riwayat audit.',
         function () { doBatalkanVerifikasi_(p, close); }, 'warning', true, 'Membatalkan...',
         { title: 'Batalkan Verifikasi?', confirm: 'Ya, Batalkan' });
-    } });
-  }
-  actions.push({ label: 'Tutup', cls: 'vf-ghost', onClick: function (b, close) { close(); } });
-  vfOpenModal_({ title: 'Detail Verifikasi', icon: 'verified', body: body, actions: actions });
+    });
+  });
+}
+
+/** Muat ulang daftar yang sedang tampil (Aktivitas dan/atau Riwayat) setelah verifikasi berubah. */
+function refreshVerifikasiFeeds_() {
+  invalidateAllPekerjaanCaches_();
+  var a = document.getElementById('activity-feed-list'), r = document.getElementById('my-reports-list');
+  if (a && a.offsetParent !== null && typeof loadPekerjaanAktivitas === 'function') loadPekerjaanAktivitas(true);
+  if (r && r.offsetParent !== null && typeof loadRiwayatPekerjaan === 'function') loadRiwayatPekerjaan(true);
 }
 
 function doBatalkanVerifikasi_(p, closeDetail) {
@@ -1966,8 +2031,7 @@ function doBatalkanVerifikasi_(p, closeDetail) {
       if (!res || !res.success) { showSnackbar((res && res.error) || 'Gagal membatalkan verifikasi.', 'error'); return; }
       if (closeDetail) closeDetail();
       showSnackbar('Verifikasi dibatalkan.', 'success');
-      invalidateAllPekerjaanCaches_();
-      if (typeof loadPekerjaanAktivitas === 'function') loadPekerjaanAktivitas(true);
+      refreshVerifikasiFeeds_();
     })
     .withFailureHandler(function () { endAction(null); showSnackbar('Gagal membatalkan verifikasi. Coba lagi.', 'error'); })
     .batalkanVerifikasiPekerjaan(session.accessCode, p.pekerjaanId);

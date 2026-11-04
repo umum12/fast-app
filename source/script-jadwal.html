@@ -219,7 +219,7 @@ function renderRiwayatFeed_(entry, q, cacheKey) {
       entry.hasMore = data.hasMore;
       done(data.pekerjaan);
     }, fail);
-  });
+  }, { verifikasi: true });
   var ctaBtn = document.getElementById('empty-state-buat-pekerjaan');
   if (ctaBtn) ctaBtn.addEventListener('click', function () { goToPage('buat'); });
 }
