@@ -1421,11 +1421,12 @@ function feedKey_(arah, q) { return (arah || 'all') + '|' + (q || ''); }
  * entry = { list, total, hasMore }; fetchMore(done, fail) mengambil halaman berikut,
  * menambahkannya ke entry.list, lalu memanggil done(itemBaru).
  */
-function renderFeedList_(container, entry, emptyHtml, fetchMore) {
+function renderFeedList_(container, entry, emptyHtml, fetchMore, cardOpts) {
+  container._feedCardOpts = cardOpts || null;
   container.innerHTML = '';
   if (!entry.list || entry.list.length === 0) { container.innerHTML = emptyHtml; return; }
   var frag = document.createDocumentFragment();
-  entry.list.forEach(function (p) { frag.appendChild(buildPekerjaanListCard_(p)); });
+  entry.list.forEach(function (p) { frag.appendChild(buildPekerjaanListCard_(p, container._feedCardOpts || undefined)); });
   container.appendChild(frag);
   appendFeedMore_(container, entry, fetchMore);
 }
@@ -1456,7 +1457,7 @@ function appendFeedMore_(container, entry, fetchMore) {
       if (observer) observer.disconnect();
       if (!wrap.parentNode) return; // daftar sudah digambar ulang
       var frag = document.createDocumentFragment();
-      (items || []).forEach(function (p) { frag.appendChild(buildPekerjaanListCard_(p)); });
+      (items || []).forEach(function (p) { frag.appendChild(buildPekerjaanListCard_(p, container._feedCardOpts || undefined)); });
       container.insertBefore(frag, wrap);
       appendFeedMore_(container, entry, fetchMore);
     }, function () {
@@ -1766,6 +1767,73 @@ function buildPekerjaanActionRow_(p, opts) {
 }
 
 
+
+/**
+ * VERIFIKASI PEKERJAAN (Aktivitas). Status verifikasi TERPISAH dari status pekerjaan.
+ * Tombol tampil untuk semua role saat MENUNGGU, tetapi hanya Administrator yang aktif
+ * (p.canVerifikasi dihitung backend; backend tetap menolak non-admin).
+ */
+function buildVerifikasiRow_(p, card, opts) {
+  var row = document.createElement('div');
+  row.className = 'lc-verif';
+  row.addEventListener('click', function (e) { e.stopPropagation(); });
+  var st = p.verifikasiStatus;
+  var at = p.verifiedAt ? escapeHtmlJk_(p.verifiedAt) + ' WIB' : '';
+  var badge = document.createElement('span');
+  if (st === 'ADMIN') {
+    badge.className = 'lc-verif-badge verif-admin';
+    badge.innerHTML = mdIcon('verifiedUser', 16) + '<span><b>TERVERIFIKASI</b> oleh ' + escapeHtmlJk_(p.verifiedByName || 'Admin') + (at ? ' \u00b7 ' + at : '') + '</span>';
+  } else if (st === 'OTOMATIS') {
+    badge.className = 'lc-verif-badge verif-auto';
+    badge.innerHTML = mdIcon('sync', 16) + '<span><b>TERVERIFIKASI OTOMATIS</b>' + (at ? ' \u00b7 ' + at : '') + '</span>';
+  } else {
+    badge.className = 'lc-verif-badge verif-wait';
+    badge.innerHTML = mdIcon('schedule', 16) + '<span><b>MENUNGGU VERIFIKASI</b></span>';
+  }
+  row.appendChild(badge);
+  if (st === 'MENUNGGU') {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn-card-action action-primary lc-verif-btn';
+    btn.innerHTML = mdIcon('verified', 18) + '<span>Verifikasi</span>';
+    if (!p.canVerifikasi) {
+      btn.disabled = true;
+      btn.title = 'Hanya Administrator yang dapat memverifikasi';
+    } else {
+      btn.addEventListener('click', function (e) { e.stopPropagation(); doVerifikasiPekerjaan_(btn, p, card, opts); });
+    }
+    row.appendChild(btn);
+  }
+  return row;
+}
+
+function doVerifikasiPekerjaan_(btn, p, card, opts) {
+  var session = loadSession();
+  if (!session || btn.dataset.busy === '1') return;
+  btn.dataset.busy = '1';
+  btn.disabled = true;
+  btn.innerHTML = '<span>Memverifikasi...</span>';
+  google.script.run
+    .withSuccessHandler(function (res) {
+      if (!res || !res.success) {
+        btn.dataset.busy = '';
+        btn.disabled = false;
+        btn.innerHTML = mdIcon('verified', 18) + '<span>Verifikasi</span>';
+        showSnackbar((res && res.error) || 'Gagal memverifikasi.', 'error');
+        return;
+      }
+      showSnackbar('Pekerjaan terverifikasi.', 'success');
+      invalidateAllPekerjaanCaches_();
+      if (typeof loadPekerjaanAktivitas === 'function') loadPekerjaanAktivitas(true);
+    })
+    .withFailureHandler(function () {
+      btn.dataset.busy = '';
+      btn.disabled = false;
+      btn.innerHTML = mdIcon('verified', 18) + '<span>Verifikasi</span>';
+      showSnackbar('Gagal memverifikasi. Periksa koneksi lalu coba lagi.', 'error');
+    })
+    .verifikasiPekerjaan(session.accessCode, p.pekerjaanId);
+}
 
 /**
  * Foto representatif satu kartu — completion jika ada, fallback ke
@@ -2594,11 +2662,15 @@ function renderKomentarForm_(p, canKirim) {
     var btn = document.getElementById('btn-komentar-kirim');
     if (!input.value.trim()) return;
     var session = loadSession();
+    // Kunci kirim: kirim ulang (respons hilang) dengan isi yang sama tidak membuat komentar ganda.
+    var kmtScope_ = 'kmt:' + p.pekerjaanId;
+    var kmtKey_ = stickyKeyFor_(kmtScope_, stickyFp_([input.value]));
     beginAction(btn, 'Kirim...');
     google.script.run
       .withSuccessHandler(function (response) {
         endAction(btn);
         if (!response.success) { showSnackbar(response.error, 'error'); return; }
+        stickyKeyClear_(kmtScope_);
         input.value = '';
         invalidateAllPekerjaanCaches_();
         loadKomentar_(p);
@@ -2607,7 +2679,7 @@ function renderKomentarForm_(p, canKirim) {
         endAction(btn);
         showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error');
       })
-      .buatKomentar(session.accessCode, p.pekerjaanId, input.value);
+      .buatKomentar(session.accessCode, p.pekerjaanId, input.value, kmtKey_);
   });
 }
 

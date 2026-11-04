@@ -2183,6 +2183,10 @@ function buildPekerjaanListCard_(p, opts) {
 
   card.appendChild(main);
   if (pendingActions) { card.classList.add('has-actions'); card.appendChild(pendingActions); }
+  if (opts.verifikasi && p.verifikasiStatus && typeof buildVerifikasiRow_ === 'function') {
+    card.classList.add('has-verif');
+    card.appendChild(buildVerifikasiRow_(p, card, opts));
+  }
 
   card.addEventListener('click', function () { openPekerjaanDetail(p, { actions: !!opts.actions }); });
   return card;

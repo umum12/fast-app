@@ -147,7 +147,7 @@ function renderAktivitasFeed_(entry, prm) {
         entry.hasMore = data.hasMore;
         done(data.pekerjaan);
       }, fail);
-    });
+    }, { verifikasi: true });
 }
 
 // Filter & pencarian kini dijalankan di server (akurat atas seluruh data).
