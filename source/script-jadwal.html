@@ -1774,7 +1774,13 @@ function submitContentForm_() {
 
 
 function confirmHapusContent_(contentId) {
-  showConfirmModal('Hapus konten ini?', function () { doHapusContent_(contentId); }, 'delete', true, 'Menghapus...');
+  showConfirmModal('', function () { doHapusContent_(contentId); }, 'delete', true, 'Menghapus...', {
+    variant: 'konten',
+    title: 'Hapus konten ini?',
+    messageHtml: 'Tindakan ini tidak dapat dibatalkan. Semua data terkait konten ini akan <strong class="cm-red">dihapus secara permanen</strong> dari sistem.',
+    checkText: 'Saya paham bahwa data ini akan dihapus permanen dan tidak dapat dikembalikan.',
+    confirm: 'Ya, Lanjutkan'
+  });
 }
 
 function doHapusContent_(contentId) {
@@ -1840,11 +1846,44 @@ function renderContentBanner_(list) {
   var track = document.createElement('div');
   track.className = 'cc-track';
 
+  var lastSwipeAt = 0; // klik tepat setelah geser tidak boleh membuka detail
   items.forEach(function (c) {
     var typeInfo = CONTENT_TYPE_BADGE[c.contentType] || { cls: 'badge-neutral', icon: 'description' };
     var tone = c.contentType === 'warning' ? 'red' : (c.contentType === 'information' ? 'lime' : 'blue');
     var slide = document.createElement('div');
     slide.className = 'cc-slide tone-' + tone + (c.contentType === 'warning' ? ' is-warning' : '');
+    var hasText = !!String(c.content || '').replace(/<[^>]*>/g, '').trim();
+
+    if (c.imageUrl) {
+      // Slide GAMBAR: hanya gambar (tanpa judul/teks), utuh tanpa terpotong. Rasio 16:9 pas penuh;
+      // rasio lain ditampilkan utuh di atas latar buram dari gambar yang sama.
+      slide.classList.add('is-image');
+      var bg = document.createElement('div');
+      bg.className = 'cc-img-bg';
+      bg.style.backgroundImage = 'url("' + String(c.imageUrl).replace(/"/g, '%22') + '")';
+      var img = document.createElement('img');
+      img.className = 'cc-img';
+      img.src = c.imageUrl;
+      img.alt = c.title || 'Pengumuman';
+      img.decoding = 'async';
+      img.draggable = false;
+      img.addEventListener('click', function () {
+        if (Date.now() - lastSwipeAt < 350) return;
+        openPhotoViewer([c.imageUrl], 0);
+      });
+      slide.appendChild(bg);
+      slide.appendChild(img);
+      if (hasText || c.pdfUrl) {
+        var more = document.createElement('button');
+        more.type = 'button';
+        more.className = 'cc-more cc-more-float';
+        more.innerHTML = '<span>Detail</span>' + mdIcon('chevronRight', 14);
+        more.addEventListener('click', function (e) { e.stopPropagation(); openContentDetail_(c, typeInfo); });
+        slide.appendChild(more);
+      }
+      track.appendChild(slide);
+      return;
+    }
 
     var head = document.createElement('div');
     head.className = 'cc-head';
@@ -1868,15 +1907,6 @@ function renderContentBanner_(list) {
     msg.innerHTML = sanitizeRichContentHtml_(c.content);
     slide.appendChild(msg);
 
-    if (c.imageUrl) {
-      var img = document.createElement('img');
-      img.className = 'content-card-image';
-      img.src = c.imageUrl;
-      img.alt = c.title;
-      img.decoding = 'async';
-      img.addEventListener('click', function () { openPhotoViewer([c.imageUrl], 0); });
-      slide.appendChild(img);
-    }
     if (c.pdfUrl) {
       var link = document.createElement('a');
       link.className = 'content-card-pdf-link';
@@ -1886,6 +1916,19 @@ function renderContentBanner_(list) {
       link.innerHTML = mdIcon('description', 14) + '<span>Buka PDF</span>';
       slide.appendChild(link);
     }
+    // Teks panjang dipotong rapi (area carousel tetap); ketuk untuk membaca selengkapnya.
+    var moreTxt = document.createElement('button');
+    moreTxt.type = 'button';
+    moreTxt.className = 'cc-more cc-more-text';
+    moreTxt.hidden = true;
+    moreTxt.innerHTML = '<span>Selengkapnya</span>' + mdIcon('chevronRight', 14);
+    moreTxt.addEventListener('click', function (e) { e.stopPropagation(); openContentDetail_(c, typeInfo); });
+    slide.appendChild(moreTxt);
+    slide.addEventListener('click', function (e) {
+      if (e.target.closest('a,button')) return;
+      if (Date.now() - lastSwipeAt < 350) return;
+      if (slide.classList.contains('is-clipped')) openContentDetail_(c, typeInfo);
+    });
     track.appendChild(slide);
   });
   viewport.appendChild(track);
@@ -1939,12 +1982,77 @@ function renderContentBanner_(list) {
       touching = false;
       if (sx === null) return;
       var dx = e.changedTouches[0].clientX - sx; sx = null;
-      if (Math.abs(dx) > 40) go(idx + (dx < 0 ? 1 : -1), true);
+      if (Math.abs(dx) > 40) { lastSwipeAt = Date.now(); go(idx + (dx < 0 ? 1 : -1), true); }
     });
     go(0);
     restart();
   }
   container.appendChild(wrap);
+
+  // Tandai slide teks yang terpotong (tinggi carousel tetap) dan perbarui saat ukuran layar berubah.
+  function markClipped() {
+    Array.prototype.forEach.call(track.querySelectorAll('.cc-slide:not(.is-image)'), function (sl) {
+      var m = sl.querySelector('.cc-message');
+      var clipped = !!m && (m.scrollHeight - m.clientHeight > 2);
+      sl.classList.toggle('is-clipped', clipped);
+      var b = sl.querySelector('.cc-more-text');
+      if (b) b.hidden = !clipped;
+    });
+  }
+  markClipped();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (document.body.contains(wrap)) markClipped(); });
+  var onResize = function () {
+    if (!document.body.contains(wrap)) { window.removeEventListener('resize', onResize); return; }
+    markClipped();
+  };
+  window.addEventListener('resize', onResize);
+}
+
+/** Detail konten lengkap (teks panjang / gambar + keterangan / PDF) — dibuka dari carousel. */
+function openContentDetail_(c, typeInfo) {
+  vfOpenCustom_('vf-detail cc-detail', function (card, close) {
+    var wrap = document.createElement('div');
+    wrap.className = 'vf-d-body';
+    var h = document.createElement('div');
+    h.className = 'cc-detail-title';
+    h.textContent = c.title || '';
+    wrap.appendChild(h);
+    if (c.contentTypeLabel) {
+      var bd = document.createElement('span');
+      bd.className = 'cc-detail-badge';
+      bd.textContent = c.contentTypeLabel;
+      wrap.insertBefore(bd, h);
+    }
+    if (c.imageUrl) {
+      var im = document.createElement('img');
+      im.className = 'cc-detail-img';
+      im.src = c.imageUrl;
+      im.alt = c.title || '';
+      im.addEventListener('click', function () { openPhotoViewer([c.imageUrl], 0); });
+      wrap.appendChild(im);
+    }
+    var body = document.createElement('div');
+    body.className = 'cc-message reminder-message cc-detail-text';
+    body.innerHTML = sanitizeRichContentHtml_(c.content);
+    wrap.appendChild(body);
+    if (c.pdfUrl) {
+      var link = document.createElement('a');
+      link.className = 'content-card-pdf-link';
+      link.href = c.pdfUrl; link.target = '_blank'; link.rel = 'noopener';
+      link.innerHTML = mdIcon('description', 14) + '<span>Buka PDF</span>';
+      wrap.appendChild(link);
+    }
+    var head = document.createElement('div');
+    head.className = 'vf-d-head';
+    head.innerHTML = '<div class="vf-d-title"><span class="vf-d-ico">' + mdIcon((typeInfo && typeInfo.icon) || 'description', 22) + '</span><span>Detail Informasi</span></div>' +
+      '<button type="button" class="vf-x" aria-label="Tutup">' + mdIcon('close', 18) + '</button>';
+    var foot = document.createElement('div');
+    foot.className = 'vf-d-foot';
+    foot.innerHTML = '<button type="button" class="vf-btn vf-secondary">Tutup</button>';
+    card.appendChild(head); card.appendChild(wrap); card.appendChild(foot);
+    head.querySelector('.vf-x').addEventListener('click', close);
+    foot.querySelector('button').addEventListener('click', close);
+  });
 }
 
 function renderContentManagementList_(list) {

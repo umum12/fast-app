@@ -80,10 +80,10 @@ function showConfirmModal(message, onConfirm, iconName, busyMode, busyLabel, lab
   pendingConfirmCallback = onConfirm;
   confirmModalIsBusyMode = !!busyMode;
   confirmModalBusyLabel = busyLabel || 'Memproses...';
-  document.getElementById('confirm-modal-icon').innerHTML = mdIcon(iconName || 'delete', 24);
+  document.getElementById('confirm-modal-icon').innerHTML = mdIcon(iconName || 'delete', labels.variant === 'konten' ? 36 : 24);
   var msgEl = document.getElementById('confirm-modal-message');
-  msgEl.textContent = message || '';
-  msgEl.style.display = message ? '' : 'none';
+  if (labels.messageHtml) { msgEl.innerHTML = labels.messageHtml; msgEl.style.display = ''; } // HTML statis dari pemanggil (bukan input pengguna)
+  else { msgEl.textContent = message || ''; msgEl.style.display = message ? '' : 'none'; }
   document.getElementById('confirm-modal-cancel').disabled = false;
   document.getElementById('confirm-modal-cancel').innerHTML = '<span>' + (labels.cancel || 'Batal') + '</span>';
   var confirmBtn = document.getElementById('confirm-modal-confirm');
@@ -99,6 +99,10 @@ function showConfirmModal(message, onConfirm, iconName, busyMode, busyLabel, lab
   var checkbox = document.getElementById('confirm-modal-checkbox');
   var rich = !!(labels.title || labels.points || labels.checkText);
   card.classList.toggle('rich', rich);
+  // Varian "konten": ikon besar, latar kabur, kotak persetujuan merah muda (mis. Hapus Konten).
+  var modern = labels.variant === 'konten';
+  card.classList.toggle('cm-modern', modern);
+  document.getElementById('confirm-modal-overlay').classList.toggle('cm-blur', modern);
   titleEl.style.display = labels.title ? '' : 'none';
   titleEl.textContent = labels.title || '';
   pointsEl.style.display = 'none'; pointsEl.textContent = '';
