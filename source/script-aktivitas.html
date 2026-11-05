@@ -217,23 +217,96 @@ function initPdfRenderButton_() {
 }
 
 // ============================================================
-// PHOTO VIEWER (Section 18.4) — pinch zoom, double-tap zoom, swipe, close
+// PHOTO VIEWER — pinch-to-zoom (menuju titik jari), pan, double-tap/klik dua kali,
+// zoom roda mouse, inersia geser, geser antar foto, tarik ke bawah untuk menutup.
+// Satu mesin Pointer Events untuk sentuh dan mouse. API publik tidak berubah:
+// openPhotoViewer(urls, index), closePhotoViewer().
 // ============================================================
 
 var viewerPhotos = [];
 var viewerIndex = 0;
 var viewerScale = 1;
 
+var PV_MAX_SCALE_ = 5;
+var PV_DOUBLE_TAP_SCALE_ = 2.5;
+var pvState_ = { s: 1, x: 0, y: 0 };
+
+function pvImg_() { return document.getElementById('viewer-img'); }
+function pvBox_() { return document.getElementById('photo-viewer'); }
+
+function pvApply_(snap) {
+  var img = pvImg_();
+  img.classList.toggle('pv-snap', !!snap);
+  img.style.transform = 'translate3d(' + pvState_.x + 'px,' + pvState_.y + 'px,0) scale(' + pvState_.s + ')';
+  viewerScale = pvState_.s;
+  pvUpdateCounter_();
+}
+
+function pvUpdateCounter_() {
+  var c = document.getElementById('viewer-counter');
+  if (!c) return;
+  var txt = (viewerIndex + 1) + ' / ' + viewerPhotos.length;
+  if (pvState_.s > 1.05) txt += ' · ' + (Math.round(pvState_.s * 10) / 10) + '×';
+  c.textContent = txt;
+}
+
+/** Batas geser agar tepi foto tidak lewat dari layar (0 bila foto lebih kecil dari layar). */
+function pvBounds_(s) {
+  var img = pvImg_(), box = pvBox_();
+  return {
+    x: Math.max(0, (img.clientWidth * s - box.clientWidth) / 2),
+    y: Math.max(0, (img.clientHeight * s - box.clientHeight) / 2)
+  };
+}
+
+function pvClamp_(v, b) { return Math.max(-b, Math.min(b, v)); }
+
+/** Selama gerakan: lewat batas ditahan (karet) alih-alih terpotong keras. */
+function pvRubber_(v, b) {
+  if (v > b) return b + (v - b) * 0.35;
+  if (v < -b) return -b + (v + b) * 0.35;
+  return v;
+}
+
+function pvReset_(snap) {
+  pvState_.s = 1; pvState_.x = 0; pvState_.y = 0;
+  pvApply_(snap);
+}
+
+/** Setelah gerakan: kembalikan ke batas yang sah (animasi singkat). */
+function pvSettle_() {
+  var s = Math.max(1, Math.min(PV_MAX_SCALE_, pvState_.s));
+  var b = pvBounds_(s);
+  pvState_.s = s;
+  pvState_.x = pvClamp_(pvState_.x, b.x);
+  pvState_.y = pvClamp_(pvState_.y, b.y);
+  if (s === 1) { pvState_.x = 0; pvState_.y = 0; }
+  pvApply_(true);
+}
+
+/** Zoom ke skala baru dengan titik (fx, fy) — relatif terhadap pusat layar — tetap di bawah jari. */
+function pvZoomAt_(newScale, fx, fy, snap) {
+  var st = pvState_;
+  var qx = (fx - st.x) / st.s, qy = (fy - st.y) / st.s;
+  st.s = newScale;
+  st.x = fx - newScale * qx;
+  st.y = fy - newScale * qy;
+  var b = pvBounds_(newScale);
+  st.x = pvClamp_(st.x, b.x); st.y = pvClamp_(st.y, b.y);
+  if (newScale <= 1) { st.x = 0; st.y = 0; }
+  pvApply_(snap);
+}
+
 function openPhotoViewer(urls, startIndex) {
   viewerPhotos = urls;
   viewerIndex = startIndex || 0;
-  viewerScale = 1;
   updateViewerImage();
   document.getElementById('photo-viewer').classList.add('show');
 }
 
 function closePhotoViewer() {
   document.getElementById('photo-viewer').classList.remove('show');
+  pvBox_().style.background = '';
 }
 
 var PHOTO_VIEWER_PLACEHOLDER =
@@ -245,80 +318,222 @@ var PHOTO_VIEWER_PLACEHOLDER =
   );
 
 function updateViewerImage() {
-  var img = document.getElementById('viewer-img');
+  var img = pvImg_();
   img.onerror = function () {
     console.warn('Gagal memuat foto di Photo Viewer. URL:', viewerPhotos[viewerIndex]);
     img.onerror = null;
     img.src = PHOTO_VIEWER_PLACEHOLDER;
   };
+  img.draggable = false;
   img.src = viewerPhotos[viewerIndex];
-  viewerScale = 1;
-  img.style.transform = 'scale(1)';
-  document.getElementById('viewer-counter').textContent =
-    (viewerIndex + 1) + ' / ' + viewerPhotos.length;
+  pvReset_(false);
+  // Muat diam-diam foto tetangga supaya geser terasa instan.
+  [viewerIndex - 1, viewerIndex + 1].forEach(function (i) {
+    if (i >= 0 && i < viewerPhotos.length) { try { (new Image()).src = viewerPhotos[i]; } catch (e) {} }
+  });
+}
+
+function pvGo_(delta) {
+  var n = viewerIndex + delta;
+  if (n < 0 || n >= viewerPhotos.length) return false;
+  viewerIndex = n;
+  updateViewerImage();
+  return true;
 }
 
 document.getElementById('viewer-close').addEventListener('click', closePhotoViewer);
 
 (function setupViewerGestures() {
-  var img = document.getElementById('viewer-img');
-  var touchStartX = 0, touchStartY = 0;
-  var lastTapTime = 0;
-  var pinchStartDist = null;
-  var pinchStartScale = 1;
+  var box = pvBox_();
+  var img = pvImg_();
+  var pointers = {};            // id -> {x, y}
+  var mode = '';                // '' | 'pan' | 'pinch' | 'swipe' | 'dismiss'
+  var start = null;             // {x, y, t, sx, sy} untuk 1 jari
+  var pinch = null;             // {dist, scale, qx, qy}
+  var vel = { x: 0, y: 0, t: 0, px: 0, py: 0 };
+  var lastTap = { t: 0, x: 0, y: 0 };
+  var raf = 0;
 
-  function distance(t1, t2) {
-    var dx = t1.clientX - t2.clientX;
-    var dy = t1.clientY - t2.clientY;
-    return Math.sqrt(dx * dx + dy * dy);
+  function count() { return Object.keys(pointers).length; }
+  function pts() { return Object.keys(pointers).map(function (k) { return pointers[k]; }); }
+  function center() { var r = box.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }
+  function stopInertia() { if (raf) { cancelAnimationFrame(raf); raf = 0; } }
+
+  function beginSingle(p) {
+    start = { x: p.x, y: p.y, t: Date.now(), sx: pvState_.x, sy: pvState_.y };
+    vel = { x: 0, y: 0, t: Date.now(), px: p.x, py: p.y };
+    mode = pvState_.s > 1.02 ? 'pan' : '';
   }
 
-  img.addEventListener('touchstart', function (e) {
-    if (e.touches.length === 2) {
-      pinchStartDist = distance(e.touches[0], e.touches[1]);
-      pinchStartScale = viewerScale;
-    } else if (e.touches.length === 1) {
-      touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
-    }
+  function beginPinch() {
+    var a = pts(), c = center();
+    var d = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) || 1;
+    var fx = (a[0].x + a[1].x) / 2 - c.x, fy = (a[0].y + a[1].y) / 2 - c.y;
+    pinch = { dist: d, scale: pvState_.s, qx: (fx - pvState_.x) / pvState_.s, qy: (fy - pvState_.y) / pvState_.s };
+    mode = 'pinch';
+  }
+
+  box.addEventListener('pointerdown', function (e) {
+    if (e.target.closest && e.target.closest('.viewer-close')) return;
+    stopInertia();
+    try { box.setPointerCapture(e.pointerId); } catch (err) {}
+    pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+    pvImg_().classList.remove('pv-snap');
+    if (count() === 1) beginSingle(pointers[e.pointerId]);
+    else if (count() === 2) beginPinch();
   });
 
-  img.addEventListener('touchmove', function (e) {
-    if (e.touches.length === 2 && pinchStartDist) {
-      var newDist = distance(e.touches[0], e.touches[1]);
-      var scale = pinchStartScale * (newDist / pinchStartDist);
-      viewerScale = Math.min(4, Math.max(1, scale));
-      img.style.transform = 'scale(' + viewerScale + ')';
+  box.addEventListener('pointermove', function (e) {
+    if (!pointers[e.pointerId]) return;
+    pointers[e.pointerId] = { x: e.clientX, y: e.clientY };
+    var c = center();
+
+    if (mode === 'pinch' && count() >= 2) {
+      var a = pts();
+      var d = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) || 1;
+      var fx = (a[0].x + a[1].x) / 2 - c.x, fy = (a[0].y + a[1].y) / 2 - c.y;
+      var s = pinch.scale * (d / pinch.dist);
+      // karet pada skala di luar batas
+      if (s < 1) s = Math.max(0.6, 1 - (1 - s) * 0.5);
+      else if (s > PV_MAX_SCALE_) s = PV_MAX_SCALE_ + (s - PV_MAX_SCALE_) * 0.3;
+      pvState_.s = s;
+      var b = pvBounds_(Math.max(1, s));
+      pvState_.x = pvRubber_(fx - s * pinch.qx, b.x);
+      pvState_.y = pvRubber_(fy - s * pinch.qy, b.y);
+      pvApply_(false);
       e.preventDefault();
+      return;
+    }
+
+    if (count() !== 1 || !start) return;
+    var p = pointers[e.pointerId];
+    var dx = p.x - start.x, dy = p.y - start.y;
+    var now = Date.now();
+    if (now - vel.t > 0) {
+      vel.x = (p.x - vel.px) / Math.max(1, now - vel.t);
+      vel.y = (p.y - vel.py) / Math.max(1, now - vel.t);
+      vel.t = now; vel.px = p.x; vel.py = p.y;
+    }
+
+    if (mode === 'pan') {
+      var bb = pvBounds_(pvState_.s);
+      pvState_.x = pvRubber_(start.sx + dx, bb.x);
+      pvState_.y = pvRubber_(start.sy + dy, bb.y);
+      pvApply_(false);
+      return;
+    }
+
+    // Skala 1: tentukan arah gerakan sekali (geser antar foto / tarik ke bawah untuk menutup).
+    if (!mode && Math.hypot(dx, dy) > 10) mode = Math.abs(dx) > Math.abs(dy) ? 'swipe' : (dy > 0 ? 'dismiss' : 'swipe-v');
+    if (mode === 'swipe') {
+      var atEdge = (dx > 0 && viewerIndex === 0) || (dx < 0 && viewerIndex === viewerPhotos.length - 1);
+      pvState_.x = atEdge ? dx * 0.3 : dx;
+      pvState_.y = 0;
+      pvApply_(false);
+    } else if (mode === 'dismiss') {
+      pvState_.x = dx * 0.4; pvState_.y = dy;
+      pvApply_(false);
+      box.style.background = 'rgba(0,0,0,' + Math.max(0.25, 0.92 - dy / 500) + ')';
     }
   }, { passive: false });
 
-  img.addEventListener('touchend', function (e) {
-    if (e.changedTouches.length === 1 && viewerScale === 1) {
-      var dx = e.changedTouches[0].clientX - touchStartX;
-      var dy = e.changedTouches[0].clientY - touchStartY;
-
-      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy)) {
-        if (dx < 0 && viewerIndex < viewerPhotos.length - 1) {
-          viewerIndex++;
-          updateViewerImage();
-        } else if (dx > 0 && viewerIndex > 0) {
-          viewerIndex--;
-          updateViewerImage();
-        }
-        return;
-      }
-
-      var now = new Date().getTime();
-      if (now - lastTapTime < 300) {
-        // Double tap
-        viewerScale = viewerScale > 1 ? 1 : 2.5;
-        img.style.transform = 'scale(' + viewerScale + ')';
-      }
-      lastTapTime = now;
+  function inertia() {
+    var last = Date.now();
+    function step() {
+      var now = Date.now(), dt = Math.min(32, now - last); last = now;
+      var b = pvBounds_(pvState_.s);
+      pvState_.x = pvClamp_(pvState_.x + vel.x * dt, b.x);
+      pvState_.y = pvClamp_(pvState_.y + vel.y * dt, b.y);
+      var f = Math.pow(0.94, dt / 16);
+      vel.x *= f; vel.y *= f;
+      pvApply_(false);
+      if (Math.abs(vel.x) > 0.02 || Math.abs(vel.y) > 0.02) raf = requestAnimationFrame(step); else raf = 0;
     }
-    pinchStartDist = null;
+    raf = requestAnimationFrame(step);
+  }
+
+  function endPointer(e) {
+    if (!pointers[e.pointerId]) return;
+    var p = pointers[e.pointerId];
+    delete pointers[e.pointerId];
+    try { box.releasePointerCapture(e.pointerId); } catch (err) {}
+    var n = count();
+
+    if (mode === 'pinch') {
+      if (n < 2) {
+        pvSettle_();
+        // jari yang tersisa melanjutkan sebagai geser
+        if (n === 1) { var rest = pts()[0]; beginSingle(rest); mode = pvState_.s > 1.02 ? 'pan' : 'skip'; }
+        else mode = '';
+      }
+      return;
+    }
+    if (n !== 0) return;
+
+    var dx = p.x - (start ? start.x : p.x), dy = p.y - (start ? start.y : p.y);
+    var dur = Date.now() - (start ? start.t : Date.now());
+    var moved = Math.hypot(dx, dy);
+    var m = mode; mode = '';
+
+    if (m === 'swipe') {
+      var fast = Math.abs(vel.x) > 0.5;
+      if ((Math.abs(dx) > box.clientWidth * 0.2 || fast) && pvGo_(dx < 0 ? 1 : -1)) return;
+      pvSettle_(); return;
+    }
+    if (m === 'dismiss') {
+      box.style.background = '';
+      if (dy > 110 || vel.y > 0.6) { closePhotoViewer(); pvReset_(false); } else pvSettle_();
+      return;
+    }
+    if (m === 'pan') {
+      if (moved > 6) {
+        var recent = Date.now() - vel.t < 80;
+        if (recent && (Math.abs(vel.x) > 0.05 || Math.abs(vel.y) > 0.05)) { pvSettle_(); inertia(); return; }
+      }
+      pvSettle_();
+      if (moved > 6) return;
+    }
+    if (m === 'skip') return;
+
+    // Ketukan (bukan geser): dua ketukan cepat = zoom masuk/keluar di titik ketukan.
+    if (moved < 8 && dur < 300) {
+      var now = Date.now(), c = center();
+      if (now - lastTap.t < 300 && Math.hypot(p.x - lastTap.x, p.y - lastTap.y) < 40) {
+        lastTap.t = 0;
+        if (pvState_.s > 1.05) pvZoomAt_(1, 0, 0, true);
+        else pvZoomAt_(PV_DOUBLE_TAP_SCALE_, p.x - c.x, p.y - c.y, true);
+      } else {
+        lastTap = { t: now, x: p.x, y: p.y };
+      }
+    } else if (pvState_.s !== 1) { pvSettle_(); }
+  }
+  box.addEventListener('pointerup', endPointer);
+  box.addEventListener('pointercancel', function (e) { endPointer(e); mode = ''; pvSettle_(); });
+
+  // Mouse/trackpad: roda = zoom ke posisi kursor.
+  box.addEventListener('wheel', function (e) {
+    if (!box.classList.contains('show')) return;
+    e.preventDefault();
+    stopInertia();
+    var c = center();
+    var f = Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0018));
+    var s = Math.max(1, Math.min(PV_MAX_SCALE_, pvState_.s * f));
+    pvZoomAt_(s, e.clientX - c.x, e.clientY - c.y, false);
+  }, { passive: false });
+
+  // Papan ketik: panah = foto sebelumnya/berikutnya, + / - zoom, 0 = reset.
+  document.addEventListener('keydown', function (ev) {
+    if (!box.classList.contains('show')) return;
+    if (ev.key === 'ArrowRight') pvGo_(1);
+    else if (ev.key === 'ArrowLeft') pvGo_(-1);
+    else if (ev.key === '+' || ev.key === '=') pvZoomAt_(Math.min(PV_MAX_SCALE_, pvState_.s * 1.4), 0, 0, true);
+    else if (ev.key === '-') pvZoomAt_(Math.max(1, pvState_.s / 1.4), 0, 0, true);
+    else if (ev.key === '0') pvReset_(true);
   });
+
+  // Ubah ukuran/rotasi layar: pastikan posisi tetap dalam batas.
+  window.addEventListener('resize', function () { if (box.classList.contains('show')) pvSettle_(); });
+  img.addEventListener('dragstart', function (e) { e.preventDefault(); });
 })();
 
 // ============================================================
@@ -334,6 +549,8 @@ document.getElementById('viewer-close').addEventListener('click', closePhotoView
   var indicatorText = document.getElementById('pull-indicator-text');
 
   function pullablePage() {
+    var pv = document.getElementById('photo-viewer');
+    if (pv && pv.classList.contains('show')) return false; // penampil foto memakai geser sendiri
     return currentPage === 'beranda' || currentPage === 'pekerjaan' || currentPage === 'jadwal' || currentPage === 'aktivitas';
   }
 

@@ -1551,16 +1551,47 @@ function renderListSkeleton_(containerId, cardCount, message) {
       '<div class="skeleton-block skeleton-thumb"></div>' +
     '</div>';
 
-  // Radar loader (ringan, CSS-only) + skeleton card; hilang otomatis saat list dirender.
+  // Radar pulse loader (CSS-only, ringan); hilang otomatis saat list dirender.
   var html =
-    '<div class="loader-radar-card">' +
-      '<div class="loader-radar"><span class="lr-ring r1"></span><span class="lr-ring r2"></span>' +
-        '<span class="lr-sweep"></span><span class="lr-core">' + mdIcon('sensors', 24) + '</span></div>' +
-      '<div class="loader-radar-text"><div class="lr-title">' + (message || 'Memuat data...') + '</div>' +
-        '<div class="lr-sub">Mengambil data terbaru dari server</div></div>' +
+    '<div class="loader-radar-card lr2" role="status" aria-live="polite">' +
+      '<div class="loader-radar"><span class="lr-wave w1"></span><span class="lr-wave w2"></span><span class="lr-wave w3"></span>' +
+        '<span class="lr-spin"></span><span class="lr-core">' +
+        '<svg class="lr-wifi" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" aria-hidden="true">' +
+        '<path stroke-width="2.2" d="M3.51 7.23a15 15 0 0 1 16.98 0"/><path stroke-width="2.2" d="M6.54 10.87a10.5 10.5 0 0 1 10.92 0"/>' +
+        '<path stroke-width="2.2" d="M9.57 14.5a6 6 0 0 1 4.86 0"/><circle cx="12" cy="18.25" r="1.35" fill="currentColor" stroke="none"/></svg></span></div>' +
+      '<div class="loader-radar-text"><div class="lr-head"><div class="lr-title">' + (message || 'Memuat data...') + '</div><span class="lr-pct">0%</span></div>' +
+        '<div class="lr-sub">Mengambil data terbaru dari server</div>' +
+        '<div class="lr-track"><div class="lr-bar"><div class="lr-fill"></div></div><span class="lr-dash"></span>' +
+        '<div class="lr-badge"><span class="lr-badge-pill">' + mdIcon('mail', 12) + '<span class="lr-badge-pct">0%</span></span><span class="lr-badge-arrow"></span></div></div></div>' +
     '</div>';
   for (var i = 0; i < (cardCount || 3); i++) html += cardHtml;
   el.innerHTML = html;
+  startLoaderProgress_(el);
+}
+
+/**
+ * Persen SIMULASI untuk loader (kosmetik, bukan progres unduhan sebenarnya): naik cepat di awal,
+ * melambat mendekati 90% dan berhenti di sana sampai daftar dirender (loader dibuang). Timer
+ * berhenti sendiri saat kartu loader hilang dari halaman, dan tidak pernah dobel per wadah.
+ */
+function startLoaderProgress_(container) {
+  if (container._lrTimer) { clearInterval(container._lrTimer); container._lrTimer = null; }
+  var card = container.querySelector('.lr2');
+  if (!card) return;
+  var pct = card.querySelector('.lr-pct'), bpct = card.querySelector('.lr-badge-pct'),
+      fill = card.querySelector('.lr-fill'), badge = card.querySelector('.lr-badge');
+  var v = 0;
+  function paint() {
+    var n = Math.min(90, Math.floor(v));
+    pct.textContent = n + '%'; bpct.textContent = n + '%';
+    fill.style.width = n + '%'; badge.style.left = n + '%';
+  }
+  paint();
+  container._lrTimer = setInterval(function () {
+    if (!card.isConnected) { clearInterval(container._lrTimer); container._lrTimer = null; return; }
+    v += Math.max(0.12, (90 - v) * 0.045);
+    paint();
+  }, 120);
 }
 
 /**
