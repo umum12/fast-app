@@ -241,7 +241,7 @@ function finishSendingOverlay_(next) {
   var ov = document.getElementById('sending-overlay');
   if (!ov || !ov.classList.contains('show')) {
     // Layar sudah ditutup pengguna (jaringan lambat): beri tahu bahwa kirim akhirnya berhasil, di halaman mana pun.
-    if (sendingDismissed_) { sendingDismissed_ = false; try { showSnackbar('Berhasil terkirim', 'success'); } catch (e) {} }
+    if (sendingDismissed_) { sendingDismissed_ = false; try { showSnackbar('Berhasil terkirim.', 'success'); } catch (e) {} }
     if (next) next();
     return;
   }
@@ -3371,7 +3371,7 @@ function doAmbilPekerjaanInline_(buttonEl, p) {
     if (prog.parentNode) prog.parentNode.removeChild(prog);
     endFocus();
   }
-  function toastSuccess() { showSnackbar('Pekerjaan berhasil diambil', 'success', toastDetail); }
+  function toastSuccess() { showSnackbar('Pekerjaan berhasil diambil.', 'success', toastDetail); }
 
   setP(10, 'Mengecek data penugasan...');
   // Merayap pelan selagi menunggu server (maks 60%); fase berikutnya mengikuti respons asli.

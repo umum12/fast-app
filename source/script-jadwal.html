@@ -1249,6 +1249,50 @@ function initBerandaPage() {
   setTimeout(loadHomeBootstrap, 0);
 }
 
+// ============================================================
+// BERANDA BERBASIS TUGAS — ringkasan "yang perlu dilakukan sekarang".
+// Memakai angka dashboard yang SUDAH ada di bundle Beranda (tanpa panggilan baru).
+// ============================================================
+function renderHomeTasks_(dash) {
+  var box = document.getElementById('home-tasks');
+  if (!box) return;
+  var st = dash && dash.stats;
+  var user = appBootstrap && appBootstrap.currentUser;
+  if (!st || !user) { box.hidden = true; box.innerHTML = ''; return; }
+  var open = Number(st.tasksAvailableCount) || 0;
+  var mine = Number(st.myClaimedCount) || 0;
+  var tiles = [
+    { cls: 'ht-open' + (open ? ' has' : ''), icon: 'inbox', n: open, label: 'Menunggu diambil', go: 'pekerjaan' }
+  ];
+  if (user.role === 'fs') {
+    tiles.push({ cls: 'ht-mine' + (mine ? ' has' : ''), icon: 'task', n: mine, label: 'Saya kerjakan', go: 'pekerjaan' });
+  } else {
+    var done = Number(st.tasksCompletedThisWeek) || 0;
+    tiles.push({ cls: 'ht-done' + (done ? ' has' : ''), icon: 'checkCircle', n: done, label: 'Selesai minggu ini', go: 'aktivitas' });
+  }
+  box.innerHTML = '';
+  var title = document.createElement('div');
+  title.className = 'ht-title';
+  title.textContent = 'Perlu perhatian';
+  box.appendChild(title);
+  var row = document.createElement('div');
+  row.className = 'ht-row';
+  tiles.forEach(function (t) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'ht-tile ' + t.cls;
+    b.setAttribute('aria-label', t.n + ' ' + t.label);
+    b.innerHTML = '<span class="ht-ico">' + mdIcon(t.icon, 20) + '</span>' +
+      '<span class="ht-txt"><span class="ht-num">' + t.n + '</span><span class="ht-lbl"></span></span>' +
+      '<span class="ht-go">' + mdIcon('chevronRight', 18) + '</span>';
+    b.querySelector('.ht-lbl').textContent = t.label;
+    b.addEventListener('click', function () { goToPage(t.go); });
+    row.appendChild(b);
+  });
+  box.appendChild(row);
+  box.hidden = false;
+}
+
 function loadHomeBootstrap(force) {
   var session = loadSession();
   if (!session) return;
@@ -1259,6 +1303,7 @@ function loadHomeBootstrap(force) {
   }
 
   if (pageDataCache.dashboard && pageDataCache.content) {
+    renderHomeTasks_(pageDataCache.dashboard);
     renderContentBanner_(pageDataCache.content);
     if (appBootstrap.currentUser.role === 'admin') renderContentManagementList_(pageDataCache.content);
     if (typeof prefetchTabs_ === 'function') prefetchTabs_();
@@ -1267,6 +1312,8 @@ function loadHomeBootstrap(force) {
 
   // Salinan tersimpan: banner langsung tampil, lalu diperbarui dari server.
   var pcContent = !force ? persistGet_('content') : null;
+  var pcDashHome = !force ? persistGet_('dashboard') : null;
+  if (pcDashHome) renderHomeTasks_(pcDashHome);
   var shownStale = false;
   if (pcContent) {
     shownStale = true;
@@ -1285,6 +1332,7 @@ function loadHomeBootstrap(force) {
         persistSet_('content', response.data.content);
         persistSet_('dashboard', response.data.dashboard);
       }
+      renderHomeTasks_(response.data.dashboard);
       if (!(shownStale && sameFeedList_(pcContent, response.data.content))) {
         renderContentBanner_(response.data.content);
         if (appBootstrap.currentUser.role === 'admin') renderContentManagementList_(response.data.content);
@@ -1531,7 +1579,7 @@ function attachContentFormListenersOnce_() {
       contentFormPdfWasRemoved = false;
       renderContentPdfSlot_();
     };
-    reader.onerror = function () { showSnackbar('Gagal membaca file PDF.', 'error'); };
+    reader.onerror = function () { showSnackbar('Gagal membaca file PDF. Coba pilih ulang file.', 'error'); };
     reader.readAsDataURL(file);
   });
 
@@ -2052,14 +2100,14 @@ function handleContentHtmlFile_(file) {
     var err = validateSlideHtmlClient_(text);
     if (err) { showSnackbar(err, 'error'); return; }
     var b64;
-    try { b64 = btoa(unescape(encodeURIComponent(text))); } catch (e) { showSnackbar('Gagal membaca file HTML.', 'error'); return; }
+    try { b64 = btoa(unescape(encodeURIComponent(text))); } catch (e) { showSnackbar('Gagal membaca file HTML. Coba pilih ulang file.', 'error'); return; }
     contentFormHtml = { fileName: file.name, base64: b64, text: text };
     contentFormHtmlWasRemoved = false;
     // Satu jenis tampilan per slide: HTML menggantikan gambar.
     if (contentFormImage) { contentFormImage = null; contentFormImageWasRemoved = true; renderContentImageSlot_(); showSnackbar('Gambar dilepas: satu slide hanya satu jenis tampilan.', 'info'); }
     renderContentHtmlSlot_();
   };
-  reader.onerror = function () { showSnackbar('Gagal membaca file HTML.', 'error'); };
+  reader.onerror = function () { showSnackbar('Gagal membaca file HTML. Coba pilih ulang file.', 'error'); };
   reader.readAsText(file, 'UTF-8');
 }
 

@@ -390,11 +390,21 @@ var snackbarTimer = null;
  * (opsional) menampilkan baris kedua dan memperbesar toast + durasinya
  * (untuk konfirmasi penting). Pesan lama tanpa detail tidak berubah.
  */
+// Umpan balik getar singkat (HP yang mendukung). Dimatikan bila localStorage fa_haptic = 'off'.
+function haptic_(kind) {
+  try {
+    if (!navigator.vibrate || localStorage.getItem('fa_haptic') === 'off') return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    navigator.vibrate(kind === 'error' ? [18, 40, 18] : kind === 'success' ? 12 : 8);
+  } catch (e) {}
+}
+
 function showSnackbar(message, type, detail) {
   // Audit #6: sesi tidak valid (akun dinonaktifkan / kode diganti) -> kembali ke layar login.
   if (typeof message === 'string' && message.indexOf('Sesi tidak valid') === 0 && exitInvalidSession_(message)) return;
   var el = document.getElementById('snackbar');
   var t = type || 'info';
+  if (t === 'success' || t === 'error') haptic_(t);
   el.className = 'snackbar-' + t + (detail ? ' snackbar-rich' : '');
   el.innerHTML = '';
 
