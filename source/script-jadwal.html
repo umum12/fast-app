@@ -1552,35 +1552,10 @@ function attachContentFormListenersOnce_() {
       contentFormImage = { previewUrl: result.previewUrl, base64: result.base64, mimeType: result.mimeType };
       contentFormImageWasRemoved = false;
       renderContentImageSlot_();
-      if (contentFormHtml) { contentFormHtml = null; contentFormHtmlWasRemoved = true; renderContentHtmlSlot_(); showSnackbar('Slide HTML dilepas: satu slide hanya satu jenis tampilan.', 'info'); }
     }).catch(function () {
       endAction(null);
       showSnackbar('Gagal memproses gambar. Coba lagi.', 'error');
     });
-  });
-
-  document.getElementById('content-html-file-input').addEventListener('change', function (e) {
-    var file = e.target.files[0];
-    e.target.value = '';
-    handleContentHtmlFile_(file);
-  });
-  document.getElementById('btn-content-html-template').addEventListener('click', downloadSlideHtmlTemplate_);
-
-  document.getElementById('content-pdf-file-input').addEventListener('change', function (e) {
-    var file = e.target.files[0];
-    e.target.value = '';
-    if (!file) return;
-    if (file.type !== 'application/pdf') { showSnackbar('File harus berformat PDF.', 'error'); return; }
-    if (file.size > 5 * 1024 * 1024) { showSnackbar('Ukuran PDF maksimal 5MB.', 'error'); return; }
-
-    var reader = new FileReader();
-    reader.onload = function () {
-      contentFormPdf = { fileName: file.name, base64: reader.result.split(',')[1], mimeType: 'application/pdf' };
-      contentFormPdfWasRemoved = false;
-      renderContentPdfSlot_();
-    };
-    reader.onerror = function () { showSnackbar('Gagal membaca file PDF. Coba pilih ulang file.', 'error'); };
-    reader.readAsDataURL(file);
   });
 
   document.getElementById('btn-toggle-content-form').addEventListener('click', function () {
@@ -1675,33 +1650,27 @@ function renderContentImageSlot_() {
 }
 
 function renderContentPdfSlot_() {
+  // Upload PDF sudah dihapus. Slot ini hanya muncul untuk konten lama yang masih punya PDF,
+  // agar Admin bisa melepasnya. Tidak ada tombol unggah.
   var container = document.getElementById('content-pdf-slot-container');
+  var group = document.getElementById('content-pdf-group');
   container.innerHTML = '';
-
-  if (contentFormPdf) {
-    var chip = document.createElement('div');
-    chip.className = 'content-pdf-chip';
-    chip.innerHTML = mdIcon('description', 16) + '<span>' + (contentFormPdf.fileName || 'Dokumen PDF') + '</span>';
-    var removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.textContent = '\u00d7';
-    removeBtn.setAttribute('aria-label', 'Hapus PDF');
-    removeBtn.addEventListener('click', function () {
-      contentFormPdf = null;
-      contentFormPdfWasRemoved = true;
-      renderContentPdfSlot_();
-    });
-    chip.appendChild(removeBtn);
-    container.appendChild(chip);
-  } else {
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'btn-outlined';
-    btn.style.width = 'auto';
-    btn.innerHTML = mdIcon('upload', 16) + '<span>Pilih PDF</span>';
-    btn.addEventListener('click', function () { document.getElementById('content-pdf-file-input').click(); });
-    container.appendChild(btn);
-  }
+  if (group) group.style.display = contentFormPdf ? '' : 'none';
+  if (!contentFormPdf) return;
+  var chip = document.createElement('div');
+  chip.className = 'content-pdf-chip';
+  chip.innerHTML = mdIcon('description', 16) + '<span>' + (contentFormPdf.fileName || 'Dokumen PDF') + '</span>';
+  var removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.textContent = '\u00d7';
+  removeBtn.setAttribute('aria-label', 'Hapus PDF');
+  removeBtn.addEventListener('click', function () {
+    contentFormPdf = null;
+    contentFormPdfWasRemoved = true;
+    renderContentPdfSlot_();
+  });
+  chip.appendChild(removeBtn);
+  container.appendChild(chip);
 }
 
 function openContentForm_(entry) {
@@ -1738,11 +1707,7 @@ function openContentForm_(entry) {
   contentFormImageWasRemoved = false;
   renderContentImageSlot_();
 
-  contentFormHtml = (entry && entry.hasHtml) ? { fileName: 'Slide HTML (tersimpan)', saved: true, entry: entry } : null;
-  contentFormHtmlWasRemoved = false;
-  renderContentHtmlSlot_();
-
-  contentFormPdf = (entry && entry.pdfUrl) ? { fileName: 'Dokumen PDF (tersimpan)', base64: null } : null;
+  contentFormPdf = (entry && entry.pdfUrl) ? { fileName: 'PDF lama (tersimpan)', base64: null } : null;
   contentFormPdfWasRemoved = false;
   renderContentPdfSlot_();
 
@@ -1795,15 +1760,7 @@ function submitContentForm_() {
     data.removeImage = true;
   }
 
-  if (contentFormHtml && contentFormHtml.base64) {
-    data.html = { base64: contentFormHtml.base64, mimeType: 'text/html' };
-  } else if (!contentFormHtml && contentFormHtmlWasRemoved) {
-    data.removeHtml = true;
-  }
-
-  if (contentFormPdf && contentFormPdf.base64) {
-    data.pdf = { base64: contentFormPdf.base64, mimeType: contentFormPdf.mimeType };
-  } else if (!contentFormPdf && contentFormPdfWasRemoved) {
+  if (!contentFormPdf && contentFormPdfWasRemoved) {
     data.removePdf = true;
   }
 
@@ -1812,7 +1769,7 @@ function submitContentForm_() {
   var submitBtn = document.getElementById('btn-submit-content');
   // Kunci kirim hanya untuk BUAT konten (menghindari konten & file Drive ganda saat kirim ulang).
   if (!editId) data.submitKey = stickyKeyFor_('cnt:new', stickyFp_([data.contentType, data.title, data.content, data.scheduleRule, data.startDate, data.endDate,
-    data.image ? data.image.base64.length : 0, data.html ? data.html.base64.length : 0, data.pdf ? data.pdf.base64.length : 0]));
+    data.image ? data.image.base64.length : 0]));
   beginAction(submitBtn, 'Menyimpan...');
 
   var call = google.script.run
@@ -1898,219 +1855,6 @@ var contentCarouselTimer_ = null;
 
 /** Beranda: pengumuman tayang ditampilkan sebagai carousel (geser, panah, titik, autoplay 5 dtk). */
 
-// ============================================================
-// SLIDE HTML (Carousel) — template, validasi, render sandbox
-// ============================================================
-var SLIDE_HTML_W_ = 960, SLIDE_HTML_H_ = 720;
-var SLIDE_HTML_MAX_BYTES_ = 200 * 1024;
-var SLIDE_HTML_TEMPLATE_ = "<!doctype html>\n<html lang=\"id\">\n<head>\n<meta charset=\"utf-8\">\n<title>Template Slide Carousel FAST<\/title>\n<\!--\n  TEMPLATE SLIDE CAROUSEL — FAST APP\n  Kanvas TETAP 960 x 720 px (rasio 4:3, untuk HP). Aplikasi menskalakan kanvas ini agar pas\n  ke area Carousel; ukuran area tidak berubah berapa pun isi slide Anda.\n\n  ATURAN (dicek otomatis saat unggah):\n  - Hanya HTML + CSS. Tanpa JavaScript, tanpa atribut onclick/onload dsb.\n  - Tanpa tautan, formulir, bingkai tertanam, CSS/skrip/gambar dari alamat luar\n    (http/https). Semua harus berada di dalam file ini.\n  - Gambar kecil: sisipkan sebagai data URI (data:image/...;base64,...).\n  - Font: pakai font sistem (font luar tidak dimuat).\n  - Maksimal ukuran file 200 KB.\n  - Animasi: gunakan CSS (@keyframes). Slide tidak bisa diklik/digulir.\n\n  AREA AMAN: biarkan 48 px dari tepi kiri/kanan dan 40 px atas/bawah bebas dari\n  teks penting. Pojok kanan bawah (±200 x 70 px) dapat tertutup chip \"Detail\".\n  Silakan ubah teks, warna (variabel --... di :root), dan animasi di bawah.\n-->\n<style>\n  :root {\n    --biru: #1F4E9C;\n    --lime: #9CC247;\n    --merah: #D6312B;\n    --gelap: #0f172a;\n    --terang: #ffffff;\n    --aman-x: 48px;\n    --aman-y: 40px;\n  }\n  * { box-sizing: border-box; margin: 0; padding: 0; }\n  html, body { width: 960px; height: 720px; overflow: hidden; }\n  body {\n    position: relative;\n    font-family: system-ui, -apple-system, \"Segoe UI\", Roboto, Arial, sans-serif;\n    color: var(--terang);\n    background: linear-gradient(135deg, var(--biru) 0%, #173b78 60%, var(--gelap) 100%);\n  }\n\n  /* Dekorasi latar (boleh dihapus/diganti) */\n  .bulat { position: absolute; border-radius: 50%; opacity: .18; animation: melayang 9s ease-in-out infinite; }\n  .b1 { width: 460px; height: 460px; right: -140px; top: -150px; background: var(--lime); }\n  .b2 { width: 360px; height: 360px; left: -120px; bottom: -150px; background: var(--merah); animation-delay: -4s; }\n  .garis { position: absolute; left: 0; right: 0; top: 0; height: 12px;\n    background: linear-gradient(90deg, var(--biru) 0 55%, var(--lime) 55% 85%, var(--merah) 85% 100%); }\n\n  /* Isi utama di dalam area aman */\n  .isi {\n    position: absolute; inset: var(--aman-y) var(--aman-x);\n    display: flex; flex-direction: column; justify-content: center; gap: 24px;\n  }\n  .label {\n    align-self: flex-start;\n    font-size: 26px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase;\n    color: var(--gelap); background: var(--lime);\n    padding: 8px 22px; border-radius: 999px;\n    animation: masuk .7s ease-out both;\n  }\n  h1 {\n    font-size: 76px; line-height: 1.08; font-weight: 900; letter-spacing: -.02em;\n    animation: masuk .8s .15s ease-out both;\n  }\n  p {\n    font-size: 34px; line-height: 1.35; max-width: 820px; opacity: .92;\n    animation: masuk .8s .3s ease-out both;\n  }\n  .info {\n    display: flex; flex-wrap: wrap; gap: 16px; margin-top: 8px;\n    animation: masuk .8s .45s ease-out both;\n  }\n  .kartu {\n    background: rgba(255,255,255,.14); border: 2px solid rgba(255,255,255,.35);\n    border-radius: 20px; padding: 12px 24px; font-size: 28px; font-weight: 700;\n  }\n  .kartu b { color: var(--lime); }\n  .sorot { color: var(--lime); }\n\n  @keyframes masuk { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: none; } }\n  @keyframes melayang { 0%,100% { transform: translateY(0); } 50% { transform: translateY(22px); } }\n  @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }\n<\/style>\n<\/head>\n<body>\n  <div class=\"bulat b1\"><\/div>\n  <div class=\"bulat b2\"><\/div>\n  <div class=\"garis\"><\/div>\n\n  <div class=\"isi\">\n    <div class=\"label\">Pengumuman<\/div>\n    <h1>Judul Slide <span class=\"sorot\">Facility Support<\/span><\/h1>\n    <p>Tulis pesan singkat di sini. Ubah teks, warna, dan animasi sesuai kebutuhan.<\/p>\n    <div class=\"info\">\n      <div class=\"kartu\">Tanggal: <b>01 Jan 2026<\/b><\/div>\n      <div class=\"kartu\">Lokasi: <b>Gedung A<\/b><\/div>\n    <\/div>\n  <\/div>\n<\/body>\n<\/html>\n";
-
-// Salinan logika validateContentHtml_ (content.gs) agar Admin langsung mendapat umpan balik.
-// Server tetap memeriksa ulang; pertahanan utama = iframe sandbox + CSP.
-function validateSlideHtmlClient_(text) {
-  if (typeof text !== 'string' || !text.trim()) return 'File HTML kosong.';
-  var bytes;
-  try { bytes = unescape(encodeURIComponent(text)).length; } catch (e) { bytes = text.length * 3; }
-  if (bytes > SLIDE_HTML_MAX_BYTES_) return 'Ukuran file HTML maksimal 200 KB.';
-  var bad = /<\s*(script|iframe|frame|frameset|object|embed|applet|base|form|link|meta\s+[^>]*http-equiv)\b/i;
-  var m = text.match(bad);
-  if (m) return 'HTML tidak boleh memuat elemen <' + m[1].split(/\s/)[0].toLowerCase() + '>.';
-  if (/<[a-z][^>]*[\s"'\/]on[a-z]+\s*=/i.test(text)) return 'HTML tidak boleh memuat atribut event (onclick, onload, dsb).';
-  if (/(javascript|vbscript)\s*:/i.test(text)) return 'HTML tidak boleh memuat javascript:.';
-  if (/@import/i.test(text)) return 'CSS tidak boleh memakai @import.';
-  if (/expression\s*\(|-moz-binding|behavior\s*:/i.test(text)) return 'CSS tidak diperbolehkan memuat ekspresi/binding.';
-  var re, a;
-  re = /url\(\s*(['"]?)\s*([^'")]*)/ig;
-  while ((a = re.exec(text))) {
-    if (!/^(data:image\/|#)/i.test(a[2].trim())) return 'Sumber luar di CSS url() tidak diizinkan. Sisipkan gambar sebagai data URI.';
-  }
-  re = /[\s"'\/](src|srcset|poster|action|formaction|background|data|xlink:href|href)\s*=\s*(['"]?)\s*([^'">\s]*)/ig;
-  while ((a = re.exec(text))) {
-    var attr = a[1].toLowerCase(), val = a[3];
-    if (attr === 'href' || attr === 'xlink:href') {
-      if (val.charAt(0) !== '#') return 'Tautan (href) tidak diizinkan di slide HTML.';
-    } else if (!/^data:image\//i.test(val)) {
-      return 'Sumber luar (' + attr + ') tidak diizinkan. Sisipkan gambar sebagai data URI.';
-    }
-  }
-  return null;
-}
-
-// Dokumen untuk iframe srcdoc: CSP disuntik paling awal (di dalam <head>) agar semua sumber luar diblokir.
-var SLIDE_HTML_CSP_ = "default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:; media-src data:";
-function buildSlideHtmlDoc_(text) {
-  var meta = '<meta http-equiv="Content-Security-Policy" content="' + SLIDE_HTML_CSP_ + '">';
-  var s = String(text || '');
-  if (/<head[^>]*>/i.test(s)) return s.replace(/<head[^>]*>/i, function (h) { return h + meta; });
-  if (/<html[^>]*>/i.test(s)) return s.replace(/<html[^>]*>/i, function (h) { return h + '<head>' + meta + '</head>'; });
-  return '<!doctype html><html><head>' + meta + '<meta charset="utf-8"></head><body>' + s + '</body></html>';
-}
-
-/**
- * Memasang iframe sandbox berukuran tetap 960x720 ke dalam host (elemen ber-ukuran tetap/4:3),
- * lalu menskalakannya agar pas (scale = min(w/960, h/720), di tengah). Ukuran host TIDAK ikut isi.
- */
-function mountSlideHtml_(host, text) {
-  host.innerHTML = '';
-  host.classList.add('cc-html-host');
-  var frame = document.createElement('iframe');
-  frame.className = 'cc-html-frame';
-  frame.setAttribute('sandbox', '');           // tanpa skrip, same-origin, form, popup, navigasi
-  frame.setAttribute('referrerpolicy', 'no-referrer');
-  frame.setAttribute('scrolling', 'no');
-  frame.setAttribute('tabindex', '-1');
-  frame.setAttribute('aria-hidden', 'true');
-  frame.title = 'Slide HTML';
-  frame.width = SLIDE_HTML_W_; frame.height = SLIDE_HTML_H_;
-  frame.srcdoc = buildSlideHtmlDoc_(text);
-  host.appendChild(frame);
-
-  function fit() {
-    var w = host.clientWidth, h = host.clientHeight;
-    if (!w || !h) return;
-    var sc = Math.min(w / SLIDE_HTML_W_, h / SLIDE_HTML_H_);
-    frame.style.transform = 'translate(' + ((w - SLIDE_HTML_W_ * sc) / 2) + 'px,' + ((h - SLIDE_HTML_H_ * sc) / 2) + 'px) scale(' + sc + ')';
-  }
-  fit();
-  if (typeof ResizeObserver !== 'undefined') {
-    var ro = new ResizeObserver(function () { if (!document.body.contains(host)) { ro.disconnect(); return; } fit(); });
-    ro.observe(host);
-  } else {
-    var onR = function () { if (!document.body.contains(host)) { window.removeEventListener('resize', onR); return; } fit(); };
-    window.addEventListener('resize', onR);
-  }
-  return frame;
-}
-
-// Cache perangkat: kunci memuat htmlFileId (isi tidak berubah untuk file yang sama).
-var slideHtmlMem_ = {};
-function slideHtmlCacheKey_(c) { return 'fa_slidehtml_' + c.contentId + '_' + c.htmlFileId; }
-function slideHtmlCacheGet_(c) {
-  var k = slideHtmlCacheKey_(c);
-  if (slideHtmlMem_[k]) return slideHtmlMem_[k];
-  try { var v = localStorage.getItem(k); if (v) { slideHtmlMem_[k] = v; return v; } } catch (e) {}
-  return null;
-}
-function slideHtmlCachePut_(c, text) {
-  var k = slideHtmlCacheKey_(c);
-  slideHtmlMem_[k] = text;
-  try { localStorage.setItem(k, text); } catch (e) { /* penuh/diblokir: cukup memori */ }
-}
-function slideHtmlCachePrune_(items) {
-  var keep = {};
-  (items || []).forEach(function (c) { if (c.hasHtml) keep[slideHtmlCacheKey_(c)] = 1; });
-  try {
-    var del = [];
-    for (var i = 0; i < localStorage.length; i++) {
-      var k = localStorage.key(i);
-      if (k && k.indexOf('fa_slidehtml_') === 0 && !keep[k]) del.push(k);
-    }
-    del.forEach(function (k) { localStorage.removeItem(k); delete slideHtmlMem_[k]; });
-  } catch (e) {}
-}
-
-// Ambil isi HTML (dari cache bila ada) lalu panggil cb(error, text).
-function fetchSlideHtml_(c, cb) {
-  var cached = slideHtmlCacheGet_(c);
-  if (cached) { cb(null, cached); return; }
-  var session = loadSession();
-  if (!session) { cb('Sesi tidak valid.'); return; }
-  google.script.run
-    .withSuccessHandler(function (r) {
-      var html = r && r.success && r.data && r.data.html;
-      if (!html) { cb((r && r.error) || 'Gagal memuat slide.'); return; }
-      slideHtmlCachePut_(c, html);
-      cb(null, html);
-    })
-    .withFailureHandler(function () { cb('Gagal terhubung ke server.'); })
-    .getContentHtml(session.accessCode, c.contentId);
-}
-
-function downloadSlideHtmlTemplate_() {
-  try {
-    var blob = new Blob([SLIDE_HTML_TEMPLATE_], { type: 'text/html;charset=utf-8' });
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = url; a.download = 'template-slide-carousel.html';
-    document.body.appendChild(a); a.click();
-    setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 1000);
-  } catch (e) { showSnackbar('Gagal mengunduh template.', 'error'); }
-}
-
-// ----- Form: slot HTML -----
-var contentFormHtml = null;           // { fileName, base64, text } | { fileName, saved:true, entry }
-var contentFormHtmlWasRemoved = false;
-
-function renderContentHtmlSlot_() {
-  var container = document.getElementById('content-html-slot-container');
-  var prev = document.getElementById('content-html-preview');
-  if (!container) return;
-  container.innerHTML = '';
-  prev.innerHTML = ''; prev.style.display = 'none';
-
-  if (contentFormHtml) {
-    var chip = document.createElement('div');
-    chip.className = 'content-pdf-chip';
-    var nm = document.createElement('span'); nm.textContent = contentFormHtml.fileName || 'Slide HTML';
-    chip.innerHTML = mdIcon('description', 16);
-    chip.appendChild(nm);
-    var removeBtn = document.createElement('button');
-    removeBtn.type = 'button'; removeBtn.textContent = '×'; removeBtn.setAttribute('aria-label', 'Hapus slide HTML');
-    removeBtn.addEventListener('click', function () {
-      contentFormHtml = null; contentFormHtmlWasRemoved = true; renderContentHtmlSlot_();
-    });
-    chip.appendChild(removeBtn);
-    container.appendChild(chip);
-
-    prev.style.display = 'block';
-    var box = document.createElement('div');
-    box.className = 'cc-html-preview-box';
-    prev.appendChild(box);
-    var note = document.createElement('div');
-    note.className = 'form-hint'; note.style.cssText = 'font-size:12px;color:var(--color-text-muted);margin-top:6px;';
-    note.textContent = 'Pratinjau (sama seperti tampilan Carousel).';
-    prev.appendChild(note);
-    if (contentFormHtml.text) {
-      mountSlideHtml_(box, contentFormHtml.text);
-    } else if (contentFormHtml.saved) {
-      box.innerHTML = '<div class="cc-html-msg">Memuat pratinjau…</div>';
-      var cur = contentFormHtml;
-      fetchSlideHtml_(cur.entry, function (err, text) {
-        if (contentFormHtml !== cur || !document.body.contains(box)) return;
-        if (err) { box.innerHTML = '<div class="cc-html-msg">Pratinjau tidak tersedia.</div>'; return; }
-        mountSlideHtml_(box, text);
-      });
-    }
-  } else {
-    var btn = document.createElement('button');
-    btn.type = 'button'; btn.className = 'btn-outlined'; btn.style.width = 'auto';
-    btn.innerHTML = mdIcon('upload', 16) + '<span>Pilih file HTML</span>';
-    btn.addEventListener('click', function () { document.getElementById('content-html-file-input').click(); });
-    container.appendChild(btn);
-  }
-}
-
-function handleContentHtmlFile_(file) {
-  if (!file) return;
-  if (!/\.html?$/i.test(file.name)) { showSnackbar('File harus berekstensi .html.', 'error'); return; }
-  if (file.size > SLIDE_HTML_MAX_BYTES_) { showSnackbar('Ukuran file HTML maksimal 200 KB.', 'error'); return; }
-  var reader = new FileReader();
-  reader.onload = function () {
-    var text = String(reader.result || '');
-    var err = validateSlideHtmlClient_(text);
-    if (err) { showSnackbar(err, 'error'); return; }
-    var b64;
-    try { b64 = btoa(unescape(encodeURIComponent(text))); } catch (e) { showSnackbar('Gagal membaca file HTML. Coba pilih ulang file.', 'error'); return; }
-    contentFormHtml = { fileName: file.name, base64: b64, text: text };
-    contentFormHtmlWasRemoved = false;
-    // Satu jenis tampilan per slide: HTML menggantikan gambar.
-    if (contentFormImage) { contentFormImage = null; contentFormImageWasRemoved = true; renderContentImageSlot_(); showSnackbar('Gambar dilepas: satu slide hanya satu jenis tampilan.', 'info'); }
-    renderContentHtmlSlot_();
-  };
-  reader.onerror = function () { showSnackbar('Gagal membaca file HTML. Coba pilih ulang file.', 'error'); };
-  reader.readAsText(file, 'UTF-8');
-}
-
 function renderContentBanner_(list) {
   var container = document.getElementById('content-banner-container');
   if (contentCarouselTimer_) { clearInterval(contentCarouselTimer_); contentCarouselTimer_ = null; }
@@ -2126,7 +1870,6 @@ function renderContentBanner_(list) {
   var track = document.createElement('div');
   track.className = 'cc-track';
 
-  var htmlLoaders = [];
   var lastSwipeAt = 0; // klik tepat setelah geser tidak boleh membuka detail
   items.forEach(function (c) {
     var typeInfo = CONTENT_TYPE_BADGE[c.contentType] || { cls: 'badge-neutral', icon: 'description' };
@@ -2134,39 +1877,6 @@ function renderContentBanner_(list) {
     var slide = document.createElement('div');
     slide.className = 'cc-slide tone-' + tone + (c.contentType === 'warning' ? ' is-warning' : '');
     var hasText = !!String(c.content || '').replace(/<[^>]*>/g, '').trim();
-
-    if (c.hasHtml) {
-      // Slide HTML: kanvas 960x720 di dalam iframe sandbox, diskalakan pas ke area carousel tetap.
-      slide.classList.add('is-html');
-      var hhost = document.createElement('div');
-      hhost.className = 'cc-html';
-      hhost.innerHTML = '<div class="cc-html-msg">Memuat\u2026</div>';
-      slide.appendChild(hhost);
-      htmlLoaders[items.indexOf(c)] = function () {
-        if (hhost.getAttribute('data-state')) return;
-        hhost.setAttribute('data-state', 'loading');
-        fetchSlideHtml_(c, function (err, text) {
-          if (err) {
-            hhost.removeAttribute('data-state');
-            hhost.innerHTML = '<button type="button" class="cc-html-msg cc-html-retry">Gagal memuat. Ketuk untuk coba lagi.</button>';
-            hhost.querySelector('button').addEventListener('click', function (e) { e.stopPropagation(); htmlLoaders[items.indexOf(c)](); });
-            return;
-          }
-          hhost.setAttribute('data-state', 'ready');
-          mountSlideHtml_(hhost, text);
-        });
-      };
-      if (String(c.content || '').trim() || c.pdfUrl) {
-        var moreH = document.createElement('button');
-        moreH.type = 'button';
-        moreH.className = 'cc-more cc-more-float';
-        moreH.innerHTML = '<span>Detail</span>' + mdIcon('chevronRight', 14);
-        moreH.addEventListener('click', function (e) { e.stopPropagation(); openContentDetail_(c, typeInfo); });
-        slide.appendChild(moreH);
-      }
-      track.appendChild(slide);
-      return;
-    }
 
     if (c.imageUrl) {
       // Slide GAMBAR: hanya gambar (tanpa judul/teks), utuh tanpa terpotong. Rasio 4:3 pas penuh;
@@ -2191,7 +1901,8 @@ function renderContentBanner_(list) {
         var more = document.createElement('button');
         more.type = 'button';
         more.className = 'cc-more cc-more-float';
-        more.innerHTML = '<span>Detail</span>' + mdIcon('chevronRight', 14);
+        more.innerHTML = mdIcon('arrowForward', 18);
+        more.setAttribute('aria-label', 'Lihat detail');
         more.addEventListener('click', function (e) { e.stopPropagation(); openContentDetail_(c, typeInfo); });
         slide.appendChild(more);
       }
@@ -2249,9 +1960,6 @@ function renderContentBanner_(list) {
   wrap.appendChild(viewport);
 
   var n = items.length, idx = 0;
-  function warmHtml_(i) { var f = htmlLoaders[(i + n) % n]; if (f) f(); }
-  warmHtml_(0); if (n > 1) warmHtml_(1);
-  slideHtmlCachePrune_(items);
   if (n > 1) {
     var prev = document.createElement('button');
     prev.type = 'button'; prev.className = 'cc-nav cc-prev'; prev.setAttribute('aria-label', 'Sebelumnya');
@@ -2276,7 +1984,6 @@ function renderContentBanner_(list) {
     var go = function (i, user) {
       idx = (i + n) % n;
       track.style.transform = 'translateX(-' + (idx * 100) + '%)';
-      warmHtml_(idx); warmHtml_(idx + 1);
       Array.prototype.forEach.call(dots.children, function (d, k) { d.className = k === idx ? 'active' : ''; });
       if (user) restart();
     };
