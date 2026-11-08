@@ -899,8 +899,9 @@ function renderApp(bootstrap, session) {
   var lastPage = (session.uiState && session.uiState.activePage) || defaultPage;
   // Tautan lama / launcher: index.html#buat -> langsung ke menu Buat.
   try {
-    if (location.hash === '#buat') {
-      lastPage = 'buat';
+    var hashPage = /^#(buat|pekerjaan)$/.exec(location.hash);
+    if (hashPage) {
+      lastPage = hashPage[1];   // #buat: tautan lama/launcher; #pekerjaan: ketukan notifikasi saat aplikasi tertutup
       history.replaceState(null, '', location.pathname + location.search);
     }
   } catch (e) {}
@@ -917,6 +918,18 @@ function renderApp(bootstrap, session) {
   // Auto-logout 30 menit tidak ada aktivitas — mulai/reset hitungan
   // mundur begitu user berhasil masuk (login baru atau resume sesi).
   resetInactivityTimer();
+}
+
+// ============================================================
+// KETUKAN NOTIFIKASI saat aplikasi sudah terbuka: service worker (sw.js) mengirim pesan, kita pindah halaman.
+// ============================================================
+if (navigator.serviceWorker) {
+  navigator.serviceWorker.addEventListener('message', function (e) {
+    var d = e && e.data;
+    if (!d || d.type !== 'FASTAPP_GOTO' || !appBootstrap) return;
+    var m = /#(pekerjaan)$/.exec(String(d.url || ''));
+    if (m) goToPage(m[1]);
+  });
 }
 
 // ============================================================
@@ -959,6 +972,9 @@ function attemptBootstrap(session, attempt) {
     .withSuccessHandler(function (response) {
       if (finished || seq !== bootstrapSeq_) return; // jawaban basi dari percobaan yang sudah ditinggalkan
       if (bootEpoch_ !== sessionEpoch_) return;      // sesi berakhir/berganti saat menunggu
+      // Gagal SEMENTARA (error server, pembatasan, sibuk): jangan hapus sesi — coba lagi, lalu layar "Coba lagi".
+      // Sesi hanya dihapus bila server menolak kode itu sendiri (tidak valid / dinonaktifkan).
+      if (!response || (!response.success && !isSessionRejection_(response))) { fail(1200 * attempt); return; }
       finished = true;
       clearTimeout(watchdog);
       bootstrapInFlight_ = false;
@@ -977,6 +993,11 @@ function attemptBootstrap(session, attempt) {
     })
     .withFailureHandler(function () { fail(1200 * attempt); })
     .getBootstrapData(session.accessCode, true);
+}
+
+/** true bila server menolak KODE AKSES (sesi tidak valid / kode tidak ditemukan / akun nonaktif). */
+function isSessionRejection_(response) {
+  return !!(response && response.success === false && /^(sesi tidak valid|kode akses)/i.test(String(response.error || '')));
 }
 
 /** Layar pemulihan: tidak pernah menyisakan layar kosong/macet saat server tak terjangkau. */
