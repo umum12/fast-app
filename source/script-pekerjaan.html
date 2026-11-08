@@ -645,6 +645,7 @@ function createSubmitKey_() {
 var SUBMITKEY_PREFIX_ = 'fa_sk:v1:';
 var SUBMITKEY_MAX_AGE_MS_ = 5 * 60 * 60 * 1000;
 var createSubmitKeyFp_ = '';
+var createSubmitKeyReused_ = false; // true bila kunci ini dipakai ulang (kirim ulang) -> server boleh memeriksa baris terakhir
 
 function submitKeyStoreKey_() {
   var s = (typeof loadSession === 'function') ? loadSession() : null;
@@ -661,13 +662,14 @@ function submitFingerprint_(data) {
 }
 
 function createSubmitKeyForContent_(fp) {
-  if (createSubmitKeyValue_ && createSubmitKeyFp_ === fp) return createSubmitKeyValue_;
+  if (createSubmitKeyValue_ && createSubmitKeyFp_ === fp) { createSubmitKeyReused_ = true; return createSubmitKeyValue_; }
   var saved = '';
   try {
     var sk = submitKeyStoreKey_();
     var o = sk ? JSON.parse(localStorage.getItem(sk) || 'null') : null;
     if (o && o.k && o.fp === fp && (Date.now() - o.t) < SUBMITKEY_MAX_AGE_MS_) saved = o.k;
   } catch (e) { /* abaikan */ }
+  createSubmitKeyReused_ = !!saved;
   createSubmitKeyValue_ = saved || (Date.now().toString(36) + Math.random().toString(36).slice(2, 12));
   createSubmitKeyFp_ = fp;
   if (!saved) {
@@ -677,7 +679,7 @@ function createSubmitKeyForContent_(fp) {
 }
 
 function submitKeyClear_() {
-  createSubmitKeyValue_ = ''; createSubmitKeyFp_ = '';
+  createSubmitKeyValue_ = ''; createSubmitKeyFp_ = ''; createSubmitKeyReused_ = false;
   try { var sk = submitKeyStoreKey_(); if (sk) localStorage.removeItem(sk); } catch (e) { /* abaikan */ }
 }
 
@@ -923,6 +925,7 @@ var performedAtEl = document.getElementById('form-performed-at');
   }
 
   data.submitKey = createSubmitKeyForContent_(submitFingerprint_(data));
+  if (createSubmitKeyReused_) data.retry = true;
 
   var session = loadSession();
   var submitBtn = document.getElementById('btn-submit-report');
