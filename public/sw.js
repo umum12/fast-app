@@ -63,7 +63,11 @@ self.addEventListener('fetch', (e) => {
     fetch(req, { cache: 'no-cache' }).then((res) => {
       clearTimeout(timer);
       if (res && res.ok) {
-        const copy = res.clone(); caches.open(CACHE).then((c) => c.put(req, copy));
+        // Kunci tanpa query string (varian ?x=... tidak menumpuk); hanya 200 penuh (206 sebagian ditolak cache.put).
+        if (res.status === 200) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(url.origin + url.pathname, copy)).catch(() => {});
+        }
         if (!done) { done = true; resolve(res); }
         return;
       }
@@ -111,7 +115,10 @@ self.addEventListener('notificationclick', (e) => {
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
       for (const c of list) {
-        if (c.url.startsWith(self.registration.scope) && 'focus' in c) return c.focus();
+        if (c.url.startsWith(self.registration.scope) && 'focus' in c) {
+          if (rel) { try { c.postMessage({ type: 'FASTAPP_GOTO', url: rel }); } catch (_) {} }
+          return c.focus();
+        }
       }
       return self.clients.openWindow(target);
     })

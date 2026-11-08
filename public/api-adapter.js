@@ -50,7 +50,15 @@
         // webAppUrl dari server menunjuk ke /exec; di sini diarahkan ke situs ini
         // supaya tombol/tautan internal tetap berada di GitHub Pages.
         try { data = JSON.parse(text, function (k, v) { return (k === 'webAppUrl' && typeof v === 'string') ? BASE_URL : v; }); }
-        catch (e) { reject(new Error('Respons server tidak valid. Pastikan Apps Script sudah di-deploy ulang (versi baru) dengan akses "Anyone".')); return; }
+        catch (e) {
+          // Halaman HTML dari Google (kuota harian/terlalu banyak permintaan) berbeda dari deploy yang salah.
+          var quota = /^\s*</.test(text) && /exceeded|quota|too many times|rate limit|terlalu banyak/i.test(text);
+          var er = new Error(quota
+            ? 'Server Google sedang membatasi permintaan (kuota). Coba lagi beberapa saat lagi.'
+            : 'Respons server tidak valid. Pastikan Apps Script sudah di-deploy ulang (versi baru) dengan akses "Anyone".');
+          er.code = quota ? 'quota' : 'badresponse';
+          reject(er); return;
+        }
         resolve(data);
       }).catch(function (err) {
         if (timer) clearTimeout(timer);
