@@ -8,7 +8,7 @@ var ACTIVITY_TABS = [
   { key: 'all', label: 'Semua' },
   { key: 'mandiri', label: 'Mandiri' },
   { key: 'admin_ke_fs', label: 'Penugasan' },
-  { key: 'fs_ke_admin', label: 'Lapor/Permintaan' }
+  { key: 'fs_ke_admin', label: 'Kerusakan/Permintaan' }
 ];
 
 
@@ -188,7 +188,7 @@ function renderAktivitasFeed_(entry, prm) {
         entry.hasMore = data.hasMore;
         done(data.pekerjaan);
       }, fail);
-    }, { verifikasi: true });
+    }, { verifikasi: true, dayGroups: true });
 }
 
 // Filter & pencarian kini dijalankan di server (akurat atas seluruh data).

@@ -1424,12 +1424,54 @@ function feedKey_(arah, q) { return (arah || 'all') + '|' + (q || ''); }
  * entry = { list, total, hasMore }; fetchMore(done, fail) mengambil halaman berikut,
  * menambahkannya ke entry.list, lalu memanggil done(itemBaru).
  */
+/**
+ * Penanda hari untuk timeline Aktivitas ("Hari ini", "Kemarin", "Sabtu, 7 Nov").
+ * Daftar diurutkan menurut lastUpdateAt (kunci yang sama di server), sehingga penanda per-hari
+ * selalu berurutan dan tidak berulang. Tanpa lastUpdateAt (cache lama) -> tanpa penanda.
+ * Hari dihitung dalam WIB (UTC+7), sama dengan zona waktu server.
+ */
+function feedDayInfo_(s) {
+  var ms = tlParseMs_(s);
+  if (!isFinite(ms)) return null;
+  var DAY = 86400000, OFF = 7 * 3600000;
+  var dayIdx = Math.floor((ms + OFF) / DAY);
+  var diff = Math.floor((Date.now() + OFF) / DAY) - dayIdx;
+  var d = new Date(ms + OFF);
+  var label;
+  if (diff <= 0) label = 'Hari ini';
+  else if (diff === 1) label = 'Kemarin';
+  else {
+    label = INDO_DAY_NAMES_SHORT_[d.getUTCDay()] + ', ' + d.getUTCDate() + ' ' + TL_MONTHS_[d.getUTCMonth()] +
+      (d.getUTCFullYear() !== new Date(Date.now() + OFF).getUTCFullYear() ? ' ' + d.getUTCFullYear() : '');
+  }
+  return { key: dayIdx, label: label };
+}
+var INDO_DAY_NAMES_SHORT_ = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu']; // indeks getUTCDay()
+
+/** Menambah penanda hari (bila berganti hari) lalu kartu ke frag. */
+function feedAppendCard_(container, frag, p) {
+  if (container._feedCardOpts && container._feedCardOpts.dayGroups) {
+    var di = feedDayInfo_(p.lastUpdateAt);
+    if (di && di.key !== container._feedLastDay) {
+      container._feedLastDay = di.key;
+      var h = document.createElement('div');
+      h.className = 'feed-day';
+      h.setAttribute('role', 'heading');
+      h.setAttribute('aria-level', '3');
+      h.textContent = di.label;
+      frag.appendChild(h);
+    }
+  }
+  frag.appendChild(buildPekerjaanListCard_(p, container._feedCardOpts || undefined));
+}
+
 function renderFeedList_(container, entry, emptyHtml, fetchMore, cardOpts) {
   container._feedCardOpts = cardOpts || null;
+  container._feedLastDay = null;
   container.innerHTML = '';
   if (!entry.list || entry.list.length === 0) { container.innerHTML = emptyHtml; return; }
   var frag = document.createDocumentFragment();
-  entry.list.forEach(function (p) { frag.appendChild(buildPekerjaanListCard_(p, container._feedCardOpts || undefined)); });
+  entry.list.forEach(function (p) { feedAppendCard_(container, frag, p); });
   container.appendChild(frag);
   appendFeedMore_(container, entry, fetchMore);
 }
@@ -1460,7 +1502,7 @@ function appendFeedMore_(container, entry, fetchMore) {
       if (observer) observer.disconnect();
       if (!wrap.parentNode) return; // daftar sudah digambar ulang
       var frag = document.createDocumentFragment();
-      (items || []).forEach(function (p) { frag.appendChild(buildPekerjaanListCard_(p, container._feedCardOpts || undefined)); });
+      (items || []).forEach(function (p) { feedAppendCard_(container, frag, p); });
       container.insertBefore(frag, wrap);
       appendFeedMore_(container, entry, fetchMore);
     }, function () {
