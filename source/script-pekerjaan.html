@@ -2881,6 +2881,40 @@ function doHapusKomentar_(p, komentarId) {
     .hapusKomentar(session.accessCode, komentarId);
 }
 
+/** Gelembung sementara "Mengirim..." agar komentar langsung terlihat; diganti daftar asli setelah server menjawab. */
+function addPendingKomentar_(p, session, text) {
+  var listEl = document.getElementById('komentar-list');
+  if (!listEl) return null;
+  var chat = listEl.querySelector('.komentar-chat');
+  if (!chat) {
+    listEl.innerHTML = '';
+    chat = document.createElement('div');
+    chat.className = 'komentar-chat';
+    listEl.appendChild(chat);
+  }
+  var isOwnerReport = !!p.createdBy && session && session.userCode === p.createdBy;
+  var row = document.createElement('div');
+  row.className = 'komentar-row ' + (isOwnerReport ? 'right' : 'left');
+  row.style.opacity = '0.6';
+  var item = document.createElement('div');
+  item.className = 'komentar-bubble ' + (isOwnerReport ? 'owner' : 'other');
+  var body = document.createElement('div');
+  body.className = 'komentar-text';
+  body.textContent = String(text).trim();
+  var when = document.createElement('div');
+  when.className = 'komentar-when';
+  when.textContent = 'Mengirim...';
+  item.appendChild(body);
+  item.appendChild(when);
+  row.appendChild(item);
+  chat.appendChild(row);
+  try { row.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) { /* abaikan */ }
+  return row;
+}
+function removePendingKomentar_(row) {
+  try { if (row && row.parentNode) row.parentNode.removeChild(row); } catch (e) { /* abaikan */ }
+}
+
 function renderKomentarForm_(p, canKirim) {
   var wrap = document.getElementById('komentar-form-wrap');
   if (!wrap || wrap.dataset.rendered) return; // render sekali agar teks yang sedang diketik tidak hilang
@@ -2902,17 +2936,20 @@ function renderKomentarForm_(p, canKirim) {
     var kmtScope_ = 'kmt:' + p.pekerjaanId;
     var kmtKey_ = stickyKeyFor_(kmtScope_, stickyFp_([input.value]));
     beginAction(btn, 'Kirim...');
+    var pending_ = addPendingKomentar_(p, session, input.value); // tampil langsung; server menyusul
     google.script.run
       .withSuccessHandler(function (response) {
         endAction(btn);
-        if (!response.success) { showSnackbar(response.error, 'error'); return; }
+        if (!response.success) { removePendingKomentar_(pending_); showSnackbar(response.error, 'error'); return; }
         stickyKeyClear_(kmtScope_);
         input.value = '';
+        removePendingKomentar_(pending_);
         invalidateAllPekerjaanCaches_();
         loadKomentar_(p);
       })
       .withFailureHandler(function () {
         endAction(btn);
+        removePendingKomentar_(pending_);
         showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error');
       })
       .buatKomentar(session.accessCode, p.pekerjaanId, input.value, kmtKey_);
