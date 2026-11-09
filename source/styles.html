@@ -4518,3 +4518,32 @@ html[data-theme="dark"] .cc-detail-badge { background: rgba(96,165,250,.16); col
 button:focus-visible, a:focus-visible, [role="button"]:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: inherit; }
 .form-input:focus-visible { outline: none; }
 @media (prefers-reduced-motion: reduce) { .ht-tile, .btn-outlined, .btn-card-action, .rw-chip, .jk-fchip, .jk-seg-btn, .seg button { transition: none; } .ht-tile:active { transform: none; } }
+
+/* Kartu ajakan mengaktifkan notifikasi (script-push.html). Di atas navigasi bawah, di bawah snackbar. */
+.push-invite {
+  position: fixed; left: 12px; right: 12px; bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  max-width: 480px; margin: 0 auto; z-index: 80;
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: 14px; background: var(--color-surface); color: var(--color-text);
+  border: 1px solid var(--color-border); border-left: 4px solid var(--color-primary);
+  border-radius: 14px; box-shadow: var(--elevation-3);
+}
+.push-invite-ico {
+  flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--color-primary-soft); color: var(--color-primary);
+}
+.push-invite-body { flex: 1 1 auto; min-width: 0; }
+.push-invite-title { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+.push-invite-text { font-size: 13px; line-height: 1.45; color: var(--color-text-muted); }
+.push-invite-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 10px; }
+.push-invite-btn {
+  min-height: 44px; padding: 0 16px; border-radius: 10px; font-size: 14px; font-weight: 600;
+  cursor: pointer; border: 1px solid transparent; font-family: inherit;
+}
+.push-invite-later { background: transparent; color: var(--color-text-muted); border-color: var(--color-border); }
+.push-invite-go { background: var(--color-primary-solid); color: #fff; }
+.push-invite-go:active { background: var(--color-primary-solid-dark); }
+@media (min-width: 768px) {
+  .push-invite { left: auto; right: 20px; bottom: 20px; width: 380px; margin: 0; }
+}

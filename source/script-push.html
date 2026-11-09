@@ -17,6 +17,10 @@ var PushUI = (function () {
   var LS_TOKEN = 'fs_push_token';
   var LS_SYNC = 'fs_push_sync';      // 'KODE|timestamp' — sinkron token ke akun yang login
   var SYNC_EVERY_MS = 24 * 60 * 60 * 1000;
+  var LS_INV = 'fs_push_invite';     // JSON {n: jumlah ajakan yang ditunda/diproses, t: waktu terakhir}
+  var INVITE_GAP_MS = 3 * 24 * 60 * 60 * 1000; // jeda antar ajakan
+  var INVITE_MAX = 3;                // maksimal ajakan per perangkat
+  var INVITE_DELAY_MS = 1800;        // beri waktu halaman tampil dulu
 
   var accessCode = '';
   var busy = false;
@@ -207,6 +211,7 @@ var PushUI = (function () {
       else if (state === 'on') setDot('on', 'Notifikasi aktif');
       else setDot('off', state === 'lost' ? 'Notifikasi terputus' : 'Notifikasi nonaktif');
       renderCard(state);
+      maybeInvite(state);
       if (state === 'lost') heal();
     });
   }
@@ -233,6 +238,78 @@ var PushUI = (function () {
     if (/; wv\)|FBAN|FBAV|Instagram|Line\/|Telegram|GSA\//i.test(ua)) return 'Aplikasi terbuka di browser bawaan aplikasi lain. Izin notifikasi terpisah dari Chrome/aplikasi terpasang — buka lewat Chrome atau aplikasi FAST yang terpasang.';
     if (!isStandalone()) return 'Terbuka di tab browser, bukan aplikasi terpasang. Bila notifikasi aktif di aplikasi terpasang tetapi tidak di sini, kemungkinan browser/profil berbeda.';
     return '';
+  }
+
+  // ---------- ajakan aktivasi (kartu di layar) ----------
+  // Izin notifikasi tidak bisa dipaksa: harus lewat ketukan pengguna (aturan iOS/Chrome). Kartu ini meminta
+  // izin lewat tombol, lalu popup bawaan browser muncul. Tidak muncul bila izin sudah diblokir.
+  var inviteTimer = null;
+  function inviteState() {
+    try { var o = JSON.parse(ls(LS_INV) || '{}'); return { n: o.n | 0, t: +o.t || 0 }; } catch (e) { return { n: 0, t: 0 }; }
+  }
+  function inviteDue() {
+    var s = inviteState();
+    return s.n < INVITE_MAX && (s.n === 0 || (Date.now() - s.t) >= INVITE_GAP_MS);
+  }
+  function inviteMarkSeen() { var s = inviteState(); ls(LS_INV, JSON.stringify({ n: s.n + 1, t: Date.now() })); }
+  function removeInvite() {
+    if (inviteTimer) { clearTimeout(inviteTimer); inviteTimer = null; }
+    var n = el('push-invite'); if (n && n.parentNode) n.parentNode.removeChild(n);
+  }
+  function inviteBlockedContext() {
+    var ua = navigator.userAgent || '', inFrame = false;
+    try { inFrame = window.top !== window.self; } catch (e) { inFrame = true; }
+    return inFrame || /; wv\)|FBAN|FBAV|Instagram|Line\/|Telegram|GSA\//i.test(ua);
+  }
+  /** 'ask' = bisa meminta izin; 'ios' = perlu ditambahkan ke Layar Utama dulu; '' = jangan tampilkan. */
+  function inviteVariant() {
+    if (!accessCode || document.hidden || busy || inviteBlockedContext()) return '';
+    var role = ''; try { role = ((typeof loadSession === 'function' && loadSession()) || {}).role || ''; } catch (e) {}
+    if (role === 'demo') return '';
+    if (!inviteDue()) return '';
+    if (!browserSupports()) return (isIos() && !isStandalone()) ? 'ios' : '';
+    return Notification.permission === 'denied' ? '' : 'ask';
+  }
+  function showInvite(variant) {
+    if (el('push-invite')) return;
+    var box = document.createElement('div');
+    box.id = 'push-invite'; box.className = 'push-invite'; box.setAttribute('role', 'region');
+    box.setAttribute('aria-label', 'Ajakan mengaktifkan notifikasi');
+    var ico = document.createElement('span'); ico.className = 'push-invite-ico'; ico.setAttribute('aria-hidden', 'true');
+    try { ico.innerHTML = mdIcon('bellRing', 22); } catch (e) {}
+    var body = document.createElement('div'); body.className = 'push-invite-body';
+    var h = document.createElement('div'); h.className = 'push-invite-title'; h.textContent = 'Aktifkan notifikasi';
+    var t = document.createElement('div'); t.className = 'push-invite-text';
+    t.textContent = variant === 'ios'
+      ? 'Di iPhone/iPad, buka menu Bagikan di Safari lalu pilih "Tambah ke Layar Utama". Buka aplikasi dari Layar Utama untuk bisa mengaktifkan notifikasi.'
+      : 'Dapat pemberitahuan langsung saat ada pekerjaan baru untuk Anda, komentar baru, dan pekerjaan Anda diverifikasi.';
+    var act = document.createElement('div'); act.className = 'push-invite-actions';
+    var later = document.createElement('button'); later.type = 'button'; later.className = 'push-invite-btn push-invite-later';
+    later.textContent = variant === 'ios' ? 'Mengerti' : 'Nanti';
+    later.addEventListener('click', function () { inviteMarkSeen(); removeInvite(); });
+    act.appendChild(later);
+    if (variant === 'ask') {
+      var go = document.createElement('button'); go.type = 'button'; go.className = 'push-invite-btn push-invite-go';
+      go.textContent = 'Aktifkan';
+      go.addEventListener('click', function () {
+        inviteMarkSeen();   // dihitung sekali: popup yang ditutup tidak membuat kartu muncul lagi terus-menerus
+        removeInvite();
+        enable();           // dijalankan dari ketukan pengguna -> popup izin bawaan browser
+      });
+      act.appendChild(go);
+    }
+    body.appendChild(h); body.appendChild(t); body.appendChild(act);
+    box.appendChild(ico); box.appendChild(body);
+    document.body.appendChild(box);
+  }
+  function maybeInvite(state) {
+    if (state === 'on' || state === 'lost' || state === 'na' || state === 'unknown') { removeInvite(); return; }
+    if (el('push-invite') || inviteTimer || !inviteVariant()) return;
+    inviteTimer = setTimeout(function () {
+      inviteTimer = null;
+      var v = inviteVariant();
+      if (v) showInvite(v);
+    }, INVITE_DELAY_MS);
   }
 
   function render() { refreshIndicator(); }
@@ -447,6 +524,7 @@ var PushUI = (function () {
    * Best-effort: bila offline, token lama tetap sampai login berikutnya memindahkannya.
    */
   function releaseOnLogout() {
+    try { removeInvite(); } catch (e) {}
     try {
       var token = ls(LS_TOKEN);
       if (accessCode && token) call('unregisterPushToken', accessCode, token).catch(function () {});
