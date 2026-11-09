@@ -96,6 +96,7 @@ function loadPekerjaanAktivitas(force) {
   renderActivityQuick_();
 
   var prm = currentAktivitasParams_();
+  updateActivityFilterSummary_(null); // jumlah menyusul saat daftar tergambar
   var container = document.getElementById('activity-feed-list');
   var isDefault = prm.key === feedKey_('', '');
   var cached = pageDataCache.pekerjaanAktivitasByKey[prm.key];
@@ -135,7 +136,47 @@ function loadPekerjaanAktivitas(force) {
   });
 }
 
+/**
+ * Baris ringkasan filter ("12 hasil · Penugasan · Hari ini") + tombol Reset.
+ * Tampil HANYA bila ada filter/pencarian aktif. total = null saat jumlah belum diketahui.
+ */
+function updateActivityFilterSummary_(total) {
+  var el = document.getElementById('activity-filter-summary');
+  if (!el) return;
+  var q = (document.getElementById('activity-search').value || '').trim();
+  var parts = [];
+  if (q) parts.push('\u201C' + q + '\u201D');
+  if (currentActivityFilter !== 'all') {
+    var t = ACTIVITY_TABS.filter(function (x) { return x.key === currentActivityFilter; })[0];
+    if (t) parts.push(t.label);
+  }
+  ACTIVITY_QUICK_.forEach(function (d) { if (activityQuick_[d.group] === d.value) parts.push(d.label); });
+  if (!parts.length) { el.hidden = true; el.innerHTML = ''; return; }
+  var head = (total == null) ? 'Memuat' : (total + ' hasil');
+  el.hidden = false;
+  el.innerHTML = '';
+  var txt = document.createElement('span');
+  txt.className = 'act-filter-summary-text';
+  txt.textContent = head + ' \u00B7 ' + parts.join(' \u00B7 ');
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'rw-chip rw-chip-reset';
+  btn.textContent = 'Reset';
+  btn.addEventListener('click', resetAktivitasFilters_);
+  el.appendChild(txt);
+  el.appendChild(btn);
+}
+
+function resetAktivitasFilters_() {
+  document.getElementById('activity-search').value = '';
+  currentActivityFilter = 'all';
+  activityQuick_.range = '';
+  activityQuick_.status = '';
+  loadPekerjaanAktivitas();
+}
+
 function renderAktivitasFeed_(entry, prm) {
+  updateActivityFilterSummary_(entry.total);
   document.getElementById('activity-feed-list').dataset.feedKey = prm.key;
   renderFeedList_(document.getElementById('activity-feed-list'), entry,
     '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('inbox', 26) + '</div>' + ((prm.q || activityQuick_.range || activityQuick_.status) ? 'Tidak ada aktivitas yang cocok.' : 'Belum ada aktivitas.') + '</div>',
@@ -199,15 +240,19 @@ function initPdfRenderButton_() {
   var body = document.getElementById('ringkasan-body');
   if (!toggle || !body) return;
 
+  var card = document.getElementById('ringkasan-card');
   function applyState(open) {
     body.style.display = open ? 'block' : 'none';
     toggle.innerHTML = mdIcon(open ? 'chevronUp' : 'chevronDown', 18);
-    try { localStorage.setItem('fs_ringkasan_open', open ? '1' : '0'); } catch (e) {}
+    toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (card) card.classList.toggle('is-collapsed', !open);
+    try { localStorage.setItem('fs_ringkasan_v2', open ? '1' : '0'); } catch (e) {}
   }
 
+  // Bawaan terlipat (daftar aktivitas langsung terlihat); pilihan pengguna diingat per perangkat.
   var saved = null;
-  try { saved = localStorage.getItem('fs_ringkasan_open'); } catch (e) {}
-  var isOpen = saved !== '0';
+  try { saved = localStorage.getItem('fs_ringkasan_v2'); } catch (e) {}
+  var isOpen = saved === '1';
   applyState(isOpen);
 
   toggle.addEventListener('click', function () {

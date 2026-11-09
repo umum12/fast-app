@@ -4547,3 +4547,11 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible { outline: 
 @media (min-width: 768px) {
   .push-invite { left: auto; right: 20px; bottom: 20px; width: 380px; margin: 0; }
 }
+
+/* ===== Aktivitas: Ringkasan terlipat + ringkasan filter ===== */
+.ringkasan-inline { display: none; margin: 2px 0 0; font-size: 12px; color: var(--color-text-muted); }
+#ringkasan-card.is-collapsed .ringkasan-inline:not(:empty) { display: block; }
+.act-filter-summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -2px 0 10px; font-size: 13px; color: var(--color-text-muted); }
+.act-filter-summary[hidden] { display: none; }
+.act-filter-summary-text { min-width: 0; overflow-wrap: anywhere; }
+.act-filter-summary .rw-chip { min-height: 32px; }

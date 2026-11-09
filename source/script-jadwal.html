@@ -1393,6 +1393,8 @@ function loadAktivitasSummary(force) {
 function renderDashboardStats(stats) {
   var container = document.getElementById('dashboard-stats');
   container.innerHTML = '';
+  var inl = document.getElementById('ringkasan-inline'); // ringkasan satu baris saat kartu terlipat
+  if (inl) inl.textContent = (stats.reportsThisWeek || 0) + ' laporan minggu ini \u00B7 ' + (stats.reportsThisMonth || 0) + ' bulan ini';
 
   STATS_LABELS.forEach(function (s) {
     var box = document.createElement('div');

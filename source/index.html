@@ -478,8 +478,11 @@
                     <section class="page-section" data-page="aktivitas">
             <div class="card" id="ringkasan-card">
               <div class="card-header-row" style="margin-bottom:0;">
-                <h2 style="margin:0; flex:1;">Ringkasan</h2>
-                <button class="btn-icon" id="btn-toggle-ringkasan" type="button" aria-label="Buka/tutup Ringkasan"></button>
+                <div style="flex:1; min-width:0;">
+                  <h2 style="margin:0;">Ringkasan</h2>
+                  <p class="ringkasan-inline" id="ringkasan-inline" aria-live="polite"></p>
+                </div>
+                <button class="btn-icon" id="btn-toggle-ringkasan" type="button" aria-label="Buka/tutup Ringkasan" aria-expanded="false"></button>
               </div>
               <div id="ringkasan-body" style="margin-top:10px;">
                 <div class="stats-grid" id="dashboard-stats"><div class="sk-stat" aria-busy="true"><span class="sr-only">Memuat statistik</span><div class="skeleton-block sk-statbox"></div><div class="skeleton-block sk-statbox"></div><div class="skeleton-block sk-statbox"></div></div></div>
@@ -506,6 +509,7 @@
                 <input id="activity-search" class="form-input" type="text" aria-label="Cari aktivitas" placeholder="Cari ID, subjek, lantai, atau nama...">
               </div>
               <div class="rw-filter-row" id="activity-quick-row" role="group" aria-label="Filter cepat aktivitas" style="margin-bottom:10px;"></div>
+              <div class="act-filter-summary" id="activity-filter-summary" hidden></div>
 
               <div id="activity-feed-list"><div aria-busy="true"><span class="sr-only">Memuat aktivitas</span><div class="skeleton-card"><div class="skeleton-card-main"><div class="skeleton-block skeleton-pill"></div><div class="skeleton-block skeleton-date"></div><div class="skeleton-person-row"><div class="skeleton-block skeleton-avatar"></div><div class="skeleton-person-lines"><div class="skeleton-block skeleton-line-name"></div><div class="skeleton-block skeleton-line-sub"></div></div></div></div><div class="skeleton-block skeleton-thumb"></div></div><div class="skeleton-card"><div class="skeleton-card-main"><div class="skeleton-block skeleton-pill"></div><div class="skeleton-block skeleton-date"></div><div class="skeleton-person-row"><div class="skeleton-block skeleton-avatar"></div><div class="skeleton-person-lines"><div class="skeleton-block skeleton-line-name"></div><div class="skeleton-block skeleton-line-sub"></div></div></div></div><div class="skeleton-block skeleton-thumb"></div></div></div></div>
             </div>
