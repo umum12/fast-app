@@ -1911,6 +1911,8 @@ function vfOpenModal_(cfg) {
 
 function vfText_(txt) { var d = document.createElement('p'); d.className = 'vf-text'; d.textContent = txt; return d; }
 
+var vfRowOf_ = (typeof WeakMap === 'function') ? new WeakMap() : null; // p -> {row, card, opts} (tidak ikut disimpan ke cache)
+
 function buildVerifikasiRow_(p, card, opts) {
   var row = document.createElement('div');
   row.className = 'lc-verif';
@@ -1935,7 +1937,47 @@ function buildVerifikasiRow_(p, card, opts) {
   det.innerHTML = '<span>Detail Verifikasi</span>' + mdIcon('chevronRight', 16);
   det.addEventListener('click', function (e) { e.stopPropagation(); openVerifikasiDetail_(p); });
   row.appendChild(det);
+  if (vfRowOf_) vfRowOf_.set(p, { row: row, card: card, opts: opts });
   return row;
+}
+
+/** Waktu sekarang (WIB) format server: dd/MM/yyyy HH:mm:ss. */
+function vfNowWib_() {
+  var d = new Date(Date.now() + 7 * 3600000);
+  function z(n) { return (n < 10 ? '0' : '') + n; }
+  return z(d.getUTCDate()) + '/' + z(d.getUTCMonth() + 1) + '/' + d.getUTCFullYear() + ' ' + z(d.getUTCHours()) + ':' + z(d.getUTCMinutes()) + ':' + z(d.getUTCSeconds());
+}
+
+/**
+ * Terapkan hasil verifikasi/batal ke data kartu SEKARANG (setelah server sukses) lalu gambar ulang
+ * baris verifikasinya di tempat: label berubah seketika, tanpa memuat ulang daftar.
+ * aksi: 'VERIFIKASI' | 'BATAL'. Server tetap sumber kebenaran (daftar disegarkan diam-diam sesudahnya).
+ */
+function vfApplyLocal_(p, aksi, jenis) {
+  var sess = loadSession() || {};
+  var nama = sess.displayName || '';
+  var waktu = vfNowWib_();
+  if (aksi === 'VERIFIKASI') {
+    p.verifikasiStatus = 'ADMIN';
+    p.verifiedByName = nama;
+    p.verifiedAt = waktu;
+    p.verifiedJenis = jenis || 'DEFAULT';
+    p.canVerifikasi = false;
+    p.canBatalkanVerifikasi = true;
+  } else {
+    p.verifikasiStatus = 'MENUNGGU';
+    p.verifiedByName = '';
+    p.verifiedAt = '';
+    p.verifiedJenis = '';
+    p.canVerifikasi = true;
+    p.canBatalkanVerifikasi = false;
+  }
+  p.verifikasiRiwayat = [{ aksi: aksi, tipe: 'ADMIN', jenis: aksi === 'VERIFIKASI' ? (jenis || 'DEFAULT') : '', oleh: nama, waktu: waktu }].concat(p.verifikasiRiwayat || []);
+  var h = vfRowOf_ && vfRowOf_.get(p);
+  if (h && h.row && h.row.parentNode) {
+    var fresh = buildVerifikasiRow_(p, h.card, h.opts);
+    h.row.parentNode.replaceChild(fresh, h.row);
+  }
 }
 
 /** Modal bebas isi: buildFn(card, close) mengisi kartu. Menutup via Esc / klik latar. */
@@ -2025,6 +2067,7 @@ function doVerifikasiPekerjaan_(btn, close, p, jenis) {
     .withSuccessHandler(function (res) {
       if (!res || !res.success) { reset(); showSnackbar((res && res.error) || 'Gagal memverifikasi.', 'error'); return; }
       close();
+      vfApplyLocal_(p, 'VERIFIKASI', jenis);
       showSnackbar('Pekerjaan terverifikasi.', 'success');
       refreshVerifikasiFeeds_();
     })
@@ -2092,7 +2135,14 @@ function openVerifikasiDetail_(p) {
 
 /** Muat ulang daftar yang sedang tampil (Aktivitas dan/atau Riwayat) setelah verifikasi berubah. */
 function refreshVerifikasiFeeds_() {
+  // Cache Aktivitas DIPERTAHANKAN (sudah diperbarui di tempat oleh vfApplyLocal_) agar daftar tidak
+  // dikosongkan/"Memuat aktivitas tim"; ditandai basi (t:0) supaya tetap disegarkan diam-diam dari server.
+  var keep = pageDataCache.pekerjaanAktivitasByKey || {};
   invalidateAllPekerjaanCaches_();
+  var defKey = feedKey_('', '');
+  Object.keys(keep).forEach(function (k) { if (keep[k]) keep[k].t = 0; });
+  pageDataCache.pekerjaanAktivitasByKey = keep;
+  if (keep[defKey] && keep[defKey].list) persistSet_('aktivitas', { list: keep[defKey].list, total: keep[defKey].total, hasMore: keep[defKey].hasMore });
   var a = document.getElementById('activity-feed-list'), r = document.getElementById('my-reports-list');
   if (a && a.offsetParent !== null && typeof loadPekerjaanAktivitas === 'function') loadPekerjaanAktivitas(true);
   if (r && r.offsetParent !== null && typeof loadRiwayatPekerjaan === 'function') loadRiwayatPekerjaan(true);
@@ -2106,6 +2156,7 @@ function doBatalkanVerifikasi_(p, closeDetail) {
       endAction(null);
       if (!res || !res.success) { showSnackbar((res && res.error) || 'Gagal membatalkan verifikasi.', 'error'); return; }
       if (closeDetail) closeDetail();
+      vfApplyLocal_(p, 'BATAL');
       showSnackbar('Verifikasi dibatalkan.', 'success');
       refreshVerifikasiFeeds_();
     })
