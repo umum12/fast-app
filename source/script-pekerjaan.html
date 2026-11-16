@@ -241,7 +241,7 @@ function finishSendingOverlay_(next) {
   var ov = document.getElementById('sending-overlay');
   if (!ov || !ov.classList.contains('show')) {
     // Layar sudah ditutup pengguna (jaringan lambat): beri tahu bahwa kirim akhirnya berhasil, di halaman mana pun.
-    if (sendingDismissed_) { sendingDismissed_ = false; try { showSnackbar('Berhasil terkirim.', 'success'); } catch (e) {} }
+    if (sendingDismissed_) { sendingDismissed_ = false; sfx_('sent'); try { showSnackbar('Berhasil terkirim.', 'success'); } catch (e) {} }
     if (next) next();
     return;
   }
@@ -1232,6 +1232,7 @@ function setSuccessCentered_(on) {
 }
 
 function showPekerjaanSuccessCard(jenis) {
+  sfx_('sent');
   setSuccessButtons_(false);
   document.getElementById('buat-form-card').style.display = 'none';
   var isMandiri = JENIS_MANDIRI_SET_.indexOf(jenis) !== -1;
@@ -1248,6 +1249,7 @@ function showPekerjaanSuccessCard(jenis) {
 }
 
 function showLaporanSuccessCard_(pekerjaanId) {
+  sfx_('sent');
   setSuccessButtons_(true);
   var wrap = document.getElementById('buat-selesai-wrap');
   if (wrap) wrap.style.display = 'none';
@@ -1954,6 +1956,7 @@ function vfNowWib_() {
  * aksi: 'VERIFIKASI' | 'BATAL'. Server tetap sumber kebenaran (daftar disegarkan diam-diam sesudahnya).
  */
 function vfApplyLocal_(p, aksi, jenis) {
+  sfx_(aksi === 'VERIFIKASI' ? 'verify' : 'unverify');
   var sess = loadSession() || {};
   var nama = sess.displayName || '';
   var waktu = vfNowWib_();
@@ -2012,6 +2015,7 @@ var VF_KEY_SVG_ =
   '<circle cx="7.5" cy="15.5" r="3.5"></circle><path d="M10 13L19 4"></path><path d="M15.5 7.5L18 10"></path></svg>';
 
 function openVerifikasiTerbatas_() {
+  sfx_('locked');
   vfOpenCustom_('vf-restricted', function (card, close) {
     card.innerHTML =
       '<div class="vf-glow"></div>' +
@@ -3036,6 +3040,7 @@ function renderKomentarForm_(p, canKirim) {
         if (!response.success) { removePendingKomentar_(pending_); showSnackbar(response.error, 'error'); return; }
         stickyKeyClear_(kmtScope_);
         input.value = '';
+        sfx_('comment');
         removePendingKomentar_(pending_);
         invalidateAllPekerjaanCaches_();
         loadKomentar_(p);

@@ -390,6 +390,112 @@ var snackbarTimer = null;
  * (opsional) menampilkan baris kedua dan memperbesar toast + durasinya
  * (untuk konfirmasi penting). Pesan lama tanpa detail tidak berubah.
  */
+/* ===== Efek suara (Web Audio, disintesis — tanpa file audio) ===== */
+var SFX_KEY_ = 'fa_sound';          // 'off' = dimatikan; selain itu aktif (bawaan: aktif)
+var sfxCtx_ = null, sfxLastAt_ = 0, sfxVol_ = 1;
+
+function sfxEnabled_() { try { return localStorage.getItem(SFX_KEY_) !== 'off'; } catch (e) { return true; } }
+
+function sfxCtx_get_() {
+  if (sfxCtx_) return sfxCtx_;
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  try { sfxCtx_ = new AC(); } catch (e) { sfxCtx_ = null; }
+  return sfxCtx_;
+}
+
+/** Satu nada: frekuensi (opsional meluncur ke freq2), mulai (detik dari sekarang), durasi, jenis gelombang, kekerasan. */
+function sfxTone_(ctx, out, freq, at, dur, type, gain, freq2) {
+  var t0 = ctx.currentTime + at;
+  var o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = type || 'sine';
+  o.frequency.setValueAtTime(freq, t0);
+  if (freq2) o.frequency.exponentialRampToValueAtTime(freq2, t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(gain, t0 + 0.012);       // serangan halus (tanpa "klik")
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);       // peluruhan
+  o.connect(g); g.connect(out);
+  o.start(t0); o.stop(t0 + dur + 0.02);
+}
+
+var SFX_SOUNDS_ = {
+  // Laporan terkirim: arpeggio naik yang ceria
+  sent: function (c, o) {
+    [523.25, 659.25, 783.99].forEach(function (f, i) { sfxTone_(c, o, f, i * 0.085, 0.22, 'triangle', 0.5); });
+    sfxTone_(c, o, 1046.5, 0.255, 0.45, 'sine', 0.55);
+  },
+  // Akses terbatas: dua "bonk" rendah (terdengar menolak, bukan alarm)
+  locked: function (c, o) {
+    sfxTone_(c, o, 196, 0, 0.16, 'square', 0.16, 165);
+    sfxTone_(c, o, 165, 0.17, 0.22, 'square', 0.16, 130);
+  },
+  // Verifikasi: "ding" lonceng dua nada
+  verify: function (c, o) {
+    sfxTone_(c, o, 783.99, 0, 0.5, 'sine', 0.5);   sfxTone_(c, o, 1567.98, 0, 0.3, 'sine', 0.12);
+    sfxTone_(c, o, 1174.66, 0.11, 0.7, 'sine', 0.5); sfxTone_(c, o, 2349.3, 0.11, 0.4, 'sine', 0.1);
+  },
+  // Batal verifikasi: dua nada turun yang lembut
+  unverify: function (c, o) {
+    sfxTone_(c, o, 587.33, 0, 0.2, 'triangle', 0.4);
+    sfxTone_(c, o, 440, 0.12, 0.3, 'triangle', 0.4);
+  },
+  // Komentar terkirim: "blip" pendek
+  comment: function (c, o) {
+    sfxTone_(c, o, 880, 0, 0.07, 'sine', 0.5, 1320);
+    sfxTone_(c, o, 1320, 0.07, 0.1, 'sine', 0.4);
+  },
+  // Simpan/ubah data: konfirmasi pendek dua nada
+  save: function (c, o) {
+    sfxTone_(c, o, 880, 0, 0.09, 'triangle', 0.45);
+    sfxTone_(c, o, 1108.73, 0.08, 0.16, 'triangle', 0.45);
+  },
+  // Hapus data: meluncur turun
+  del: function (c, o) {
+    sfxTone_(c, o, 520, 0, 0.26, 'sine', 0.55, 130);
+    sfxTone_(c, o, 260, 0, 0.2, 'triangle', 0.18, 90);
+  },
+  // Gagal/kesalahan: dua bip rendah
+  error: function (c, o) {
+    sfxTone_(c, o, 330, 0, 0.11, 'square', 0.13);
+    sfxTone_(c, o, 330, 0.15, 0.14, 'square', 0.13);
+  }
+};
+
+/**
+ * Putar efek suara. force=true mengabaikan sakelar (dipakai halaman pratinjau/tombol "Coba").
+ * Aman: tanpa dukungan audio / sakelar mati / tab tersembunyi / reduced-motion -> diam, tanpa error.
+ */
+function sfx_(name, force) {
+  try {
+    if (!force && (!sfxEnabled_() || document.hidden)) return;
+    var fn = SFX_SOUNDS_[name]; if (!fn) return;
+    var c = sfxCtx_get_(); if (!c) return;
+    if (c.state === 'suspended') c.resume();
+    var master = c.createGain();
+    master.gain.value = 0.6 * sfxVol_;                   // volume standar (tidak keras, tidak pelan)
+    master.connect(c.destination);
+    fn(c, master);
+    sfxLastAt_ = Date.now();
+  } catch (e) { /* suara tidak boleh mengganggu aksi */ }
+}
+
+/** Suara untuk snackbar umum (dipakai bila tidak ada suara khusus barusan). */
+function sfxForSnackbar_(type, msg) {
+  if (type === 'error') return 'error';
+  if (type !== 'success') return '';
+  if (/dihapus/i.test(msg || '')) return 'del';
+  if (/dibatalkan|dilepas/i.test(msg || '')) return 'unverify';
+  return 'save';
+}
+
+// Peramban (terutama iOS) hanya mengizinkan suara setelah ada ketukan: siapkan/lanjutkan audio di ketukan pertama.
+(function () {
+  function unlock() {
+    try { if (!sfxEnabled_()) return; var c = sfxCtx_get_(); if (c && c.state === 'suspended') c.resume(); } catch (e) {}
+  }
+  ['pointerdown', 'touchend', 'keydown'].forEach(function (ev) { document.addEventListener(ev, unlock, { passive: true }); });
+})();
+
 // Umpan balik getar singkat (HP yang mendukung). Dimatikan bila localStorage fa_haptic = 'off'.
 function haptic_(kind) {
   try {
@@ -405,6 +511,8 @@ function showSnackbar(message, type, detail) {
   var el = document.getElementById('snackbar');
   var t = type || 'info';
   if (t === 'success' || t === 'error') haptic_(t);
+  // Suara umum hanya bila tidak ada suara khusus yang baru saja diputar (mis. verifikasi, laporan terkirim).
+  if (Date.now() - sfxLastAt_ > 900) { var sn_ = sfxForSnackbar_(t, typeof message === 'string' ? message : ''); if (sn_) sfx_(sn_); }
   el.className = 'snackbar-' + t + (detail ? ' snackbar-rich' : '');
   el.innerHTML = '';
 
@@ -1510,8 +1618,8 @@ if (btnReloadClose) btnReloadClose.addEventListener('click', closeReloadOverlay_
     document.documentElement.setAttribute('data-fs', f === 'lg' || f === 'xl' ? f : 'normal');
   }
   function paint_() {
-    var t = get_('fs_theme', 'light'), f = get_('fs_fontsize', 'normal');
-    [['seg-theme', t], ['seg-fs', f]].forEach(function (p) {
+    var t = get_('fs_theme', 'light'), f = get_('fs_fontsize', 'normal'), sd = get_('fa_sound', 'on') === 'off' ? 'off' : 'on';
+    [['seg-theme', t], ['seg-fs', f], ['seg-snd', sd]].forEach(function (p) {
       var box = document.getElementById(p[0]);
       if (!box) return;
       [].forEach.call(box.querySelectorAll('button'), function (b) {
@@ -1531,6 +1639,8 @@ if (btnReloadClose) btnReloadClose.addEventListener('click', closeReloadOverlay_
   }
   bind_('seg-theme', 'fs_theme', applyTheme_);
   bind_('seg-fs', 'fs_fontsize', applyFont_);
+  // Suara: nilai 'on'/'off'. Saat diaktifkan, putar contoh suara sebagai umpan balik.
+  bind_('seg-snd', 'fa_sound', function () { if (get_('fa_sound', 'on') !== 'off') sfx_('save'); });
   if (mq) {
     var onChange = function () { if (get_('fs_theme', 'light') === 'auto') applyTheme_(); };
     if (mq.addEventListener) mq.addEventListener('change', onChange); else if (mq.addListener) mq.addListener(onChange);
