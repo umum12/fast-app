@@ -267,6 +267,7 @@ var splashTimer_ = null, splashPct_ = 0, splashStep_ = 0, splashShownAt_ = 0;
 var SPLASH_STEPS_ = ['Menghubungkan ke server...', 'Memverifikasi akses petugas...', 'Menyiapkan dasbor & data...'];
 
 function showSplash_() {
+  sfxPreload_(); // unduh+decode suara "siap" selagi memuat, agar bunyi tepat saat 100%
   var el = document.getElementById('splash-screen');
   if (!el) return;
   clearInterval(splashTimer_);
@@ -295,7 +296,7 @@ function hideSplash_(ok) {
   var el = document.getElementById('splash-screen');
   if (!el || !el.classList.contains('show')) return;
   clearInterval(splashTimer_);
-  if (ok) setSplashProgress_(100, 'Siap digunakan');
+  if (ok) { setSplashProgress_(100, 'Siap digunakan'); sfxFile_('online'); }
   // Tampil minimal ~500 ms supaya tidak berkedip, lalu hilang otomatis.
   var wait = Math.max(ok ? 250 : 0, 500 - (Date.now() - splashShownAt_));
   setTimeout(function () {
@@ -477,6 +478,52 @@ function sfx_(name, force) {
     fn(c, master);
     sfxLastAt_ = Date.now();
   } catch (e) { /* suara tidak boleh mengganggu aksi */ }
+}
+
+/* ----- Suara dari berkas (mp3 milik tim di folder sounds/) -----
+ * Diputar lewat Web Audio (bukan elemen <audio>) agar tidak bermasalah dengan service worker.
+ * online = bunyi saat aplikasi "Siap digunakan" (splash 100%); notif = bunyi saat push masuk dan aplikasi terbuka.
+ * Berkas tidak ada (mis. versi Apps Script) / diblokir autoplay / sakelar Suara mati -> diam, tanpa error. */
+var SFX_FILES_ = { online: { url: 'sounds/ub-online.mp3', vol: 1 }, notif: { url: 'sounds/bbm-fast.mp3', vol: 1 } };
+var sfxBuf_ = {}, sfxBufLoading_ = {};
+
+function sfxLoadFile_(name) {
+  if (sfxBuf_[name]) return Promise.resolve(sfxBuf_[name]);
+  if (sfxBufLoading_[name]) return sfxBufLoading_[name];
+  var c = sfxCtx_get_(), f = SFX_FILES_[name];
+  if (!c || !f || !window.fetch) return Promise.resolve(null);
+  sfxBufLoading_[name] = fetch(f.url).then(function (r) {
+    if (!r.ok) throw new Error('http ' + r.status);
+    return r.arrayBuffer();
+  }).then(function (ab) {
+    return new Promise(function (res, rej) { c.decodeAudioData(ab, res, rej); });
+  }).then(function (buf) { sfxBuf_[name] = buf; delete sfxBufLoading_[name]; return buf; })
+    .catch(function () { delete sfxBufLoading_[name]; return null; });
+  return sfxBufLoading_[name];
+}
+
+/** Siapkan (unduh + decode) berkas suara lebih awal agar bunyi tanpa jeda saat dibutuhkan. */
+function sfxPreload_() {
+  try { if (sfxEnabled_()) Object.keys(SFX_FILES_).forEach(sfxLoadFile_); } catch (e) {}
+}
+
+function sfxFile_(name) {
+  try {
+    if (!sfxEnabled_() || document.hidden || !SFX_FILES_[name]) return;
+    var c = sfxCtx_get_(); if (!c) return;
+    sfxLoadFile_(name).then(function (buf) {
+      if (!buf) return;
+      return (c.state === 'running' ? Promise.resolve() : Promise.resolve(c.resume())).then(function () {
+        // Masih diblokir autoplay (belum ada ketukan)? Jangan menunda: bunyi yang telat lebih mengganggu daripada tanpa bunyi.
+        if (c.state !== 'running' || document.hidden) return;
+        var s = c.createBufferSource(), g = c.createGain();
+        s.buffer = buf; g.gain.value = SFX_FILES_[name].vol * sfxVol_;
+        s.connect(g); g.connect(c.destination);
+        s.start(0);
+        sfxLastAt_ = Date.now();
+      });
+    }).catch(function () {});
+  } catch (e) { /* suara tidak boleh mengganggu aplikasi */ }
 }
 
 /** Suara untuk snackbar umum (dipakai bila tidak ada suara khusus barusan). */
@@ -1034,6 +1081,8 @@ function renderApp(bootstrap, session) {
 if (navigator.serviceWorker) {
   navigator.serviceWorker.addEventListener('message', function (e) {
     var d = e && e.data;
+    // Push masuk saat aplikasi terbuka & terlihat: service worker menyenyapkan nada sistem, kita bunyikan nada tim.
+    if (d && d.type === 'FASTAPP_PUSH') { if (document.visibilityState === 'visible') sfxFile_('notif'); return; }
     if (!d || d.type !== 'FASTAPP_GOTO' || !appBootstrap) return;
     var m = /#(pekerjaan)$/.exec(String(d.url || ''));
     if (m) goToPage(m[1]);
