@@ -97,15 +97,26 @@ self.addEventListener('push', (e) => {
   // FCM membungkus: { data: {...}, notification: {...} }; toleran bila datar.
   const d = Object.assign({}, payload.notification || {}, payload.data || (payload.title || payload.body ? payload : {}));
   const title = d.title || 'Facility Support';
-  const options = {
-    body: d.body || '',
-    icon: 'icons/icon-192.png',
-    badge: 'icons/badge-96.png',
-    tag: d.tag || 'fastapp',
-    renotify: true,
-    data: { url: d.url || '' }
-  };
-  e.waitUntil(self.registration.showNotification(title, options));
+  e.waitUntil((async () => {
+    // Aplikasi sedang terbuka & terlihat -> halaman memutar nada tim (sounds/bbm-fast.mp3), jadi nada sistem
+    // disenyapkan agar tidak dobel. Spesifikasi: silent:true tidak boleh bersama renotify:true.
+    let visible = [];
+    try {
+      const list = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      visible = list.filter((c) => c.visibilityState === 'visible' && c.url.startsWith(self.registration.scope));
+    } catch (_) { visible = []; }
+    const options = {
+      body: d.body || '',
+      icon: 'icons/icon-192.png',
+      badge: 'icons/badge-96.png',
+      tag: d.tag || 'fastapp',
+      renotify: !visible.length,
+      data: { url: d.url || '' }
+    };
+    if (visible.length) options.silent = true;
+    await self.registration.showNotification(title, options);
+    visible.forEach((c) => { try { c.postMessage({ type: 'FASTAPP_PUSH' }); } catch (_) {} });
+  })());
 });
 
 self.addEventListener('notificationclick', (e) => {
