@@ -1377,12 +1377,134 @@ function sameFeedList_(a, b) {
  * Lepas/Selesaikan/Hapus) — pola event-driven cache Patch 8.0. */
 function invalidateAllPekerjaanCaches_() {
   cacheGen_++;
-  pageDataCache.pekerjaanInbox = null;
-  pageDataCache.pekerjaanRiwayatByKey = {};
+  pageDataCache.pekerjaanInboxStale_ = true; // Inbox tetap tampil, disegarkan diam-diam
   pageDataCache.pekerjaanAktivitas = null;
-  pageDataCache.pekerjaanAktivitasByKey = {};
+  markAktivitasStale_(); // Aktivitas & Riwayat: tetap tampil, disegarkan diam-diam (tanpa skeleton)
+  markRiwayatStale_();
   pageDataCache.dashboard = null;
-  persistRemove_(['inbox', 'aktivitas', 'riwayat', 'dashboard']);
+  persistRemove_(['inbox', 'riwayat', 'dashboard']);
+}
+
+/** Tandai cache Aktivitas basi (t:0) TANPA membuangnya: daftar lama tetap tampil
+ * dan loadPekerjaanAktivitas memperbaruinya di latar (hanya digambar ulang bila
+ * isinya berubah) — tidak ada lagi "Memuat aktivitas tim..." tiap ada perubahan kecil. */
+function markRiwayatStale_() {
+  var m = pageDataCache.pekerjaanRiwayatByKey || {};
+  Object.keys(m).forEach(function (k) { if (m[k]) m[k].t = 0; });
+}
+
+/* ===== Loading per-card (loadingById) =====
+ * Hanya card yang sedang diproses (verifikasi/batal/hapus/ambil/lepas) yang ditutup lapisan
+ * shimmer + ikon + pesan sesuai tindakan. Card lain tidak disentuh. Lapisan menutupi card
+ * (ukuran & posisi tetap) dan menahan ketukan sehingga tidak ada request ganda pada card itu. */
+var loadingById = {};
+var CARD_BUSY_META_ = {
+  create:   { icon: 'addCircle', text: 'Sedang menambahkan' },
+  update:   { icon: 'edit',      text: 'Sedang menyimpan perubahan' },
+  'delete': { icon: 'delete',    text: 'Sedang menghapus' },
+  verify:   { icon: 'verified',  text: 'Sedang memverifikasi' },
+  unverify: { icon: 'block',     text: 'Sedang membatalkan verifikasi' },
+  take:     { icon: 'taskAlt',   text: 'Sedang mengambil' },
+  release:  { icon: 'logout',    text: 'Sedang melepas' },
+  undone:   { icon: 'block',     text: 'Sedang membatalkan penuntasan' },
+  refresh:  { icon: 'refresh',   text: 'Sedang memperbarui data' }
+};
+var CARD_BUSY_TIMEOUT_MS_ = 60000;
+
+/** "RPT-20261110-01" -> "RPT 01". */
+function cardIdLabel_(id) {
+  var m = /^RPT-.*-(\d+)$/.exec(String(id || ''));
+  return m ? 'RPT ' + m[1] : String(id || '');
+}
+
+function cardBusyEls_(id) {
+  var all = document.querySelectorAll('.list-card[data-pid]'), out = [];
+  for (var i = 0; i < all.length; i++) if (all[i].dataset.pid === id) out.push(all[i]);
+  return out;
+}
+
+function cardBusyOverlay_(card) {
+  for (var i = 0; i < card.children.length; i++) if (card.children[i].classList.contains('card-busy')) return card.children[i];
+  return null;
+}
+
+/** Pasang/perbarui lapisan loading pada satu elemen card sesuai state loadingById[id]. */
+function cardBusyPaint_(card, id) {
+  var b = loadingById[id];
+  if (!b || !card) return;
+  var meta = CARD_BUSY_META_[b.action] || CARD_BUSY_META_.refresh;
+  var ov = cardBusyOverlay_(card);
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.className = 'card-busy';
+    ov.setAttribute('role', 'status');
+    ov.setAttribute('aria-live', 'polite');
+    ov.innerHTML = '<span class="card-busy-ico"></span><span class="card-busy-msg"></span>';
+    card.appendChild(ov);
+  }
+  card.classList.add('is-busy');
+  ov.querySelector('.card-busy-ico').innerHTML = mdIcon(meta.icon, 20);
+  ov.querySelector('.card-busy-msg').textContent = meta.text + ' ' + cardIdLabel_(id) + '...';
+}
+
+/** Mulai loading untuk satu card. false bila card itu sedang diproses (cegah request ganda). */
+function cardBusyStart_(id, action) {
+  if (!id || loadingById[id]) return false;
+  var els = cardBusyEls_(id);
+  var b = { action: action, bar: els.length === 0 };
+  b.timer = setTimeout(function () { cardBusyTimeout_(id); }, CARD_BUSY_TIMEOUT_MS_);
+  loadingById[id] = b;
+  if (b.bar) beginAction(null); // card tidak sedang tampil: fallback ke bar tipis di atas
+  els.forEach(function (c) { cardBusyPaint_(c, id); });
+  return true;
+}
+
+function cardBusyPhase_(id, action) {
+  var b = loadingById[id];
+  if (!b) return;
+  b.action = action;
+  cardBusyEls_(id).forEach(function (c) { cardBusyPaint_(c, id); });
+}
+
+/** Selesai (aman dipanggil berulang). */
+function cardBusyEnd_(id) {
+  var b = loadingById[id];
+  if (!b) return;
+  clearTimeout(b.timer);
+  delete loadingById[id];
+  if (b.bar) endAction(null);
+  cardBusyEls_(id).forEach(function (c) {
+    var ov = cardBusyOverlay_(c);
+    if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
+    c.classList.remove('is-busy');
+  });
+}
+
+function cardBusyTimeout_(id) {
+  if (!loadingById[id]) return;
+  cardBusyEnd_(id);
+  showSnackbar('Respons server lambat. Memeriksa status terbaru...', 'warning');
+  refreshCurrentPekerjaanPage_();
+}
+
+function cardBusyResetAll_() {
+  Object.keys(loadingById).forEach(function (id) { cardBusyEnd_(id); });
+}
+
+/** Segarkan daftar yang sedang tampil secara diam-diam; done(ok). Gagal -> data lama dipertahankan + peringatan. */
+function silentRefreshThen_(id, refreshFn) {
+  var finished = false;
+  refreshFn(function (ok) {
+    if (finished) return;
+    finished = true;
+    cardBusyEnd_(id);
+    if (ok === false) showSnackbar('Gagal memperbarui daftar. Data sebelumnya dipertahankan.', 'warning');
+  });
+}
+
+function markAktivitasStale_() {
+  var m = pageDataCache.pekerjaanAktivitasByKey || {};
+  Object.keys(m).forEach(function (k) { if (m[k]) m[k].t = 0; });
 }
 
 /**
@@ -1396,6 +1518,10 @@ function invalidateAllPekerjaanCaches_() {
 function resetAllPageDataCache_() {
   sessionEpoch_++;
   cacheGen_++;
+  cardBusyResetAll_();
+  var inboxEl_ = document.getElementById('pekerjaan-list');
+  if (inboxEl_) inboxEl_._inboxRendered = null;
+  pageDataCache.pekerjaanInboxStale_ = false;
   pageDataCache.dashboard = null;
   pageDataCache.pekerjaanInbox = null;
   pageDataCache.pekerjaanRiwayatByKey = {};
@@ -2062,20 +2188,18 @@ function openVerifikasiPilihJenis_(p) {
 function doVerifikasiPekerjaan_(btn, close, p, jenis) {
   var session = loadSession();
   if (!session) return;
-  btn.dataset.busy = '1';
-  btn.disabled = true;
-  var origHtml = btn.innerHTML;
-  btn.innerHTML = '<span>Menyimpan...</span>';
-  function reset() { btn.dataset.busy = ''; btn.disabled = false; btn.innerHTML = origHtml; }
+  var id = p.pekerjaanId;
+  if (!cardBusyStart_(id, 'verify')) return; // card ini sedang diproses
+  close();
   google.script.run
     .withSuccessHandler(function (res) {
-      if (!res || !res.success) { reset(); showSnackbar((res && res.error) || 'Gagal memverifikasi.', 'error'); return; }
-      close();
+      if (!res || !res.success) { cardBusyEnd_(id); showSnackbar((res && res.error) || 'Gagal memverifikasi.', 'error'); return; }
       vfApplyLocal_(p, 'VERIFIKASI', jenis);
       showSnackbar('Pekerjaan terverifikasi.', 'success');
-      refreshVerifikasiFeeds_();
+      cardBusyPhase_(id, 'refresh');
+      silentRefreshThen_(id, refreshVerifikasiFeeds_);
     })
-    .withFailureHandler(function () { reset(); showSnackbar('Gagal memverifikasi. Periksa koneksi lalu coba lagi.', 'error'); })
+    .withFailureHandler(function () { cardBusyEnd_(id); showSnackbar('Gagal memverifikasi. Periksa koneksi lalu coba lagi.', 'error'); })
     .verifikasiPekerjaan(session.accessCode, p.pekerjaanId, jenis);
 }
 
@@ -2131,14 +2255,14 @@ function openVerifikasiDetail_(p) {
     var bt = card.querySelector('.vf-batal');
     if (bt) bt.addEventListener('click', function () {
       showConfirmModal('Status pekerjaan akan kembali menjadi MENUNGGU VERIFIKASI. Informasi verifikasi sebelumnya tetap tersimpan sebagai riwayat audit.',
-        function () { doBatalkanVerifikasi_(p, close); }, 'warning', true, 'Membatalkan...',
+        function () { doBatalkanVerifikasi_(p, close); }, 'warning', false, 'Membatalkan...',
         { title: 'Batalkan Verifikasi?', confirm: 'Ya, Batalkan' });
     });
   });
 }
 
 /** Muat ulang daftar yang sedang tampil (Aktivitas dan/atau Riwayat) setelah verifikasi berubah. */
-function refreshVerifikasiFeeds_() {
+function refreshVerifikasiFeeds_(done) {
   // Cache Aktivitas DIPERTAHANKAN (sudah diperbarui di tempat oleh vfApplyLocal_) agar daftar tidak
   // dikosongkan/"Memuat aktivitas tim"; ditandai basi (t:0) supaya tetap disegarkan diam-diam dari server.
   var keep = pageDataCache.pekerjaanAktivitasByKey || {};
@@ -2148,23 +2272,30 @@ function refreshVerifikasiFeeds_() {
   pageDataCache.pekerjaanAktivitasByKey = keep;
   if (keep[defKey] && keep[defKey].list) persistSet_('aktivitas', { list: keep[defKey].list, total: keep[defKey].total, hasMore: keep[defKey].hasMore });
   var a = document.getElementById('activity-feed-list'), r = document.getElementById('my-reports-list');
-  if (a && a.offsetParent !== null && typeof loadPekerjaanAktivitas === 'function') loadPekerjaanAktivitas(true);
-  if (r && r.offsetParent !== null && typeof loadRiwayatPekerjaan === 'function') loadRiwayatPekerjaan(true);
+  var jobs = [];
+  if (a && a.offsetParent !== null && typeof loadPekerjaanAktivitas === 'function') jobs.push(loadPekerjaanAktivitas);
+  if (r && r.offsetParent !== null && typeof loadRiwayatPekerjaan === 'function') jobs.push(loadRiwayatPekerjaan);
+  var left = jobs.length, allOk = true;
+  if (!left) { if (done) done(true); return; }
+  jobs.forEach(function (fn) {
+    fn(true, function (ok) { if (ok === false) allOk = false; if (--left === 0 && done) done(allOk); });
+  });
 }
 
 function doBatalkanVerifikasi_(p, closeDetail) {
   var session = loadSession();
-  beginAction(null, 'Membatalkan...');
+  var id = p.pekerjaanId;
+  if (!cardBusyStart_(id, 'unverify')) return;
+  if (closeDetail) closeDetail();
   google.script.run
     .withSuccessHandler(function (res) {
-      endAction(null);
-      if (!res || !res.success) { showSnackbar((res && res.error) || 'Gagal membatalkan verifikasi.', 'error'); return; }
-      if (closeDetail) closeDetail();
+      if (!res || !res.success) { cardBusyEnd_(id); showSnackbar((res && res.error) || 'Gagal membatalkan verifikasi.', 'error'); return; }
       vfApplyLocal_(p, 'BATAL');
       showSnackbar('Verifikasi dibatalkan.', 'success');
-      refreshVerifikasiFeeds_();
+      cardBusyPhase_(id, 'refresh');
+      silentRefreshThen_(id, refreshVerifikasiFeeds_);
     })
-    .withFailureHandler(function () { endAction(null); showSnackbar('Gagal membatalkan verifikasi. Coba lagi.', 'error'); })
+    .withFailureHandler(function () { cardBusyEnd_(id); showSnackbar('Gagal membatalkan verifikasi. Coba lagi.', 'error'); })
     .batalkanVerifikasiPekerjaan(session.accessCode, p.pekerjaanId);
 }
 
@@ -2191,7 +2322,7 @@ function confirmHapusPekerjaan(pekerjaanId, onMutated) {
     '',
     function () { doHapusPekerjaan(pekerjaanId, onMutated); },
     'warning',
-    true,
+    false,
     'Menghapus...',
     {
       title: 'Hapus Pekerjaan Permanen?',
@@ -2208,20 +2339,23 @@ function confirmHapusPekerjaan(pekerjaanId, onMutated) {
 
 function doHapusPekerjaan(pekerjaanId, onMutated) {
   var session = loadSession();
-  beginAction(null, 'Menghapus...');
+  if (!cardBusyStart_(pekerjaanId, 'delete')) return;
+  closeActivityDetail();
   google.script.run
     .withSuccessHandler(function (response) {
-      endAction(null);
-      if (!response.success) {
-        showSnackbar(response.error, 'error');
+      if (!response || !response.success) {
+        cardBusyEnd_(pekerjaanId);
+        showSnackbar((response && response.error) || 'Gagal menghapus pekerjaan.', 'error');
         return;
       }
       showSnackbar('Pekerjaan berhasil dihapus.', 'success');
       invalidateAllPekerjaanCaches_();
+      cardBusyPhase_(pekerjaanId, 'refresh');
+      silentRefreshThen_(pekerjaanId, function (fin) { refreshCurrentPekerjaanPage_(fin); });
       if (onMutated) onMutated();
     })
     .withFailureHandler(function () {
-      endAction(null);
+      cardBusyEnd_(pekerjaanId);
       showSnackbar('Gagal menghapus pekerjaan. Coba lagi.', 'error');
     })
     .hapusPekerjaan(session.accessCode, pekerjaanId);
@@ -2477,7 +2611,7 @@ function openPekerjaanDetail(p, opts) {
           showConfirmModal(
             'Batalkan laporan penuntasan ini? Pekerjaan akan kembali berstatus Dikerjakan dan muncul lagi di Menu Pekerjaan. Foto penuntasan akan terhapus permanen.',
             function () { doBatalkanPenuntasan_(p.pekerjaanId); },
-            'warning', true, 'Membatalkan...'
+            'warning', false, 'Membatalkan...'
           );
         });
         actionsWrap.appendChild(batalkanBtn);
@@ -2522,10 +2656,7 @@ function openPekerjaanDetail(p, opts) {
       deleteBtn.style.gap = '8px';
       deleteBtn.innerHTML = mdIcon('delete', 16) + '<span>Hapus Pekerjaan</span>';
       deleteBtn.addEventListener('click', function () {
-        confirmHapusPekerjaan(p.pekerjaanId, function () {
-          closeActivityDetail();
-          refreshCurrentPekerjaanPage_();
-        });
+        confirmHapusPekerjaan(p.pekerjaanId);
       });
       pairWrap.appendChild(deleteBtn);
     }
@@ -2542,10 +2673,11 @@ function openPekerjaanDetail(p, opts) {
 /** Refresh daftar Pekerjaan pada halaman yang sedang aktif — dipakai
  * setelah Ubah/Hapus dari Detail (yang bisa dibuka dari Inbox, Riwayat,
  * maupun Aktivitas, jadi tidak tahu di muka harus me-refresh yang mana). */
-function refreshCurrentPekerjaanPage_() {
-  if (currentPage === 'pekerjaan') loadPekerjaanInbox(true);
-  else if (currentPage === 'jadwal') loadRiwayatPekerjaan(true);
-  else if (currentPage === 'aktivitas') loadPekerjaanAktivitas(true);
+function refreshCurrentPekerjaanPage_(done) {
+  if (currentPage === 'pekerjaan') loadPekerjaanInbox(true, done);
+  else if (currentPage === 'jadwal') loadRiwayatPekerjaan(true, done);
+  else if (currentPage === 'aktivitas') loadPekerjaanAktivitas(true, done);
+  else if (done) done(true);
 }
 
 /**
@@ -2636,24 +2768,22 @@ function openPekerjaanEditForm_(p) {
  */
 function doBatalkanPenuntasan_(pekerjaanId) {
   var session = loadSession();
-  beginAction(null, 'Membatalkan...');
+  if (!cardBusyStart_(pekerjaanId, 'undone')) return;
+  closeActivityDetail();
   google.script.run
     .withSuccessHandler(function (response) {
-      hideConfirmModal();
-      if (!response.success) {
-        var bar = document.getElementById('linear-progress');
-        if (bar) bar.classList.remove('show');
-        showSnackbar(response.error, 'error');
+      if (!response || !response.success) {
+        cardBusyEnd_(pekerjaanId);
+        showSnackbar((response && response.error) || 'Gagal membatalkan laporan penuntasan.', 'error');
         return;
       }
       showSnackbar('Laporan penuntasan dibatalkan. Pekerjaan kembali Dikerjakan.', 'success');
-      closeActivityDetail();
       invalidateAllPekerjaanCaches_();
-      refreshCurrentPekerjaanPage_();
+      cardBusyPhase_(pekerjaanId, 'refresh');
+      silentRefreshThen_(pekerjaanId, function (fin) { refreshCurrentPekerjaanPage_(fin); });
     })
     .withFailureHandler(function () {
-      hideConfirmModal();
-      endAction(null);
+      cardBusyEnd_(pekerjaanId);
       showSnackbar('Gagal membatalkan laporan penuntasan. Coba lagi.', 'error');
     })
     .batalkanPenuntasanPekerjaan(session.accessCode, pekerjaanId);
@@ -3139,10 +3269,12 @@ function checkPekerjaanVersion_() {
       if (pekerjaanKnownVersion_ === null) { pekerjaanKnownVersion_ = v; return; }
       if (v === pekerjaanKnownVersion_) return;
       pekerjaanKnownVersion_ = v;
-      pageDataCache.pekerjaanAktivitasByKey = {};
-      pageDataCache.pekerjaanRiwayatByKey = {};
-      persistRemove_(['inbox', 'aktivitas', 'riwayat']);
+      markAktivitasStale_();
+      markRiwayatStale_();
+      pageDataCache.pekerjaanInboxStale_ = true;
+      persistRemove_(['inbox', 'riwayat']);
       if (currentPage === 'pekerjaan') loadPekerjaanInbox(true); else refreshPekerjaanBadge_();
+      if (currentPage === 'aktivitas' && typeof loadPekerjaanAktivitas === 'function') loadPekerjaanAktivitas(true); // diam-diam, tanpa skeleton
     })
     .withFailureHandler(function () { /* diam — coba lagi pada siklus berikut */ })
     .getPekerjaanVersion(session.accessCode);
@@ -3226,12 +3358,16 @@ function openFilterPicker_(title, options, currentKey, onPick) {
 }
 
 
-function loadPekerjaanInbox(force) {
+function loadPekerjaanInbox(force, done) {
   var session = loadSession();
   if (!session) return;
+  var fin = (typeof done === 'function') ? done : function () {};
 
   var cached = pageDataCache.pekerjaanInbox;
   var stale = false;
+  var inboxEl0 = document.getElementById('pekerjaan-list');
+  var alreadyShown = !!(inboxEl0 && inboxEl0._inboxRendered);
+  if (cached && pageDataCache.pekerjaanInboxStale_) stale = true;
   if (!cached && !force) {
     // Salinan tersimpan dari kunjungan sebelumnya: tampilkan dulu, lalu perbarui dari server.
     var persisted = persistGet_('inbox');
@@ -3240,14 +3376,14 @@ function loadPekerjaanInbox(force) {
 
   if (cached && !force && !stale) {
     renderPekerjaanInboxList(cached);
+    fin(true);
     return;
   }
 
   if (stale) {
-    renderPekerjaanInboxList(cached);
-    var barStale = document.getElementById('linear-progress');
-    if (barStale) barStale.classList.add('show'); // indikator "memperbarui"
+    if (!alreadyShown) renderPekerjaanInboxList(cached); // sudah tampil -> tanpa gambar ulang
   } else if (!cached) {
+    if (inboxEl0) inboxEl0._inboxRendered = null;
     renderListSkeleton_('pekerjaan-list', 3, 'Memuat data pekerjaan...');
   }
 
@@ -3255,19 +3391,22 @@ function loadPekerjaanInbox(force) {
   google.script.run
     .withSuccessHandler(function (response) {
       if (reqDead_(gInbox)) return;
-      if (reqStale_(gInbox)) { loadPekerjaanInbox(true); return; } // mutasi terjadi saat menunggu
+      if (reqStale_(gInbox)) { loadPekerjaanInbox(true, done); return; } // mutasi terjadi saat menunggu
       var container = document.getElementById('pekerjaan-list');
       if (!response.success) {
-        if (!cached) renderLoadError_(container, 'daftar pekerjaan', function () { loadPekerjaanInbox(true); }, response.error);
+        if (!cached) { container._inboxRendered = null; renderLoadError_(container, 'daftar pekerjaan', function () { loadPekerjaanInbox(true); }, response.error); }
         var bar1 = document.getElementById('linear-progress');
         if (bar1) bar1.classList.remove('show');
+        fin(false);
         return;
       }
       pageDataCache.pekerjaanInbox = response.data.pekerjaan;
       persistSet_('inbox', response.data.pekerjaan);
       updatePekerjaanNavBadge_(response.data.pekerjaan);
       if (response.data.version) pekerjaanKnownVersion_ = response.data.version;
-      if (!(stale && sameFeedList_(cached, response.data.pekerjaan))) {
+      pageDataCache.pekerjaanInboxStale_ = false;
+      var unchanged = container && container._inboxRendered && sameFeedList_(container._inboxRendered, response.data.pekerjaan);
+      if (!unchanged) {
         renderPekerjaanInboxList(response.data.pekerjaan);
       }
       // PATCH — Jaring pengaman: SELALU matikan bar setelah render
@@ -3275,12 +3414,14 @@ function loadPekerjaanInbox(force) {
       // Lepas, pull-to-refresh, polling versi, dll).
       var bar2 = document.getElementById('linear-progress');
       if (bar2) bar2.classList.remove('show');
+      fin(true);
     })
     .withFailureHandler(function () {
       if (reqDead_(gInbox)) return;
       if (!cached) renderLoadError_(document.getElementById('pekerjaan-list'), 'daftar pekerjaan', function () { loadPekerjaanInbox(true); });
       var bar3 = document.getElementById('linear-progress');
       if (bar3) bar3.classList.remove('show');
+      fin(false);
     })
     .getPekerjaanList(session.accessCode, { view: 'inbox' });
 }
@@ -3368,6 +3509,7 @@ function prefetchTabs_() {
 
 function renderPekerjaanInboxList(list) {
   var container = document.getElementById('pekerjaan-list');
+  container._inboxRendered = list || [];
   container.innerHTML = '';
 
   if (!list || list.length === 0) {
@@ -3478,8 +3620,7 @@ function doAmbilPekerjaanInline_(buttonEl, p) {
   buttonEl.dataset.busy = '1';
 
   // --- UI: mode fokus (card aktif disorot, card lain diburamkan) + progres di bawah tombol ---
-  if (listEl) listEl.classList.add('focus-mode');
-  cardEl.classList.add('active-focus-card');
+  cardEl.classList.add('active-focus-card'); // card lain tidak diburamkan
   var originalHtml = buttonEl.innerHTML;
   buttonEl.disabled = true;
   buttonEl.classList.add('is-loading');
@@ -3571,7 +3712,7 @@ function doAmbilPekerjaanInline_(buttonEl, p) {
 function doLepasPekerjaan(pekerjaanId) {
   showConfirmModal('Lepas pekerjaan ini agar bisa diambil pihak lain?', function () {
     executeLepasPekerjaan(pekerjaanId);
-  }, 'delete', true, 'Melepas...');
+  }, 'delete', false, 'Melepas...');
 }
 
 /**
@@ -3587,23 +3728,21 @@ function doLepasPekerjaan(pekerjaanId) {
  */
 function executeLepasPekerjaan(pekerjaanId) {
   var session = loadSession();
-  beginAction(null, 'Melepas...');
+  if (!cardBusyStart_(pekerjaanId, 'release')) return;
   google.script.run
     .withSuccessHandler(function (response) {
-      hideConfirmModal();
-      if (!response.success) {
-        var bar = document.getElementById('linear-progress');
-        if (bar) bar.classList.remove('show');
-        showSnackbar(response.error, 'error');
+      if (!response || !response.success) {
+        cardBusyEnd_(pekerjaanId);
+        showSnackbar((response && response.error) || 'Gagal melepas pekerjaan.', 'error');
         return;
       }
       showSnackbar('Pekerjaan dilepas kembali.', 'success');
       invalidateAllPekerjaanCaches_();
-      loadPekerjaanInbox(true);
+      cardBusyPhase_(pekerjaanId, 'refresh');
+      silentRefreshThen_(pekerjaanId, function (fin) { loadPekerjaanInbox(true, fin); });
     })
     .withFailureHandler(function () {
-      hideConfirmModal();
-      endAction(null);
+      cardBusyEnd_(pekerjaanId);
       showSnackbar('Gagal melepas pekerjaan. Coba lagi.', 'error');
     })
     .lepasPekerjaan(session.accessCode, pekerjaanId);

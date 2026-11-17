@@ -89,9 +89,10 @@ function aktivitasFetchParams_(prm, offset) {
   return p;
 }
 
-function loadPekerjaanAktivitas(force) {
+function loadPekerjaanAktivitas(force, done) {
   var session = loadSession();
   if (!session) return;
+  var fin = (typeof done === 'function') ? done : function () {};
   renderActivityTabs();
   renderActivityQuick_();
 
@@ -111,7 +112,7 @@ function loadPekerjaanAktivitas(force) {
   }
 
   var fresh = cached && (Date.now() - (cached.t || 0)) < FEED_FRESH_MS_;
-  if (cached && !force && fresh) { renderAktivitasFeed_(cached, prm); return; }
+  if (cached && !force && fresh) { renderAktivitasFeed_(cached, prm); fin(true); return; }
 
   var alreadyShown = cached && container.dataset.feedKey === prm.key;
   if (cached && !alreadyShown) renderAktivitasFeed_(cached, prm);
@@ -119,19 +120,23 @@ function loadPekerjaanAktivitas(force) {
 
   var seq = ++aktivitasReqSeq_;
   fetchFeedPage_(aktivitasFetchParams_(prm, 0), function (data) {
-    if (seq !== aktivitasReqSeq_) return; // filter/pencarian sudah berganti
+    if (seq !== aktivitasReqSeq_) { fin(true); return; } // filter/pencarian sudah berganti
     if (isDefault) persistSet_('aktivitas', { list: data.pekerjaan, total: data.total, hasMore: data.hasMore });
     // Tidak berubah -> cukup tandai segar, tanpa gambar ulang (tanpa kedip, scroll tetap).
     if (cached && container.dataset.feedKey === prm.key &&
         sameFeedList_(cached.list.slice(0, data.pekerjaan.length), data.pekerjaan) && cached.total === data.total) {
       cached.t = Date.now();
+      fin(true);
       return;
     }
     var entry = { list: data.pekerjaan, total: data.total, hasMore: data.hasMore, t: Date.now() };
     pageDataCache.pekerjaanAktivitasByKey[prm.key] = entry;
     renderAktivitasFeed_(entry, prm);
+    fin(true);
   }, function (err) {
-    if (seq !== aktivitasReqSeq_ || cached) return;
+    if (seq !== aktivitasReqSeq_) { fin(true); return; }
+    if (cached) { fin(false); return; }
+    fin(false);
     renderLoadError_(container, 'aktivitas', function () { loadPekerjaanAktivitas(true); }, err);
   });
 }

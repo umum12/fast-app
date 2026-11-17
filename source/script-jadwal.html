@@ -140,9 +140,10 @@ function riwayatCacheKey_(q) {
   return fk === '||||' ? q.toLowerCase() : q.toLowerCase() + '#' + fk;
 }
 
-function loadRiwayatPekerjaan(force) {
+function loadRiwayatPekerjaan(force, done) {
   var session = loadSession();
   if (!session) return;
+  var fin = (typeof done === 'function') ? done : function () {};
 
   var titleEl = document.getElementById('reports-card-title');
   if (titleEl && appBootstrap) {
@@ -171,7 +172,7 @@ function loadRiwayatPekerjaan(force) {
   }
 
   var fresh = cached && (Date.now() - (cached.t || 0)) < FEED_FRESH_MS_;
-  if (cached && !force && fresh) { renderRiwayatFeed_(cached, q, cacheKey); return; }
+  if (cached && !force && fresh) { renderRiwayatFeed_(cached, q, cacheKey); fin(true); return; }
 
   var alreadyShown = cached && container.dataset.feedKey === cacheKey;
   if (cached && !alreadyShown) renderRiwayatFeed_(cached, q, cacheKey);
@@ -179,18 +180,22 @@ function loadRiwayatPekerjaan(force) {
 
   var seq = ++riwayatReqSeq_;
   fetchFeedPage_(riwayatParams_(q, 0), function (data) {
-    if (seq !== riwayatReqSeq_) return;
+    if (seq !== riwayatReqSeq_) { fin(true); return; }
     if (cacheKey === '') persistSet_('riwayat', { list: data.pekerjaan, total: data.total, hasMore: data.hasMore });
     if (cached && container.dataset.feedKey === cacheKey &&
         sameFeedList_(cached.list.slice(0, data.pekerjaan.length), data.pekerjaan) && cached.total === data.total) {
       cached.t = Date.now();
+      fin(true);
       return;
     }
     var entry = { list: data.pekerjaan, total: data.total, hasMore: data.hasMore, t: Date.now() };
     pageDataCache.pekerjaanRiwayatByKey[cacheKey] = entry;
     renderRiwayatFeed_(entry, q, cacheKey);
+    fin(true);
   }, function (err) {
-    if (seq !== riwayatReqSeq_ || cached) return;
+    if (seq !== riwayatReqSeq_) { fin(true); return; }
+    fin(false);
+    if (cached) return;
     renderLoadError_(container, 'riwayat', function () { loadRiwayatPekerjaan(true); }, err);
   });
 }
@@ -2259,6 +2264,7 @@ function buildPekerjaanListCard_(p, opts) {
 
   var card = document.createElement('div');
   card.className = 'list-card list-card-row lc2';
+  if (p.pekerjaanId) card.dataset.pid = p.pekerjaanId; // kunci identitas untuk loading per-card
 
   var main = document.createElement('div');
   main.className = 'list-card-row-main';
@@ -2324,6 +2330,7 @@ function buildPekerjaanListCard_(p, opts) {
   }
 
   card.addEventListener('click', function () { openPekerjaanDetail(p, { actions: !!opts.actions }); });
+  if (p.pekerjaanId && typeof loadingById !== 'undefined' && loadingById[p.pekerjaanId]) cardBusyPaint_(card, p.pekerjaanId);
   return card;
 }
 
