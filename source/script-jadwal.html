@@ -175,14 +175,16 @@ function loadRiwayatPekerjaan(force, done) {
   if (cached && !force && fresh) { renderRiwayatFeed_(cached, q, cacheKey); fin(true); return; }
 
   var alreadyShown = cached && container.dataset.feedKey === cacheKey;
+  container._pendingOk = (cacheKey === '');
   if (cached && !alreadyShown) renderRiwayatFeed_(cached, q, cacheKey);
   else if (!cached) renderListSkeleton_('my-reports-list', 3, q ? 'Mencari riwayat...' : 'Memuat riwayat pekerjaan...');
 
   var seq = ++riwayatReqSeq_;
   fetchFeedPage_(riwayatParams_(q, 0), function (data) {
     if (seq !== riwayatReqSeq_) { fin(true); return; }
+    var resolvedNew_ = (cacheKey === '') && pendingResolve_(data.pekerjaan);
     if (cacheKey === '') persistSet_('riwayat', { list: data.pekerjaan, total: data.total, hasMore: data.hasMore });
-    if (cached && container.dataset.feedKey === cacheKey &&
+    if (!resolvedNew_ && cached && container.dataset.feedKey === cacheKey &&
         sameFeedList_(cached.list.slice(0, data.pekerjaan.length), data.pekerjaan) && cached.total === data.total) {
       cached.t = Date.now();
       fin(true);
@@ -210,6 +212,7 @@ function riwayatParams_(q, offset, fprm) {
 
 function renderRiwayatFeed_(entry, q, cacheKey) {
   document.getElementById('my-reports-list').dataset.feedKey = cacheKey;
+  document.getElementById('my-reports-list')._pendingOk = (cacheKey === '');
   var empty = (q || riwayatFilterCount_() > 0)
     ? '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('description', 26) + '</div>Tidak ada riwayat yang cocok.</div>'
     : '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('description', 26) + '</div>Belum ada riwayat pekerjaan.<br>' +

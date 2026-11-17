@@ -115,15 +115,17 @@ function loadPekerjaanAktivitas(force, done) {
   if (cached && !force && fresh) { renderAktivitasFeed_(cached, prm); fin(true); return; }
 
   var alreadyShown = cached && container.dataset.feedKey === prm.key;
+  container._pendingOk = isDefault;
   if (cached && !alreadyShown) renderAktivitasFeed_(cached, prm);
   else if (!cached) renderListSkeleton_('activity-feed-list', 3, prm.q ? 'Mencari aktivitas...' : 'Memuat aktivitas tim...');
 
   var seq = ++aktivitasReqSeq_;
   fetchFeedPage_(aktivitasFetchParams_(prm, 0), function (data) {
     if (seq !== aktivitasReqSeq_) { fin(true); return; } // filter/pencarian sudah berganti
+    var resolvedNew_ = isDefault && pendingResolve_(data.pekerjaan);
     if (isDefault) persistSet_('aktivitas', { list: data.pekerjaan, total: data.total, hasMore: data.hasMore });
     // Tidak berubah -> cukup tandai segar, tanpa gambar ulang (tanpa kedip, scroll tetap).
-    if (cached && container.dataset.feedKey === prm.key &&
+    if (!resolvedNew_ && cached && container.dataset.feedKey === prm.key &&
         sameFeedList_(cached.list.slice(0, data.pekerjaan.length), data.pekerjaan) && cached.total === data.total) {
       cached.t = Date.now();
       fin(true);
@@ -183,6 +185,7 @@ function resetAktivitasFilters_() {
 function renderAktivitasFeed_(entry, prm) {
   updateActivityFilterSummary_(entry.total);
   document.getElementById('activity-feed-list').dataset.feedKey = prm.key;
+  document.getElementById('activity-feed-list')._pendingOk = (prm.key === feedKey_('', ''));
   renderFeedList_(document.getElementById('activity-feed-list'), entry,
     '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('inbox', 26) + '</div>' + ((prm.q || activityQuick_.range || activityQuick_.status) ? 'Tidak ada aktivitas yang cocok.' : 'Belum ada aktivitas.') + '</div>',
     function (done, fail) {

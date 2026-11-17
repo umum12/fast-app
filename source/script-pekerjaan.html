@@ -953,6 +953,7 @@ var performedAtEl = document.getElementById('form-performed-at');
       updateFormProgress();
 
       invalidateAllPekerjaanCaches_();
+      if (response.data && response.data.pekerjaanId) pendingAdd_(response.data.pekerjaanId, jenis, data.subject || '');
 
       finishSendingOverlay_(function () { showPekerjaanSuccessCard(jenis); });
     })
@@ -1531,6 +1532,7 @@ function resetAllPageDataCache_() {
   sessionEpoch_++;
   cacheGen_++;
   cardBusyResetAll_();
+  pendingCards_ = []; pendingJustResolved_ = {};
   var inboxEl_ = document.getElementById('pekerjaan-list');
   if (inboxEl_) inboxEl_._inboxRendered = null;
   pageDataCache.pekerjaanInboxStale_ = false;
@@ -1605,6 +1607,72 @@ function feedAppendCard_(container, frag, p) {
   frag.appendChild(buildPekerjaanListCard_(p, container._feedCardOpts || undefined));
 }
 
+/* ===== Kartu sementara laporan baru (skeleton) =====
+ * Setelah laporan berhasil dibuat, ID-nya sudah diketahui dari server tetapi daftar Riwayat/Aktivitas
+ * baru memuatnya beberapa detik kemudian. Selama itu tampil kartu sementara "Sedang memproses RPT xx...";
+ * begitu daftar dari server memuat ID itu, kartu sementara diganti kartu asli (dengan animasi masuk). */
+var pendingCards_ = [];
+var pendingJustResolved_ = {};
+var PENDING_TTL_MS_ = 120000;
+
+function pendingActive_() {
+  var now = Date.now();
+  pendingCards_ = pendingCards_.filter(function (p) { return now - p.t < PENDING_TTL_MS_; });
+  return pendingCards_;
+}
+
+function pendingBuildCard_(p) {
+  var b = JENIS_PEKERJAAN_BADGE[p.jenis] || { label: 'Laporan' };
+  var el = document.createElement('div');
+  el.className = 'list-card pending-card';
+  el.dataset.pending = p.id;
+  el.setAttribute('role', 'status');
+  el.setAttribute('aria-live', 'polite');
+  el.innerHTML = '<div class="pc-top"><span class="pc-chip"></span><span class="pc-id"></span></div>' +
+    '<div class="pc-subject"></div>' +
+    '<div class="pc-skel"><span class="pc-line"></span><span class="pc-line pc-short"></span></div>' +
+    '<div class="pc-msg"><span class="pc-ico"></span><span class="pc-txt"></span></div>';
+  el.querySelector('.pc-chip').textContent = b.label;
+  el.querySelector('.pc-id').textContent = cardIdLabel_(p.id);
+  var sub = el.querySelector('.pc-subject');
+  if (p.subject) sub.textContent = p.subject; else sub.style.display = 'none';
+  el.querySelector('.pc-ico').innerHTML = mdIcon('refresh', 18);
+  el.querySelector('.pc-txt').textContent = 'Sedang memproses ' + cardIdLabel_(p.id) + '...';
+  return el;
+}
+
+/** Pastikan kartu sementara tampil di paling atas daftar (hanya tampilan bawaan tanpa filter/pencarian). */
+function pendingSync_(container) {
+  if (!container) return;
+  var old = container.querySelectorAll('.pending-card');
+  for (var i = 0; i < old.length; i++) old[i].parentNode.removeChild(old[i]);
+  if (!container._pendingOk) return;
+  var act = pendingActive_();
+  if (!act.length) return;
+  var empty = container.querySelector('.empty-state');
+  if (empty && empty.parentNode === container) container.removeChild(empty);
+  for (var j = act.length - 1; j >= 0; j--) container.insertBefore(pendingBuildCard_(act[j]), container.firstChild);
+}
+
+function pendingAdd_(id, jenis, subject) {
+  if (!id) return;
+  pendingCards_ = pendingCards_.filter(function (p) { return p.id !== id; });
+  pendingCards_.push({ id: id, jenis: jenis, subject: String(subject || '').trim(), t: Date.now() });
+  ['activity-feed-list', 'my-reports-list'].forEach(function (cid) { pendingSync_(document.getElementById(cid)); });
+}
+
+/** Dipanggil saat daftar server tiba; true bila ada kartu sementara yang kini sudah ada datanya. */
+function pendingResolve_(list) {
+  if (!pendingCards_.length || !list) return false;
+  var ids = {}, hit = false;
+  list.forEach(function (p) { ids[p.pekerjaanId] = 1; });
+  pendingCards_ = pendingCards_.filter(function (p) {
+    if (ids[p.id]) { pendingJustResolved_[p.id] = 1; hit = true; return false; }
+    return true;
+  });
+  return hit;
+}
+
 /** ID kartu yang sedang tampil (null bila kosong) — untuk menandai kartu BARU saat daftar disegarkan. */
 function feedPidSet_(container) {
   var cs = container.querySelectorAll('.list-card[data-pid]'), set = {}, n = 0;
@@ -1632,11 +1700,24 @@ function renderFeedList_(container, entry, emptyHtml, fetchMore, cardOpts) {
   var oldSet = sameKey ? feedPidSet_(container) : null;
   container._lastFeedKey = container.dataset.feedKey;
   container.innerHTML = '';
-  if (!entry.list || entry.list.length === 0) { container.innerHTML = emptyHtml; return; }
+  if (!entry.list || entry.list.length === 0) { container.innerHTML = emptyHtml; pendingSync_(container); return; }
   var frag = document.createDocumentFragment();
   entry.list.forEach(function (p) { feedAppendCard_(container, frag, p); });
   container.appendChild(frag);
   feedMarkNew_(container, oldSet);
+  // Kartu yang baru saja menggantikan kartu sementara: animasi masuk + sorotan.
+  Object.keys(pendingJustResolved_).forEach(function (id) {
+    var cs = container.querySelectorAll('.list-card[data-pid]');
+    for (var i = 0; i < cs.length; i++) {
+      if (cs[i].dataset.pid === id) {
+        delete pendingJustResolved_[id];
+        cs[i].classList.add('card-new');
+        cs[i].addEventListener('animationend', function (e) { e.currentTarget.classList.remove('card-new'); }, { once: true });
+        break;
+      }
+    }
+  });
+  pendingSync_(container);
   appendFeedMore_(container, entry, fetchMore);
 }
 

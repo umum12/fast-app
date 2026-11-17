@@ -4597,3 +4597,18 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible { outline: 
 @keyframes card-new-in { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: none; } }
 @keyframes card-new-glow { 0% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary-solid, #2563eb) 45%, transparent); } 100% { box-shadow: var(--elevation-1); } }
 @media (prefers-reduced-motion: reduce) { .list-card.card-new { animation: none; } }
+
+/* ===== Kartu sementara laporan baru (skeleton) ===== */
+.list-card.pending-card { position: relative; overflow: hidden; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; animation: card-new-in .3s ease-out; }
+.pc-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pc-chip { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; background: var(--color-surface-variant, rgba(127,127,127,.14)); }
+.pc-id { font-size: 12px; font-weight: 600; opacity: .7; }
+.pc-subject { font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
+.pc-skel { display: flex; flex-direction: column; gap: 8px; }
+.pc-line { display: block; height: 12px; border-radius: 6px; background: var(--color-surface-variant, rgba(127,127,127,.16)); }
+.pc-line.pc-short { width: 60%; }
+.pc-msg { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.pc-ico { display: inline-flex; animation: pc-spin 1s linear infinite; }
+.pending-card::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(100deg, transparent 20%, rgba(127,127,127,.22) 50%, transparent 80%); background-size: 200% 100%; animation: card-busy-shimmer 1.3s linear infinite; }
+@keyframes pc-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .pending-card::after, .pc-ico, .list-card.pending-card { animation: none; } }
