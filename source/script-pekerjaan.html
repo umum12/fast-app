@@ -1406,6 +1406,7 @@ var CARD_BUSY_META_ = {
   unverify: { icon: 'block',     text: 'Sedang membatalkan verifikasi' },
   take:     { icon: 'taskAlt',   text: 'Sedang mengambil' },
   release:  { icon: 'logout',    text: 'Sedang melepas' },
+  reassign: { icon: 'arrowForward', text: 'Sedang mengalihkan' },
   undone:   { icon: 'block',     text: 'Sedang membatalkan penuntasan' },
   refresh:  { icon: 'refresh',   text: 'Sedang memperbarui data' }
 };
@@ -1485,6 +1486,17 @@ function cardBusyTimeout_(id) {
   cardBusyEnd_(id);
   showSnackbar('Respons server lambat. Memeriksa status terbaru...', 'warning');
   refreshCurrentPekerjaanPage_();
+}
+
+/** Penyimpanan dari form Ubah/Alihkan di Detail: form tetap terbuka selama menyimpan (isian tidak hilang
+ * bila gagal); kartu terkait dikunci. Sukses -> Detail ditutup, kartu menampilkan "memperbarui data"
+ * sampai daftar tersegarkan diam-diam. onOk() dipanggil sebelum penutupan (mis. snackbar). */
+function cardEditSaveBegin_(id, action) { return cardBusyStart_(id, action); }
+function cardEditSaveOk_(id) {
+  closeActivityDetail();
+  invalidateAllPekerjaanCaches_();
+  cardBusyPhase_(id, 'refresh');
+  silentRefreshThen_(id, function (fin) { refreshCurrentPekerjaanPage_(fin); });
 }
 
 function cardBusyResetAll_() {
@@ -1593,14 +1605,38 @@ function feedAppendCard_(container, frag, p) {
   frag.appendChild(buildPekerjaanListCard_(p, container._feedCardOpts || undefined));
 }
 
+/** ID kartu yang sedang tampil (null bila kosong) — untuk menandai kartu BARU saat daftar disegarkan. */
+function feedPidSet_(container) {
+  var cs = container.querySelectorAll('.list-card[data-pid]'), set = {}, n = 0;
+  for (var i = 0; i < cs.length; i++) { set[cs[i].dataset.pid] = 1; n++; }
+  return n ? set : null;
+}
+
+/** Kartu yang baru muncul (daftar sama, 1-3 kartu tambahan) diberi animasi masuk + sorotan singkat.
+ * Murni kosmetik; pergantian filter/pencarian (banyak kartu baru) tidak ditandai. */
+function feedMarkNew_(container, oldSet) {
+  if (!oldSet) return;
+  var cs = container.querySelectorAll('.list-card[data-pid]'), fresh = [], overlap = 0;
+  for (var i = 0; i < cs.length; i++) { if (oldSet[cs[i].dataset.pid]) overlap++; else fresh.push(cs[i]); }
+  if (!overlap || !fresh.length || fresh.length > 3) return;
+  fresh.forEach(function (c) {
+    c.classList.add('card-new');
+    c.addEventListener('animationend', function () { c.classList.remove('card-new'); }, { once: true });
+  });
+}
+
 function renderFeedList_(container, entry, emptyHtml, fetchMore, cardOpts) {
   container._feedCardOpts = cardOpts || null;
   container._feedLastDay = null;
+  var sameKey = container._lastFeedKey === container.dataset.feedKey;
+  var oldSet = sameKey ? feedPidSet_(container) : null;
+  container._lastFeedKey = container.dataset.feedKey;
   container.innerHTML = '';
   if (!entry.list || entry.list.length === 0) { container.innerHTML = emptyHtml; return; }
   var frag = document.createDocumentFragment();
   entry.list.forEach(function (p) { feedAppendCard_(container, frag, p); });
   container.appendChild(frag);
+  feedMarkNew_(container, oldSet);
   appendFeedMore_(container, entry, fetchMore);
 }
 
@@ -2742,18 +2778,18 @@ function openPekerjaanEditForm_(p) {
 
     var session = loadSession();
     var submitBtn = document.getElementById('btn-submit-pekerjaan-edit');
+    if (!cardEditSaveBegin_(p.pekerjaanId, 'update')) return;
     beginAction(submitBtn, 'Menyimpan...');
     google.script.run
       .withSuccessHandler(function (response) {
         endAction(submitBtn);
-        if (!response.success) { errorEl.textContent = response.error; showSnackbar(response.error, 'error'); return; }
+        if (!response || !response.success) { cardBusyEnd_(p.pekerjaanId); errorEl.textContent = (response && response.error) || 'Gagal menyimpan.'; showSnackbar(errorEl.textContent, 'error'); return; }
         showSnackbar('Pekerjaan berhasil diubah.', 'success');
-        closeActivityDetail();
-        invalidateAllPekerjaanCaches_();
-        refreshCurrentPekerjaanPage_();
+        cardEditSaveOk_(p.pekerjaanId);
       })
       .withFailureHandler(function () {
         endAction(submitBtn);
+        cardBusyEnd_(p.pekerjaanId);
         errorEl.textContent = 'Gagal terhubung ke server. Coba lagi.';
         showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error');
       })
@@ -2822,18 +2858,18 @@ function openPenuntasanEditForm_(p) {
 
     var session = loadSession();
     var submitBtn = document.getElementById('btn-submit-penuntasan-edit');
+    if (!cardEditSaveBegin_(p.pekerjaanId, 'update')) return;
     beginAction(submitBtn, 'Menyimpan...');
     google.script.run
       .withSuccessHandler(function (response) {
         endAction(submitBtn);
-        if (!response.success) { errorEl.textContent = response.error; showSnackbar(response.error, 'error'); return; }
+        if (!response || !response.success) { cardBusyEnd_(p.pekerjaanId); errorEl.textContent = (response && response.error) || 'Gagal menyimpan.'; showSnackbar(errorEl.textContent, 'error'); return; }
         showSnackbar('Catatan penuntasan berhasil diubah.', 'success');
-        closeActivityDetail();
-        invalidateAllPekerjaanCaches_();
-        refreshCurrentPekerjaanPage_();
+        cardEditSaveOk_(p.pekerjaanId);
       })
       .withFailureHandler(function () {
         endAction(submitBtn);
+        cardBusyEnd_(p.pekerjaanId);
         errorEl.textContent = 'Gagal terhubung ke server. Coba lagi.';
         showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error');
       })
@@ -2883,18 +2919,18 @@ function openAlihkanForm_(p) {
     if (!sel.value) { errorEl.textContent = 'Pilih petugas tujuan.'; return; }
     var session = loadSession();
     var submitBtn = document.getElementById('btn-submit-alihkan');
+    if (!cardEditSaveBegin_(p.pekerjaanId, 'reassign')) return;
     beginAction(submitBtn, 'Mengalihkan...');
     google.script.run
       .withSuccessHandler(function (response) {
         endAction(submitBtn);
-        if (!response.success) { errorEl.textContent = response.error; showSnackbar(response.error, 'error'); return; }
+        if (!response || !response.success) { cardBusyEnd_(p.pekerjaanId); errorEl.textContent = (response && response.error) || 'Gagal mengalihkan.'; showSnackbar(errorEl.textContent, 'error'); return; }
         showSnackbar('Pekerjaan berhasil dialihkan.', 'success');
-        closeActivityDetail();
-        invalidateAllPekerjaanCaches_();
-        refreshCurrentPekerjaanPage_();
+        cardEditSaveOk_(p.pekerjaanId);
       })
       .withFailureHandler(function () {
         endAction(submitBtn);
+        cardBusyEnd_(p.pekerjaanId);
         errorEl.textContent = 'Gagal terhubung ke server. Coba lagi.';
         showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error');
       })
@@ -3510,6 +3546,7 @@ function prefetchTabs_() {
 function renderPekerjaanInboxList(list) {
   var container = document.getElementById('pekerjaan-list');
   container._inboxRendered = list || [];
+  var oldSetIb_ = feedPidSet_(container);
   container.innerHTML = '';
 
   if (!list || list.length === 0) {
@@ -3535,6 +3572,7 @@ function renderPekerjaanInboxList(list) {
   list.forEach(function (p) {
     container.appendChild(buildPekerjaanInboxCard_(p));
   });
+  feedMarkNew_(container, oldSetIb_);
 }
 
 
