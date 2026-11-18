@@ -1622,22 +1622,25 @@ function pendingActive_() {
 }
 
 function pendingBuildCard_(p) {
-  var b = JENIS_PEKERJAAN_BADGE[p.jenis] || { label: 'Laporan' };
+  var b = JENIS_PEKERJAAN_BADGE[p.jenis] || { label: 'Laporan', icon: 'description' };
   var el = document.createElement('div');
   el.className = 'list-card pending-card';
   el.dataset.pending = p.id;
   el.setAttribute('role', 'status');
   el.setAttribute('aria-live', 'polite');
-  el.innerHTML = '<div class="pc-top"><span class="pc-chip"></span><span class="pc-id"></span></div>' +
+  el.innerHTML =
+    '<div class="pc-top"><span class="pc-chip"><span class="pc-chip-ico"></span><span class="pc-chip-txt"></span></span>' +
+    '<span class="pc-pill"><span class="pc-spin"></span>Diproses</span></div>' +
     '<div class="pc-subject"></div>' +
-    '<div class="pc-skel"><span class="pc-line"></span><span class="pc-line pc-short"></span></div>' +
-    '<div class="pc-msg"><span class="pc-ico"></span><span class="pc-txt"></span></div>';
-  el.querySelector('.pc-chip').textContent = b.label;
-  el.querySelector('.pc-id').textContent = cardIdLabel_(p.id);
+    '<div class="pc-who"><span class="pc-avatar"></span><span class="pc-who-lines"><span class="pc-line pc-w60"></span><span class="pc-line pc-w35"></span></span></div>' +
+    '<div class="pc-body"><span class="pc-line"></span><span class="pc-line pc-w70"></span></div>' +
+    '<div class="pc-msg"><div class="pc-title">Laporan sedang diproses</div>' +
+    '<div class="pc-hint">Sebentar lagi muncul di sini. Tidak perlu memuat ulang.</div></div>';
+  el.querySelector('.pc-chip-ico').innerHTML = mdIcon(b.icon || 'description', 14);
+  el.querySelector('.pc-chip-txt').textContent = b.label;
   var sub = el.querySelector('.pc-subject');
   if (p.subject) sub.textContent = p.subject; else sub.style.display = 'none';
-  el.querySelector('.pc-ico').innerHTML = mdIcon('refresh', 18);
-  el.querySelector('.pc-txt').textContent = 'Sedang memproses ' + cardIdLabel_(p.id) + '...';
+  el.querySelector('.pc-spin').innerHTML = mdIcon('refresh', 14);
   return el;
 }
 
