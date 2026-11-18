@@ -1400,16 +1400,16 @@ function markRiwayatStale_() {
  * (ukuran & posisi tetap) dan menahan ketukan sehingga tidak ada request ganda pada card itu. */
 var loadingById = {};
 var CARD_BUSY_META_ = {
-  create:   { icon: 'addCircle', text: 'Sedang menambahkan' },
-  update:   { icon: 'edit',      text: 'Sedang menyimpan perubahan' },
-  'delete': { icon: 'delete',    text: 'Sedang menghapus' },
-  verify:   { icon: 'verified',  text: 'Sedang memverifikasi' },
-  unverify: { icon: 'block',     text: 'Sedang membatalkan verifikasi' },
-  take:     { icon: 'taskAlt',   text: 'Sedang mengambil' },
-  release:  { icon: 'logout',    text: 'Sedang melepas' },
-  reassign: { icon: 'arrowForward', text: 'Sedang mengalihkan' },
-  undone:   { icon: 'block',     text: 'Sedang membatalkan penuntasan' },
-  refresh:  { icon: 'refresh',   text: 'Sedang memperbarui data' }
+  create:   { icon: 'addCircle', text: 'Sedang menambahkan', short: 'Menambahkan...' },
+  update:   { icon: 'edit',      text: 'Sedang menyimpan perubahan', short: 'Menyimpan...' },
+  'delete': { icon: 'delete',    text: 'Sedang menghapus', short: 'Menghapus...' },
+  verify:   { icon: 'verified',  text: 'Sedang memverifikasi', short: 'Memverifikasi...' },
+  unverify: { icon: 'block',     text: 'Sedang membatalkan verifikasi', short: 'Membatalkan...' },
+  take:     { icon: 'taskAlt',   text: 'Sedang mengambil', short: 'Mengambil...' },
+  release:  { icon: 'logout',    text: 'Sedang melepas', short: 'Melepas...' },
+  reassign: { icon: 'arrowForward', text: 'Sedang mengalihkan', short: 'Mengalihkan...' },
+  undone:   { icon: 'block',     text: 'Sedang membatalkan penuntasan', short: 'Membatalkan...' },
+  refresh:  { icon: 'refresh',   text: 'Sedang memperbarui data', short: 'Memperbarui...' }
 };
 var CARD_BUSY_TIMEOUT_MS_ = 60000;
 
@@ -1420,7 +1420,7 @@ function cardIdLabel_(id) {
 }
 
 function cardBusyEls_(id) {
-  var all = document.querySelectorAll('.list-card[data-pid]'), out = [];
+  var all = document.querySelectorAll('[data-pid]'), out = [];
   for (var i = 0; i < all.length; i++) if (all[i].dataset.pid === id) out.push(all[i]);
   return out;
 }
@@ -1435,6 +1435,21 @@ function cardBusyPaint_(card, id) {
   var b = loadingById[id];
   if (!b || !card) return;
   var meta = CARD_BUSY_META_[b.action] || CARD_BUSY_META_.refresh;
+  var noun = b.noun || cardIdLabel_(id);
+  // Mode "swap" (baris tabel / chip kecil): bagian tertentu diganti ikon + pesan singkat.
+  var swapSel = card.dataset.busySwap;
+  if (swapSel) {
+    var tgt = card.querySelector(swapSel);
+    if (tgt) {
+      if (card._busyOrig === undefined) card._busyOrig = tgt.innerHTML;
+      tgt.innerHTML = '<span class="busy-swap"><span class="busy-swap-ico">' + mdIcon(meta.icon, 14) + '</span><span class="busy-swap-txt"></span></span>';
+      tgt.querySelector('.busy-swap-txt').textContent = meta.short;
+      card.classList.add('is-busy-swap');
+      card.setAttribute('aria-busy', 'true');
+      card.title = meta.text + ' ' + noun + '...';
+    }
+    return;
+  }
   var ov = cardBusyOverlay_(card);
   if (!ov) {
     ov = document.createElement('div');
@@ -1446,14 +1461,14 @@ function cardBusyPaint_(card, id) {
   }
   card.classList.add('is-busy');
   ov.querySelector('.card-busy-ico').innerHTML = mdIcon(meta.icon, 20);
-  ov.querySelector('.card-busy-msg').textContent = meta.text + ' ' + cardIdLabel_(id) + '...';
+  ov.querySelector('.card-busy-msg').textContent = meta.text + ' ' + noun + '...';
 }
 
 /** Mulai loading untuk satu card. false bila card itu sedang diproses (cegah request ganda). */
-function cardBusyStart_(id, action) {
+function cardBusyStart_(id, action, noun) {
   if (!id || loadingById[id]) return false;
   var els = cardBusyEls_(id);
-  var b = { action: action, bar: els.length === 0 };
+  var b = { action: action, noun: noun || '', bar: els.length === 0 };
   b.timer = setTimeout(function () { cardBusyTimeout_(id); }, CARD_BUSY_TIMEOUT_MS_);
   loadingById[id] = b;
   if (b.bar) beginAction(null); // card tidak sedang tampil: fallback ke bar tipis di atas
@@ -1461,10 +1476,20 @@ function cardBusyStart_(id, action) {
   return true;
 }
 
+var CARD_BUSY_REFRESH_MAX_MS_ = 12000;
 function cardBusyPhase_(id, action) {
   var b = loadingById[id];
   if (!b) return;
   b.action = action;
+  if (action === 'refresh') {
+    // Server sudah mengonfirmasi; penyegaran daftar hanya kosmetik -> maksimal 12 dtk, lalu lepas tanpa pesan galat.
+    clearTimeout(b.timer);
+    b.timer = setTimeout(function () {
+      if (!loadingById[id]) return;
+      cardBusyEnd_(id);
+      refreshCurrentPekerjaanPage_();
+    }, CARD_BUSY_REFRESH_MAX_MS_);
+  }
   cardBusyEls_(id).forEach(function (c) { cardBusyPaint_(c, id); });
 }
 
@@ -1479,14 +1504,23 @@ function cardBusyEnd_(id) {
     var ov = cardBusyOverlay_(c);
     if (ov && ov.parentNode) ov.parentNode.removeChild(ov);
     c.classList.remove('is-busy');
+    if (c._busyOrig !== undefined) {
+      var tgt = c.dataset.busySwap ? c.querySelector(c.dataset.busySwap) : null;
+      if (tgt) tgt.innerHTML = c._busyOrig;
+      c._busyOrig = undefined;
+      c.classList.remove('is-busy-swap');
+      c.removeAttribute('aria-busy');
+      c.removeAttribute('title');
+    }
   });
 }
 
 function cardBusyTimeout_(id) {
-  if (!loadingById[id]) return;
+  var b = loadingById[id];
+  if (!b) return;
   cardBusyEnd_(id);
   showSnackbar('Respons server lambat. Memeriksa status terbaru...', 'warning');
-  refreshCurrentPekerjaanPage_();
+  if (typeof b.onTimeout === 'function') b.onTimeout(); else refreshCurrentPekerjaanPage_();
 }
 
 /** Penyimpanan dari form Ubah/Alihkan di Detail: form tetap terbuka selama menyimpan (isian tidak hilang
@@ -1824,9 +1858,26 @@ function skeletonCommentsHtml_() {
  * Dipakai Menu Pekerjaan, Riwayat, dan Aktivitas supaya satu bahasa
  * visual. renderSkeleton() lama tetap dipakai untuk kotak Ringkasan.
  */
+/** HTML skeleton kartu Pekerjaan — pola yang sama dengan kartu sementara di menu Buat (chip, penanda, avatar,
+ * baris isi, shimmer) sehingga loading terasa satu keluarga. Dipakai juga oleh penampung statis index.html. */
+function pekerjaanSkeletonHtml_(count) {
+  var card =
+    '<div class="list-card pk-skel-card">' +
+      '<div class="pc-top"><span class="pc-block pk-w90"></span><span class="pc-block pk-w70"></span></div>' +
+      '<div class="pc-who"><span class="pc-avatar"></span><span class="pc-who-lines"><span class="pc-line pc-w60"></span><span class="pc-line pc-w35"></span></span></div>' +
+      '<div class="pc-body"><span class="pc-line"></span><span class="pc-line pc-w70"></span></div>' +
+    '</div>';
+  var cards = '';
+  for (var i = 0; i < (count || 3); i++) cards += card;
+  return '<div class="pc-skel-wrap" role="status" aria-live="polite" aria-busy="true">' +
+    '<div class="pc-skel-head"><span class="pc-spin">' + mdIcon('refresh', 16) + '</span><span><b>Memuat pekerjaan</b><small>Mengambil daftar terbaru...</small></span></div>' +
+    cards + '</div>';
+}
+
 function renderListSkeleton_(containerId, cardCount, message) {
   var el = document.getElementById(containerId);
   if (!el) return;
+  if (containerId === 'pekerjaan-list') { el.innerHTML = pekerjaanSkeletonHtml_(cardCount); return; }
 
   var cardHtml =
     '<div class="skeleton-card">' +
@@ -2383,23 +2434,7 @@ function openVerifikasiDetail_(p) {
 
 /** Muat ulang daftar yang sedang tampil (Aktivitas dan/atau Riwayat) setelah verifikasi berubah. */
 function refreshVerifikasiFeeds_(done) {
-  // Cache Aktivitas DIPERTAHANKAN (sudah diperbarui di tempat oleh vfApplyLocal_) agar daftar tidak
-  // dikosongkan/"Memuat aktivitas tim"; ditandai basi (t:0) supaya tetap disegarkan diam-diam dari server.
-  var keep = pageDataCache.pekerjaanAktivitasByKey || {};
-  invalidateAllPekerjaanCaches_();
-  var defKey = feedKey_('', '');
-  Object.keys(keep).forEach(function (k) { if (keep[k]) keep[k].t = 0; });
-  pageDataCache.pekerjaanAktivitasByKey = keep;
-  if (keep[defKey] && keep[defKey].list) persistSet_('aktivitas', { list: keep[defKey].list, total: keep[defKey].total, hasMore: keep[defKey].hasMore });
-  var a = document.getElementById('activity-feed-list'), r = document.getElementById('my-reports-list');
-  var jobs = [];
-  if (a && a.offsetParent !== null && typeof loadPekerjaanAktivitas === 'function') jobs.push(loadPekerjaanAktivitas);
-  if (r && r.offsetParent !== null && typeof loadRiwayatPekerjaan === 'function') jobs.push(loadRiwayatPekerjaan);
-  var left = jobs.length, allOk = true;
-  if (!left) { if (done) done(true); return; }
-  jobs.forEach(function (fn) {
-    fn(true, function (ok) { if (ok === false) allOk = false; if (--left === 0 && done) done(allOk); });
-  });
+  refreshCurrentPekerjaanPage_(done);
 }
 
 function doBatalkanVerifikasi_(p, closeDetail) {
@@ -2469,9 +2504,12 @@ function doHapusPekerjaan(pekerjaanId, onMutated) {
         return;
       }
       showSnackbar('Pekerjaan berhasil dihapus.', 'success');
+      pekerjaanRemoveLocal_(pekerjaanId);   // hilang seketika di Aktivitas, Riwayat, dan Inbox
+      cardBusyEnd_(pekerjaanId);
       invalidateAllPekerjaanCaches_();
-      cardBusyPhase_(pekerjaanId, 'refresh');
-      silentRefreshThen_(pekerjaanId, function (fin) { refreshCurrentPekerjaanPage_(fin); });
+      refreshCurrentPekerjaanPage_(function (ok) {
+        if (ok === false) showSnackbar('Gagal memperbarui daftar. Data sebelumnya dipertahankan.', 'warning');
+      });
       if (onMutated) onMutated();
     })
     .withFailureHandler(function () {
@@ -2793,11 +2831,63 @@ function openPekerjaanDetail(p, opts) {
 /** Refresh daftar Pekerjaan pada halaman yang sedang aktif — dipakai
  * setelah Ubah/Hapus dari Detail (yang bisa dibuka dari Inbox, Riwayat,
  * maupun Aktivitas, jadi tidak tahu di muka harus me-refresh yang mana). */
+/** Segarkan diam-diam SEMUA daftar Pekerjaan yang sudah termuat (Aktivitas, Riwayat, Inbox), bukan hanya yang
+ * sedang dibuka: perubahan dari satu menu langsung tampak di menu lain tanpa perlu berpindah menu.
+ * done(ok) hanya menunggu daftar yang sedang dibuka; yang lain berjalan di latar belakang. */
 function refreshCurrentPekerjaanPage_(done) {
-  if (currentPage === 'pekerjaan') loadPekerjaanInbox(true, done);
-  else if (currentPage === 'jadwal') loadRiwayatPekerjaan(true, done);
-  else if (currentPage === 'aktivitas') loadPekerjaanAktivitas(true, done);
-  else if (done) done(true);
+  var feedMounted = function (id) { var e = document.getElementById(id); return !!(e && e.dataset.feedKey !== undefined); };
+  var inboxEl = document.getElementById('pekerjaan-list');
+  var targets = [
+    { page: 'aktivitas', mounted: feedMounted('activity-feed-list'), load: function (cb) { loadPekerjaanAktivitas(true, cb); } },
+    { page: 'jadwal',    mounted: feedMounted('my-reports-list'),   load: function (cb) { loadRiwayatPekerjaan(true, cb); } },
+    { page: 'pekerjaan', mounted: !!(inboxEl && inboxEl._inboxRendered), load: function (cb) { loadPekerjaanInbox(true, cb); } }
+  ];
+  var awaited = false, bgFailed = false;
+  targets.forEach(function (t) {
+    if (t.page === currentPage) { awaited = true; t.load(done); return; }
+    if (!t.mounted) return;
+    t.load(function (ok) {
+      if (ok === false && !bgFailed) { bgFailed = true; showSnackbar('Gagal memperbarui sebagian daftar. Data sebelumnya dipertahankan.', 'warning'); }
+    });
+  });
+  if (!awaited && done) done(true);
+}
+
+/** Hapus satu pekerjaan dari SEMUA cache & tampilan daftar (Aktivitas, Riwayat, Inbox) seketika. */
+function pekerjaanRemoveLocal_(id) {
+  [pageDataCache.pekerjaanAktivitasByKey, pageDataCache.pekerjaanRiwayatByKey].forEach(function (m) {
+    Object.keys(m || {}).forEach(function (k) {
+      var e = m[k];
+      if (!e || !e.list) return;
+      var n = e.list.length;
+      e.list = e.list.filter(function (p) { return p.pekerjaanId !== id; });
+      if (e.list.length < n) e.total = Math.max(0, (e.total || n) - (n - e.list.length));
+    });
+  });
+  if (Array.isArray(pageDataCache.pekerjaanInbox)) {
+    pageDataCache.pekerjaanInbox = pageDataCache.pekerjaanInbox.filter(function (p) { return p.pekerjaanId !== id; });
+  }
+  var ib = document.getElementById('pekerjaan-list');
+  if (ib && ib._inboxRendered) ib._inboxRendered = ib._inboxRendered.filter(function (p) { return p.pekerjaanId !== id; });
+  ['activity-feed-list', 'my-reports-list', 'pekerjaan-list'].forEach(function (cid) {
+    var c = document.getElementById(cid);
+    if (!c) return;
+    var cs = c.querySelectorAll('.list-card[data-pid]');
+    for (var i = 0; i < cs.length; i++) if (cs[i].dataset.pid === id && cs[i].parentNode) cs[i].parentNode.removeChild(cs[i]);
+    // Penanda hari yang kehilangan semua kartunya ikut dihapus.
+    var hs = c.querySelectorAll('.feed-day');
+    for (var j = 0; j < hs.length; j++) {
+      var nx = hs[j].nextElementSibling;
+      if (!nx || !nx.classList.contains('list-card')) hs[j].parentNode.removeChild(hs[j]);
+    }
+    // Daftar jadi kosong: paksa gambar ulang (tampilkan keadaan kosong) saat penyegaran berikutnya.
+    if (!c.querySelector('.list-card') && c.dataset.feedKey !== undefined) c.dataset.feedKey = '__kosong';
+  });
+  try {
+    var ac = document.getElementById('activity-feed-list');
+    var ent = ac && pageDataCache.pekerjaanAktivitasByKey[ac.dataset.feedKey];
+    if (ent && typeof updateActivityFilterSummary_ === 'function') updateActivityFilterSummary_(ent.total);
+  } catch (e) { /* kosmetik */ }
 }
 
 /**
@@ -3061,10 +3151,11 @@ function renderKomentarSection_(p, body) {
   if (!(cached && cached.t && (Date.now() - cached.t) < 30000)) loadKomentar_(p);
 }
 
-function loadKomentar_(p) {
+function loadKomentar_(p, done) {
   var session = loadSession();
+  var fin = (typeof done === 'function') ? done : function () {};
   var listEl = document.getElementById('komentar-list');
-  if (!listEl) return;
+  if (!listEl) { fin(true); return; }
   var hadCache = !!komentarCache_[p.pekerjaanId] || !p.commentCount;
   var gKom = reqGuard_();
   // Panel komentar masih milik laporan ini? (detail bisa sudah ditutup/berganti saat jawaban tiba)
@@ -3075,15 +3166,16 @@ function loadKomentar_(p) {
   }
   google.script.run
     .withSuccessHandler(function (response) {
-      if (reqDead_(gKom)) return;
+      if (reqDead_(gKom)) { fin(true); return; }
       var prev = komentarCache_[p.pekerjaanId];
       if (response.success && !reqStale_(gKom)) {
         komentarCache_[p.pekerjaanId] = { list: response.data.komentar, canKirim: response.data.canKirim, t: Date.now() };
       }
-      if (!samePanel_()) return; // Detail sudah ditutup / berpindah laporan lain
+      if (!samePanel_()) { fin(true); return; } // Detail sudah ditutup / berpindah laporan lain
       listEl = document.getElementById('komentar-list');
       if (!response.success) {
         if (!hadCache) { listEl.innerHTML = ''; var errEl = document.createElement('div'); errEl.className = 'komentar-empty'; errEl.textContent = response.error || 'Gagal memuat komentar.'; listEl.appendChild(errEl); }
+        fin(false);
         return;
       }
       p.commentCount = response.data.komentar.length;
@@ -3091,11 +3183,13 @@ function loadKomentar_(p) {
       var unchanged = prev && sameFeedList_(prev.list, response.data.komentar) && listEl.children.length > 0 && !listEl.querySelector('.inline-loading');
       if (!unchanged) renderKomentarList_(p, response.data.komentar);
       renderKomentarForm_(p, response.data.canKirim);
+      fin(true);
     })
     .withFailureHandler(function () {
-      if (reqDead_(gKom) || !samePanel_()) return;
+      if (reqDead_(gKom) || !samePanel_()) { fin(false); return; }
       var el = document.getElementById('komentar-list');
       if (el && !hadCache) el.innerHTML = '<div class="komentar-empty">Gagal memuat komentar.</div>';
+      fin(false);
     })
     .getKomentarList(session.accessCode, p.pekerjaanId);
 }
@@ -3118,6 +3212,7 @@ function renderKomentarList_(p, list) {
 
     var item = document.createElement('div');
     item.className = 'komentar-bubble ' + (isOwnerReport ? 'owner' : 'other');
+    if (k.komentarId) { item.dataset.pid = k.komentarId; if (loadingById[k.komentarId]) setTimeout(function () { cardBusyPaint_(item, k.komentarId); }, 0); }
 
     var head = document.createElement('div');
     head.className = 'komentar-bubble-head';
@@ -3155,7 +3250,7 @@ function renderKomentarList_(p, list) {
         }
         if (k.canHapus) {
           opts.push({ icon: 'delete', label: 'Hapus', danger: true, onClick: function () {
-            showConfirmModal('Hapus komentar ini?', function () { doHapusKomentar_(p, k.komentarId); }, 'delete', true, 'Menghapus...');
+            showConfirmModal('Hapus komentar ini?', function () { doHapusKomentar_(p, k.komentarId); }, 'delete', false, 'Menghapus...');
           } });
         }
         openBottomSheet(opts);
@@ -3194,16 +3289,16 @@ function startEditKomentar_(p, k, item, textEl, whenEl) {
   save.addEventListener('click', function () {
     if (!ta.value.trim()) { showSnackbar('Komentar tidak boleh kosong.', 'error'); return; }
     var session = loadSession();
-    beginAction(save, 'Menyimpan...');
+    if (!cardBusyStart_(k.komentarId, 'update', 'komentar')) return;
     google.script.run
       .withSuccessHandler(function (response) {
-        endAction(save);
-        if (!response.success) { showSnackbar(response.error, 'error'); return; }
+        if (!response || !response.success) { cardBusyEnd_(k.komentarId); showSnackbar((response && response.error) || 'Gagal menyimpan komentar.', 'error'); return; }
         invalidateAllPekerjaanCaches_();
-        loadKomentar_(p);
+        cardBusyPhase_(k.komentarId, 'refresh');
+        silentRefreshThen_(k.komentarId, function (fin) { loadKomentar_(p, fin); });
       })
       .withFailureHandler(function () {
-        endAction(save);
+        cardBusyEnd_(k.komentarId);
         showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error');
       })
       .ubahKomentar(session.accessCode, k.komentarId, ta.value);
@@ -3212,17 +3307,17 @@ function startEditKomentar_(p, k, item, textEl, whenEl) {
 
 function doHapusKomentar_(p, komentarId) {
   var session = loadSession();
-  beginAction(null, 'Menghapus...');
+  if (!cardBusyStart_(komentarId, 'delete', 'komentar')) return;
   google.script.run
     .withSuccessHandler(function (response) {
-      endAction(null); // juga menutup Confirm Modal (busy-mode)
-      if (!response.success) { showSnackbar(response.error, 'error'); return; }
+      if (!response || !response.success) { cardBusyEnd_(komentarId); showSnackbar((response && response.error) || 'Gagal menghapus komentar.', 'error'); return; }
       showSnackbar('Komentar dihapus.', 'success');
       invalidateAllPekerjaanCaches_();
-      loadKomentar_(p);
+      cardBusyPhase_(komentarId, 'refresh');
+      silentRefreshThen_(komentarId, function (fin) { loadKomentar_(p, fin); });
     })
     .withFailureHandler(function () {
-      endAction(null);
+      cardBusyEnd_(komentarId);
       showSnackbar('Gagal menghapus komentar. Coba lagi.', 'error');
     })
     .hapusKomentar(session.accessCode, komentarId);
@@ -3242,7 +3337,7 @@ function addPendingKomentar_(p, session, text) {
   var isOwnerReport = !!p.createdBy && session && session.userCode === p.createdBy;
   var row = document.createElement('div');
   row.className = 'komentar-row ' + (isOwnerReport ? 'right' : 'left');
-  row.style.opacity = '0.6';
+  row.classList.add('komentar-pending');
   var item = document.createElement('div');
   item.className = 'komentar-bubble ' + (isOwnerReport ? 'owner' : 'other');
   var body = document.createElement('div');
@@ -3250,7 +3345,7 @@ function addPendingKomentar_(p, session, text) {
   body.textContent = String(text).trim();
   var when = document.createElement('div');
   when.className = 'komentar-when';
-  when.textContent = 'Mengirim...';
+  when.textContent = 'Sedang mengirim komentar...';
   item.appendChild(body);
   item.appendChild(when);
   row.appendChild(item);
@@ -3861,7 +3956,7 @@ function executeLepasPekerjaan(pekerjaanId) {
       showSnackbar('Pekerjaan dilepas kembali.', 'success');
       invalidateAllPekerjaanCaches_();
       cardBusyPhase_(pekerjaanId, 'refresh');
-      silentRefreshThen_(pekerjaanId, function (fin) { loadPekerjaanInbox(true, fin); });
+      silentRefreshThen_(pekerjaanId, function (fin) { refreshCurrentPekerjaanPage_(fin); });
     })
     .withFailureHandler(function () {
       cardBusyEnd_(pekerjaanId);

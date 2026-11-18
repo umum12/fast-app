@@ -247,6 +247,17 @@ var JADWAL_JENIS_COLOR = {
 };
 // Kubu pada form: PIKET vs ABSEN (Libur Pengganti ikut kubu ABSEN)
 var JK_PIKET_JENIS_ = ['piket_sabtu', 'piket_minggu', 'piket_libur_nasional', 'tugas_khusus'];
+/** Status jadwal: nilai kosong/tidak dikenal (data lama) dianggap FIX. */
+function jkStatusOf_(e) { return e && String(e.status || '').toUpperCase() === 'TBD' ? 'TBD' : 'FIX'; }
+var JK_STATUS_NOTE_ = {
+  FIX: 'Jadwal sudah dikonfirmasi dan bersifat pasti.',
+  TBD: 'Jadwal belum dikonfirmasi dan masih dapat berubah.'
+};
+function jkStatusBadgeHtml_(e, big) {
+  var st = jkStatusOf_(e);
+  return '<span class="jk-st st-' + st.toLowerCase() + (big ? ' jk-st-big' : '') + '" title="' + JK_STATUS_NOTE_[st] + '">' + st + '</span>';
+}
+
 function jkKubuOfJenis_(jenis) { return JK_PIKET_JENIS_.indexOf(jenis) !== -1 || String(jenis).indexOf('piket') === 0 ? 'piket' : 'absen'; }
 var INDO_MONTH_LONG_ = ['Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni', 'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'];
 /** "2026-10-20" -> "Selasa, 20 Oktober 2026". */
@@ -512,6 +523,7 @@ function openJadwalForm(entry, presetDate) {
   jkKubuPetugas = isSelf ? 'saya' : 'lain';
   document.getElementById('jadwal-form-user').value = isSelf ? jkMe_().userCode : entry.userCode;
   document.getElementById('jadwal-form-notes').value = entry ? entry.catatan : '';
+  document.getElementById('jadwal-form-status').value = entry ? jkStatusOf_(entry) : 'FIX';
   document.getElementById('jadwal-form-error').textContent = '';
   jkClearErrs_();
   jkSyncLabels_();
@@ -533,7 +545,8 @@ document.getElementById('btn-submit-jadwal').addEventListener('click', function 
     tanggal: document.getElementById('jadwal-form-date').value,
     jenis: document.getElementById('jadwal-form-jenis').value,
     userCode: document.getElementById('jadwal-form-user').value,
-    catatan: document.getElementById('jadwal-form-notes').value
+    catatan: document.getElementById('jadwal-form-notes').value,
+    status: document.getElementById('jadwal-form-status').value === 'TBD' ? 'TBD' : 'FIX'
   };
 
   jkClearErrs_();
@@ -554,21 +567,28 @@ document.getElementById('btn-submit-jadwal').addEventListener('click', function 
   var editId = jadwalFormEditId;
   var submitBtn = document.getElementById('btn-submit-jadwal');
   // Kunci kirim hanya untuk TAMBAH jadwal: kirim ulang (respons hilang) dengan isian sama tidak membuat entri ganda.
-  if (!editId) data.submitKey = stickyKeyFor_('jdw:new', stickyFp_([data.tanggal, data.jenis, data.userCode, data.catatan]));
+  if (!editId) data.submitKey = stickyKeyFor_('jdw:new', stickyFp_([data.tanggal, data.jenis, data.userCode, data.catatan, data.status]));
+  // Ubah: entri terkait dikunci selama menyimpan (form tetap terbuka, isian aman bila gagal).
+  if (editId && !cardBusyStart_(editId, 'update', 'jadwal')) return;
   beginAction(submitBtn, 'Menyimpan...');
 
   var call = google.script.run
     .withSuccessHandler(function (response) {
       endAction(submitBtn);
-      if (!response.success) { errorEl.textContent = response.error; showSnackbar(response.error, 'error'); return; }
+      if (!response || !response.success) { if (editId) cardBusyEnd_(editId); errorEl.textContent = (response && response.error) || 'Gagal menyimpan jadwal.'; showSnackbar(errorEl.textContent, 'error'); return; }
       if (!editId) stickyKeyClear_('jdw:new');
       showSnackbar(editId ? 'Jadwal berhasil diubah.' : 'Jadwal berhasil ditambahkan.', 'success');
       closeJadwalForm();
-      pageDataCache.jadwalAktif = null;
-      loadJadwalAktif(true);
+      if (editId) {
+        cardBusyPhase_(editId, 'refresh');
+        silentRefreshThen_(editId, function (fin) { loadJadwalAktif(true, fin); });
+      } else {
+        jadwalTambahPending_(data);
+      }
     })
     .withFailureHandler(function () {
       endAction(submitBtn);
+      if (editId) cardBusyEnd_(editId);
       errorEl.textContent = 'Gagal terhubung ke server. Coba lagi.';
       showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error');
     });
@@ -584,34 +604,57 @@ document.getElementById('btn-submit-jadwal').addEventListener('click', function 
 function confirmHapusJadwal(jadwalId) {
   showConfirmModal('Hapus entri jadwal ini?', function () {
     doHapusJadwal(jadwalId);
-  }, 'delete', true, 'Menghapus...');
+  }, 'delete', false, 'Menghapus...');
+}
+
+/** Entri sementara "Menambahkan..." di kalender/tabel sampai daftar dari server tiba (server sudah mengonfirmasi tersimpan). */
+function jadwalTambahPending_(data) {
+  var selOpt = function (id) { var el = document.getElementById(id); var o = el && el.selectedOptions && el.selectedOptions[0]; return o ? o.textContent.trim() : ''; };
+  var me = (appBootstrap && appBootstrap.currentUser) || {};
+  var tmpId = 'tmp-jdw-' + Date.now();
+  var tmp = { jadwalId: tmpId, tanggal: data.tanggal, jenis: data.jenis, jenisLabel: selOpt('jadwal-form-jenis') || data.jenis,
+    userCode: data.userCode, userName: selOpt('jadwal-form-user') || data.userCode, catatan: data.catatan || '', status: data.status,
+    createdBy: me.userCode || '', createdByName: me.displayName || '', _tmp: true };
+  var base = (pageDataCache.jadwalAktif || []).slice();
+  pageDataCache.jadwalAktif = base; // salinan dasar tanpa entri sementara (dipulihkan bila refresh gagal)
+  renderJadwalPiket_(base.concat([tmp]));
+  cardBusyStart_(tmpId, 'create', 'jadwal');
+  var cleanup = function () { cardBusyEnd_(tmpId); };
+  loadingById[tmpId].onTimeout = function () { loadJadwalAktif(true); };
+  silentRefreshThen_(tmpId, function (fin) {
+    loadJadwalAktif(true, function (ok) {
+      if (ok === false) renderJadwalPiket_(pageDataCache.jadwalAktif || base); // buang entri sementara
+      fin(ok);
+    });
+  });
 }
 
 function doHapusJadwal(jadwalId) {
   var session = loadSession();
-  beginAction(null, 'Menghapus...');
+  if (!cardBusyStart_(jadwalId, 'delete', 'jadwal')) return;
   google.script.run
     .withSuccessHandler(function (response) {
-      endAction(null);
-      if (!response.success) { showSnackbar(response.error, 'error'); return; }
+      if (!response || !response.success) { cardBusyEnd_(jadwalId); showSnackbar((response && response.error) || 'Gagal menghapus jadwal.', 'error'); return; }
       showSnackbar('Jadwal berhasil dihapus.', 'success');
-      pageDataCache.jadwalAktif = null;
-      loadJadwalAktif(true);
+      cardBusyPhase_(jadwalId, 'refresh');
+      silentRefreshThen_(jadwalId, function (fin) { loadJadwalAktif(true, fin); });
     })
     .withFailureHandler(function () {
-      endAction(null);
+      cardBusyEnd_(jadwalId);
       showSnackbar('Gagal menghapus jadwal. Coba lagi.', 'error');
     })
     .hapusJadwal(session.accessCode, jadwalId);
 }
 
-function loadJadwalAktif(force) {
+function loadJadwalAktif(force, done) {
   var session = loadSession();
   if (!session) return;
+  var fin = (typeof done === 'function') ? done : function () {};
 
   var cached = pageDataCache.jadwalAktif;
   if (cached && !force) {
     renderJadwalPiket_(cached);
+    fin(true);
     return;
   }
 
@@ -622,16 +665,21 @@ function loadJadwalAktif(force) {
   var gJad = reqGuard_();
   google.script.run
     .withSuccessHandler(function (response) {
-      if (reqDead_(gJad)) return;
+      if (reqDead_(gJad)) { fin(true); return; }
       if (!response.success) {
         if (!cached) document.getElementById('jadwal-piket-summary').textContent = response.error;
+        fin(false);
         return;
       }
       if (!reqStale_(gJad)) pageDataCache.jadwalAktif = response.data.jadwal;
-      renderJadwalPiket_(response.data.jadwal);
+      // Gambar ulang hanya bila isi berubah (tanpa kedip) — kecuali ada entri sementara/loading yang harus diganti.
+      var showingTmp = jkAllList_.some(function (e) { return e._tmp; });
+      if (showingTmp || !cached || !sameFeedList_(cached, response.data.jadwal)) renderJadwalPiket_(response.data.jadwal);
+      fin(true);
     })
     .withFailureHandler(function () {
       if (!cached) document.getElementById('jadwal-piket-summary').textContent = 'Gagal memuat jadwal.';
+      fin(false);
     })
     .getJadwalAktif(session.accessCode);
 }
@@ -913,10 +961,13 @@ function jkRenderCalendar_(list) {
       chip.className = 'jk-chip ' + (jkKubuOfJenis_(e.jenis) === 'piket' ? 'k-piket' : 'k-absen');
       chip.style.background = colors.bg;
       chip.style.color = colors.fg;
+      var top = document.createElement('span'); top.className = 'jk-chip-top';
       var nm = document.createElement('b'); nm.textContent = e.userName;
+      top.appendChild(nm); top.insertAdjacentHTML('beforeend', jkStatusBadgeHtml_(e));
       var jn = document.createElement('small'); jn.textContent = e.jenisLabel;
-      chip.appendChild(nm); chip.appendChild(jn);
-      chip.addEventListener('click', function () { openJadwalDetail_(e); });
+      chip.appendChild(top); chip.appendChild(jn);
+      chip.addEventListener('click', function () { if (!e._tmp && !loadingById[e.jadwalId]) openJadwalDetail_(e); });
+      if (e.jadwalId) { chip.dataset.pid = e.jadwalId; chip.dataset.busySwap = 'small'; if (loadingById[e.jadwalId]) cardBusyPaint_(chip, e.jadwalId); }
       items.appendChild(chip);
     });
     row.appendChild(items);
@@ -1083,6 +1134,7 @@ function renderJadwalTable_(list, counts) {
     badge.style.color = colors.fg;
     badge.textContent = e.jenisLabel;
     tdJenis.appendChild(badge);
+    tdJenis.insertAdjacentHTML('beforeend', jkStatusBadgeHtml_(e));
     tr.appendChild(tdJenis);
 
     var tdAct = document.createElement('td');
@@ -1090,9 +1142,10 @@ function renderJadwalTable_(list, counts) {
     btn.type = 'button';
     btn.className = 'jk-btn-detail';
     btn.textContent = 'Detail';
-    btn.addEventListener('click', function () { openJadwalDetail_(e); });
+    btn.addEventListener('click', function () { if (!e._tmp && !loadingById[e.jadwalId]) openJadwalDetail_(e); });
     tdAct.appendChild(btn);
     tr.appendChild(tdAct);
+    if (e.jadwalId) { tr.dataset.pid = e.jadwalId; tr.dataset.busySwap = 'td:last-child'; if (loadingById[e.jadwalId]) cardBusyPaint_(tr, e.jadwalId); }
 
     tbody.appendChild(tr);
   });
@@ -1113,6 +1166,9 @@ function openJadwalDetail_(entry) {
   var creatorName = isSelf ? 'dirinya sendiri' : (entry.createdByName || entry.createdBy);
   var html = '<div class="jk-detail-card">';
   html += '<div class="jk-detail-head" style="color:' + colors.fg + ';">' + escapeHtmlJk_(entry.jenisLabel) + ' • ' + formatJadwalDateFull_(entry.tanggal) + '</div>';
+  var stDet = jkStatusOf_(entry);
+  html += '<hr class="jk-detail-hr"><p class="jk-detail-label">Status</p>' +
+    '<div class="jk-detail-status">' + jkStatusBadgeHtml_(entry, true) + '<small>' + JK_STATUS_NOTE_[stDet] + '</small></div>';
   html += '<hr class="jk-detail-hr"><p class="jk-detail-label">Petugas</p>' +
     '<div class="jk-detail-person">' + escapeHtmlJk_(entry.userName) + '</div>';
   if (entry.catatan) {
@@ -1780,20 +1836,27 @@ function submitContentForm_() {
   // Kunci kirim hanya untuk BUAT konten (menghindari konten & file Drive ganda saat kirim ulang).
   if (!editId) data.submitKey = stickyKeyFor_('cnt:new', stickyFp_([data.contentType, data.title, data.content, data.scheduleRule, data.startDate, data.endDate,
     data.image ? data.image.base64.length : 0]));
+  if (editId && !cardBusyStart_(editId, 'update', 'konten')) return;
   beginAction(submitBtn, 'Menyimpan...');
 
   var call = google.script.run
     .withSuccessHandler(function (response) {
       endAction(submitBtn);
-      if (!response.success) { errorEl.textContent = response.error; showSnackbar(response.error, 'error'); return; }
+      if (!response || !response.success) { if (editId) cardBusyEnd_(editId); errorEl.textContent = (response && response.error) || 'Gagal menyimpan konten.'; showSnackbar(errorEl.textContent, 'error'); return; }
       if (!editId) stickyKeyClear_('cnt:new');
       showSnackbar(editId ? 'Konten berhasil diubah.' : 'Konten berhasil ditambahkan.', 'success');
       closeContentForm_();
-      pageDataCache.content = null; persistRemove_(['content']);
-      loadContentAktif(true);
+      persistRemove_(['content']);
+      if (editId) {
+        cardBusyPhase_(editId, 'refresh');
+        silentRefreshThen_(editId, function (fin) { loadContentAktif(true, fin); });
+      } else {
+        contentTambahPending_(data);
+      }
     })
     .withFailureHandler(function () {
       endAction(submitBtn);
+      if (editId) cardBusyEnd_(editId);
       errorEl.textContent = 'Gagal terhubung ke server. Coba lagi.';
       showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error');
     });
@@ -1807,7 +1870,7 @@ function submitContentForm_() {
 
 
 function confirmHapusContent_(contentId) {
-  showConfirmModal('', function () { doHapusContent_(contentId); }, 'delete', true, 'Menghapus...', {
+  showConfirmModal('', function () { doHapusContent_(contentId); }, 'delete', false, 'Menghapus...', {
     variant: 'konten',
     title: 'Hapus konten ini?',
     messageHtml: 'Tindakan ini tidak dapat dibatalkan. Semua data terkait konten ini akan <strong class="cm-red">dihapus secara permanen</strong> dari sistem.',
@@ -1816,48 +1879,72 @@ function confirmHapusContent_(contentId) {
   });
 }
 
+var contentPending_ = null; // { title, label, t } — baris sementara "Menambahkan konten..."
+var CONTENT_PENDING_TTL_MS_ = 120000;
+
+/** Server sudah mengonfirmasi konten baru tersimpan; tampilkan baris sementara sampai daftar terbaru tiba. */
+function contentTambahPending_(data) {
+  contentPending_ = { title: String(data.title || '').trim(), label: String(data.contentType || ''), t: Date.now() };
+  persistRemove_(['content']);
+  var cur = pageDataCache.content;
+  if (cur && appBootstrap.currentUser.role === 'admin') renderContentManagementList_(cur);
+  silentRefreshThen_('tmp-content', function (fin) {
+    loadContentAktif(true, function (ok) { contentPending_ = null; if (cur !== undefined) { var c2 = pageDataCache.content; if (c2 && appBootstrap.currentUser.role === 'admin') renderContentManagementList_(c2); } fin(ok); });
+  });
+}
+
 function doHapusContent_(contentId) {
   var session = loadSession();
-  beginAction(null, 'Menghapus...');
+  if (!cardBusyStart_(contentId, 'delete', 'konten')) return;
   google.script.run
     .withSuccessHandler(function (response) {
-      endAction(null);
-      if (!response.success) { showSnackbar(response.error, 'error'); return; }
+      if (!response || !response.success) { cardBusyEnd_(contentId); showSnackbar((response && response.error) || 'Gagal menghapus konten.', 'error'); return; }
       showSnackbar('Konten berhasil dihapus.', 'success');
-      pageDataCache.content = null; persistRemove_(['content']);
-      loadContentAktif(true);
+      persistRemove_(['content']);
+      cardBusyPhase_(contentId, 'refresh');
+      silentRefreshThen_(contentId, function (fin) { loadContentAktif(true, fin); });
     })
     .withFailureHandler(function () {
-      endAction(null);
+      cardBusyEnd_(contentId);
       showSnackbar('Gagal menghapus konten. Coba lagi.', 'error');
     })
     .hapusContent(session.accessCode, contentId);
 }
 
-function loadContentAktif(force) {
+function loadContentAktif(force, done) {
   var session = loadSession();
   if (!session) return;
+  var fin = (typeof done === 'function') ? done : function () {};
 
   var cached = pageDataCache.content;
   if (cached && !force) {
     renderContentBanner_(cached);
     if (appBootstrap.currentUser.role === 'admin') renderContentManagementList_(cached);
+    fin(true);
     return;
   }
 
   var gCont = reqGuard_();
   google.script.run
     .withSuccessHandler(function (response) {
-      if (reqDead_(gCont)) return;
-      if (!response.success) return;
+      if (reqDead_(gCont)) { fin(true); return; }
+      if (!response.success) { fin(false); return; }
       if (!reqStale_(gCont)) {
         pageDataCache.content = response.data.content;
         persistSet_('content', response.data.content);
       }
-      renderContentBanner_(response.data.content);
-      if (appBootstrap.currentUser.role === 'admin') renderContentManagementList_(response.data.content);
+      if (contentPending_) {
+        var pt = contentPending_.title;
+        if (response.data.content.some(function (c) { return c.title === pt; }) || Date.now() - contentPending_.t > CONTENT_PENDING_TTL_MS_) contentPending_ = null;
+      }
+      var unchanged = cached && sameFeedList_(cached, response.data.content) && !contentPending_;
+      if (!unchanged) {
+        renderContentBanner_(response.data.content);
+        if (appBootstrap.currentUser.role === 'admin') renderContentManagementList_(response.data.content);
+      }
+      fin(true);
     })
-    .withFailureHandler(function () {})
+    .withFailureHandler(function () { fin(false); })
     .getContentAktif(session.accessCode);
 }
 
@@ -2096,7 +2183,8 @@ function renderContentManagementList_(list) {
   // Konten otomatis sistem (piket, dll.) hanya tampil di Carousel; daftar kelola ini khusus konten buatan Admin.
   list = (list || []).filter(function (c) { return c.source !== 'system'; });
 
-  if (!list || list.length === 0) {
+  var hasPending = !!(contentPending_ && Date.now() - contentPending_.t < CONTENT_PENDING_TTL_MS_);
+  if ((!list || list.length === 0) && !hasPending) {
     container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">' + mdIcon('description', 26) + '</div>Belum ada konten.</div>';
     return;
   }
@@ -2108,9 +2196,20 @@ function renderContentManagementList_(list) {
   table.innerHTML = '<thead><tr><th>Jenis &amp; Judul</th><th>Status</th><th class="cm-period">Periode</th><th>Aksi</th></tr></thead>';
   var tbody = document.createElement('tbody');
 
-  list.forEach(function (c) {
+  if (hasPending) {
+    var ptr = document.createElement('tr');
+    ptr.className = 'cm-pending-row';
+    ptr.setAttribute('role', 'status');
+    ptr.innerHTML = '<td class="cm-col-title"><div class="cm-title"></div><div class="cm-period-inline">Konten baru</div></td>' +
+      '<td colspan="3"><span class="busy-swap"><span class="busy-swap-ico">' + mdIcon('refresh', 14) + '</span><span>Sedang menambahkan konten...</span></span></td>';
+    ptr.querySelector('.cm-title').textContent = contentPending_.title || 'Konten baru';
+    tbody.appendChild(ptr);
+  }
+
+  (list || []).forEach(function (c) {
     var tr = document.createElement('tr');
     var typeInfo = CONTENT_TYPE_BADGE[c.contentType] || { cls: 'badge-neutral' };
+    tr.dataset.pid = c.contentId; tr.dataset.busySwap = '.cm-status-cell';
 
     var tdTitle = document.createElement('td');
     tdTitle.className = 'cm-col-title';
@@ -2129,6 +2228,7 @@ function renderContentManagementList_(list) {
     tr.appendChild(tdTitle);
 
     var tdStatus = document.createElement('td');
+    tdStatus.className = 'cm-status-cell';
     var st = document.createElement('span');
     st.className = 'cm-status cm-' + c.status;
     st.innerHTML = '<span class="dot' + (c.status === 'tayang' ? ' pulse' : '') + '"></span>';
@@ -2161,6 +2261,7 @@ function renderContentManagementList_(list) {
     tr.appendChild(tdAct);
 
     tbody.appendChild(tr);
+    if (loadingById[c.contentId]) cardBusyPaint_(tr, c.contentId);
   });
   table.appendChild(tbody);
   wrap.appendChild(table);

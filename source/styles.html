@@ -4622,3 +4622,44 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible { outline: 
 .pending-card::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(100deg, transparent 20%, rgba(127,127,127,.2) 50%, transparent 80%); background-size: 200% 100%; animation: card-busy-shimmer 1.4s linear infinite; }
 @keyframes pc-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .pending-card::after, .pc-spin, .list-card.pending-card { animation: none; } }
+
+
+/* ===== Skeleton daftar Pekerjaan (satu keluarga dengan kartu sementara) ===== */
+.pc-skel-wrap { display: flex; flex-direction: column; gap: 12px; }
+.pc-skel-head { display: flex; align-items: center; gap: 10px; padding: 2px 4px; font-size: 13px; color: var(--color-primary-solid, #2563eb); }
+.pc-skel-head small { display: block; font-size: 12px; opacity: .7; color: inherit; }
+.list-card.pk-skel-card { position: relative; overflow: hidden; padding: 16px; display: flex; flex-direction: column; gap: 12px;
+  border: 1.5px dashed color-mix(in srgb, var(--color-primary-solid, #2563eb) 35%, transparent);
+  background: color-mix(in srgb, var(--color-primary-solid, #2563eb) 4%, var(--color-surface, #fff)); }
+.pk-skel-card::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(100deg, transparent 20%, rgba(127,127,127,.2) 50%, transparent 80%); background-size: 200% 100%; animation: card-busy-shimmer 1.4s linear infinite; }
+.pk-skel-card .pc-top .pc-block { display: block; height: 22px; border-radius: 999px; background: color-mix(in srgb, var(--color-primary-solid, #2563eb) 14%, transparent); }
+.pk-skel-card .pc-top .pc-block + .pc-block { background: var(--color-surface-variant, rgba(127,127,127,.18)); }
+.pk-w90 { width: 90px; } .pk-w70 { width: 70px; }
+@media (prefers-reduced-motion: reduce) { .pk-skel-card::after { animation: none; } }
+
+/* ===== Badge status jadwal FIX / TBD (mini, neon) ===== */
+.jk-st { display: inline-flex; align-items: center; flex: 0 0 auto; font-size: 8.5px; font-weight: 800; letter-spacing: .06em; line-height: 1; padding: 2px 5px; border-radius: 6px; text-transform: uppercase; vertical-align: middle; }
+.jk-st.st-fix { background: #39ff14; color: #053300; box-shadow: 0 0 0 1px rgba(5,51,0,.18), 0 0 6px rgba(57,255,20,.55); }
+.jk-st.st-tbd { background: #ff9a1f; color: #3a1700; box-shadow: 0 0 0 1px rgba(58,23,0,.2), 0 0 6px rgba(255,140,0,.6); }
+.jk-chip-top { display: flex; align-items: center; gap: 6px; max-width: 100%; }
+.jk-chip-top b { min-width: 0; overflow-wrap: anywhere; }
+.jk-table .jk-st { margin-left: 6px; }
+.jk-st-big { font-size: 11px; padding: 3px 8px; border-radius: 8px; letter-spacing: .08em; }
+.jk-detail-status { display: flex; align-items: center; gap: 10px; }
+.jk-detail-status small { font-size: 12.5px; line-height: 1.4; color: var(--color-text-muted); }
+.jk-status-select { min-height: 50px; border-radius: 16px; }
+
+/* ===== Loading per-item: baris tabel / chip (mode swap) + gelembung komentar ===== */
+.busy-swap { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 12px; }
+.busy-swap-ico { display: inline-flex; animation: pc-spin 1s linear infinite; }
+.is-busy-swap { pointer-events: none; position: relative; overflow: hidden; }
+.is-busy-swap::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(100deg, transparent 20%, rgba(127,127,127,.22) 50%, transparent 80%); background-size: 200% 100%; animation: card-busy-shimmer 1.3s linear infinite; }
+.jk-chip.is-busy-swap small { display: inline-flex; }
+tr.is-busy-swap::after { display: none; }
+tr.is-busy-swap td { background-image: linear-gradient(100deg, transparent 20%, rgba(127,127,127,.2) 50%, transparent 80%); background-size: 200% 100%; animation: card-busy-shimmer 1.3s linear infinite; }
+tr.cm-pending-row td { background: color-mix(in srgb, var(--color-primary-solid, #2563eb) 6%, transparent); }
+tr.cm-pending-row .cm-title { font-weight: 700; }
+.komentar-bubble.is-busy { position: relative; overflow: hidden; }
+.komentar-row.komentar-pending .komentar-bubble { position: relative; overflow: hidden; opacity: .75; }
+.komentar-row.komentar-pending .komentar-bubble::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(100deg, transparent 20%, rgba(127,127,127,.22) 50%, transparent 80%); background-size: 200% 100%; animation: card-busy-shimmer 1.3s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .busy-swap-ico, .is-busy-swap::after, tr.is-busy-swap td, .komentar-row.komentar-pending .komentar-bubble::after { animation: none; } }

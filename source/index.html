@@ -213,7 +213,7 @@
                 </div>
               </div>
 
-              <div id="pekerjaan-list"><div aria-busy="true"><span class="sr-only">Memuat pekerjaan</span><div class="skeleton-card"><div class="skeleton-card-main"><div class="skeleton-block skeleton-pill"></div><div class="skeleton-block skeleton-date"></div><div class="skeleton-person-row"><div class="skeleton-block skeleton-avatar"></div><div class="skeleton-person-lines"><div class="skeleton-block skeleton-line-name"></div><div class="skeleton-block skeleton-line-sub"></div></div></div></div><div class="skeleton-block skeleton-thumb"></div></div><div class="skeleton-card"><div class="skeleton-card-main"><div class="skeleton-block skeleton-pill"></div><div class="skeleton-block skeleton-date"></div><div class="skeleton-person-row"><div class="skeleton-block skeleton-avatar"></div><div class="skeleton-person-lines"><div class="skeleton-block skeleton-line-name"></div><div class="skeleton-block skeleton-line-sub"></div></div></div></div><div class="skeleton-block skeleton-thumb"></div></div></div></div>
+              <div id="pekerjaan-list"><div class="pc-skel-wrap" role="status" aria-busy="true"><div class="pc-skel-head"><span><b>Memuat pekerjaan</b><small>Mengambil daftar terbaru...</small></span></div><div class="list-card pk-skel-card"><div class="pc-top"><span class="pc-block pk-w90"></span><span class="pc-block pk-w70"></span></div><div class="pc-who"><span class="pc-avatar"></span><span class="pc-who-lines"><span class="pc-line pc-w60"></span><span class="pc-line pc-w35"></span></span></div><div class="pc-body"><span class="pc-line"></span><span class="pc-line pc-w70"></span></div></div><div class="list-card pk-skel-card"><div class="pc-top"><span class="pc-block pk-w90"></span><span class="pc-block pk-w70"></span></div><div class="pc-who"><span class="pc-avatar"></span><span class="pc-who-lines"><span class="pc-line pc-w60"></span><span class="pc-line pc-w35"></span></span></div><div class="pc-body"><span class="pc-line"></span><span class="pc-line pc-w70"></span></div></div><div class="list-card pk-skel-card"><div class="pc-top"><span class="pc-block pk-w90"></span><span class="pc-block pk-w70"></span></div><div class="pc-who"><span class="pc-avatar"></span><span class="pc-who-lines"><span class="pc-line pc-w60"></span><span class="pc-line pc-w35"></span></span></div><div class="pc-body"><span class="pc-line"></span><span class="pc-line pc-w70"></span></div></div></div></div>
             </div>
           </section>
 
@@ -626,6 +626,13 @@
       <div class="form-group">
         <label class="form-label jk-label" for="jadwal-form-notes">Catatan (opsional)</label>
         <div class="jk-notes-wrap"><span class="jk-notes-ico" data-ico="editNote"></span><input id="jadwal-form-notes" class="form-input" type="text" maxlength="200" placeholder="Tambahkan catatan..."></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label jk-label" for="jadwal-form-status">Status Jadwal (opsional)</label>
+        <select id="jadwal-form-status" class="form-input jk-status-select">
+          <option value="FIX">FIX — sudah dikonfirmasi</option>
+          <option value="TBD">TBD — belum dikonfirmasi</option>
+        </select>
       </div>
       <div class="form-error" id="jadwal-form-error"></div>
       <div class="jk-footer">
