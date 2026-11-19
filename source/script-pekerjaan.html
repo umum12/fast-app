@@ -1395,7 +1395,7 @@ function markRiwayatStale_() {
 }
 
 /* ===== Loading per-card (loadingById) =====
- * Hanya card yang sedang diproses (verifikasi/batal/hapus/ambil/lepas) yang ditutup lapisan
+ * Hanya card yang sedang diproses (validasi/batal/hapus/ambil/lepas) yang ditutup lapisan
  * shimmer + ikon + pesan sesuai tindakan. Card lain tidak disentuh. Lapisan menutupi card
  * (ukuran & posisi tetap) dan menahan ketukan sehingga tidak ada request ganda pada card itu. */
 var loadingById = {};
@@ -1403,8 +1403,8 @@ var CARD_BUSY_META_ = {
   create:   { icon: 'addCircle', text: 'Sedang menambahkan', short: 'Menambahkan...' },
   update:   { icon: 'edit',      text: 'Sedang menyimpan perubahan', short: 'Menyimpan...' },
   'delete': { icon: 'delete',    text: 'Sedang menghapus', short: 'Menghapus...' },
-  verify:   { icon: 'verified',  text: 'Sedang memverifikasi', short: 'Memverifikasi...' },
-  unverify: { icon: 'block',     text: 'Sedang membatalkan verifikasi', short: 'Membatalkan...' },
+  verify:   { icon: 'verified',  text: 'Sedang memvalidasi', short: 'Memvalidasi...' },
+  unverify: { icon: 'block',     text: 'Sedang membatalkan validasi', short: 'Membatalkan...' },
   take:     { icon: 'taskAlt',   text: 'Sedang mengambil', short: 'Mengambil...' },
   release:  { icon: 'logout',    text: 'Sedang melepas', short: 'Melepas...' },
   reassign: { icon: 'arrowForward', text: 'Sedang mengalihkan', short: 'Mengalihkan...' },
@@ -2151,8 +2151,8 @@ function buildPekerjaanActionRow_(p, opts) {
  */
 var VF_JENIS_ = [
   { v: 'DEFAULT', label: 'Default', icon: 'autoAwesome', desc: 'Pekerjaan di luar kategori Harian dan Periodik.' },
-  { v: 'HARIAN', label: 'Harian', icon: 'dayToday', desc: 'Verifikasi untuk pekerjaan rutin harian.' },
-  { v: 'PERIODIK', label: 'Periodik', icon: 'updateIcon', desc: 'Verifikasi untuk pekerjaan berkala, seperti mingguan atau bulanan.' }
+  { v: 'HARIAN', label: 'Harian', icon: 'dayToday', desc: 'Validasi untuk pekerjaan rutin harian.' },
+  { v: 'PERIODIK', label: 'Periodik', icon: 'updateIcon', desc: 'Validasi untuk pekerjaan berkala, seperti mingguan atau bulanan.' }
 ];
 
 function vfJenisLabel_(v) {
@@ -2161,11 +2161,11 @@ function vfJenisLabel_(v) {
 }
 
 function vfButtonLabel_(p) {
-  if (p.verifikasiStatus === 'MENUNGGU') return 'MENUNGGU VERIFIKASI';
-  if (p.verifikasiStatus === 'OTOMATIS') return 'TERVERIFIKASI OTOMATIS';
-  if (p.verifiedJenis === 'HARIAN') return 'TERVERIFIKASI : PEKERJAAN HARIAN';
-  if (p.verifiedJenis === 'PERIODIK') return 'TERVERIFIKASI : PEKERJAAN PERIODIK';
-  return 'TERVERIFIKASI';
+  if (p.verifikasiStatus === 'MENUNGGU') return 'MENUNGGU VALIDASI';
+  if (p.verifikasiStatus === 'OTOMATIS') return 'TERVALIDASI OTOMATIS';
+  if (p.verifiedJenis === 'HARIAN') return 'PEKERJAAN HARIAN';
+  if (p.verifiedJenis === 'PERIODIK') return 'PEKERJAAN PERIODIK';
+  return 'TERVALIDASI';
 }
 
 /** Modal ringan serupa dialog: { title, icon, body (Node), actions: [{label, cls, onClick(btn, close)}] }. */
@@ -2212,7 +2212,7 @@ function vfText_(txt) { var d = document.createElement('p'); d.className = 'vf-t
 
 var vfRowOf_ = (typeof WeakMap === 'function') ? new WeakMap() : null; // p -> {row, card, opts} (tidak ikut disimpan ke cache)
 
-/** Batas "REVIEW PEKERJAAN" (biru) sebelum berubah jadi "SEDANG DITINJAU" (oranye): 5 menit sejak selesai. */
+/** Batas tampilan "REVIEW PEKERJAAN" (biru) -> "SEDANG DIVALIDASI" (oranye): 5 menit sejak selesai. Hanya logika tampilan; TIDAK ditampilkan sebagai teks durasi di UI. */
 var VF_REVIEW_MS_ = 5 * 60 * 1000;
 
 /** 'dd/MM/yyyy HH:mm[:ss]' (WIB) -> ms epoch; NaN bila tidak terbaca. */
@@ -2228,17 +2228,20 @@ function vfDueMs_(p) {
   return isNaN(t) ? NaN : t + 59999 + VF_REVIEW_MS_;
 }
 
+var VF_NOTE_DONE_ = 'Laporan telah divalidasi dan ditetapkan ke kategori yang sesuai.';
 function vfStatusInfo_(p, now) {
   if (p.verifikasiStatus === 'MENUNGGU') {
     var due = vfDueMs_(p);
     var reviewing = !isNaN(due) && (now || Date.now()) >= due;
     return reviewing
-      ? { cls: 'vf-reviewing', icon: 'schedule', label: 'SEDANG DITINJAU', note: 'Admin sedang memproses validasi laporan pekerjaan.' }
-      : { cls: 'vf-review', icon: 'description', label: 'REVIEW PEKERJAAN', note: 'Menunggu admin memeriksa dan meninjau tugas ini (0–5 Menit).', due: due };
+      ? { cls: 'vf-reviewing', icon: 'schedule', label: 'SEDANG DIVALIDASI', note: 'Laporan sedang dalam proses validasi otomatis.' }
+      : { cls: 'vf-review', icon: 'description', label: 'REVIEW PEKERJAAN', note: 'Laporan berhasil dikirim dan menunggu proses validasi.', due: due };
   }
-  if (p.verifikasiStatus === 'OTOMATIS') return { cls: 'vf-done vf-auto', icon: 'verified', label: 'TERVERIFIKASI OTOMATIS', note: 'Diverifikasi otomatis oleh sistem.' };
-  var jn = p.verifiedJenis === 'HARIAN' ? 'HARIAN' : p.verifiedJenis === 'PERIODIK' ? 'PERIODIK' : 'DEFAULT';
-  return { cls: 'vf-done', icon: 'shield', label: 'PEKERJAAN ' + jn, note: 'Telah divalidasi dan disetujui oleh Admin.' };
+  if (p.verifikasiStatus === 'OTOMATIS') return { cls: 'vf-done vf-auto', icon: 'verified', label: 'TERVALIDASI OTOMATIS', note: VF_NOTE_DONE_ };
+  // Harian = kalender, Periodik = siklus berulang; kalimat keterangan SAMA untuk keduanya.
+  if (p.verifiedJenis === 'HARIAN') return { cls: 'vf-done', icon: 'dayToday', label: 'PEKERJAAN HARIAN', note: VF_NOTE_DONE_ };
+  if (p.verifiedJenis === 'PERIODIK') return { cls: 'vf-done', icon: 'updateIcon', label: 'PEKERJAAN PERIODIK', note: VF_NOTE_DONE_ };
+  return { cls: 'vf-done', icon: 'shield', label: 'PEKERJAAN DEFAULT', note: VF_NOTE_DONE_ };
 }
 
 /** Geser untuk membuka popup. Pegangan ditarik ke kanan; lepas sebelum ujung = kembali. Ketuk/Enter = petunjuk/langsung buka. */
@@ -2297,7 +2300,7 @@ function buildVerifikasiRow_(p, card, opts) {
   function paintStatus_(box, inf, slider) {
     box.className = 'vf-box ' + inf.cls + (slider ? ' vf-slider' : '');
     var label = '<span class="vf-label">' + mdIcon(inf.icon, 16) + '<span>' + inf.label + '</span></span>';
-    box.innerHTML = (slider ? '<span class="vf-handle" role="button" tabindex="0" aria-label="Geser untuk memverifikasi">' + mdIcon('arrowForward', 18) + '</span>' : '') + label;
+    box.innerHTML = (slider ? '<span class="vf-handle" role="button" tabindex="0" aria-label="Geser untuk memvalidasi">' + mdIcon('arrowForward', 18) + '</span>' : '') + label;
     if (slider) vfAttachSlide_(box, box.querySelector('.vf-handle'), function () { openVerifikasiPilihJenis_(p); });
   }
 
@@ -2333,8 +2336,8 @@ function buildVerifikasiRow_(p, card, opts) {
   var det = document.createElement('button');
   det.type = 'button';
   det.className = 'lc-verif-detail';
-  det.setAttribute('aria-label', 'Detail verifikasi');
-  det.title = 'Detail verifikasi';
+  det.setAttribute('aria-label', 'Detail validasi');
+  det.title = 'Detail validasi';
   det.innerHTML = mdIcon('search', 20);
   det.addEventListener('click', function (e) { e.stopPropagation(); openVerifikasiDetail_(p); });
   line.appendChild(det);
@@ -2437,7 +2440,7 @@ function openVerifikasiTerbatas_() {
     card.innerHTML =
       '<div class="vf-glow"></div>' +
       '<div class="vf-r-head"><div class="vf-lock-box">' + VF_LOCK_SVG_ + VF_KEY_SVG_ + '</div><h3>Akses Terbatas</h3></div>' +
-      '<p class="vf-text">Hanya admin yang memiliki akses untuk melakukan verifikasi pekerjaan.</p>' +
+      '<p class="vf-text">Hanya admin yang memiliki akses untuk melakukan validasi pekerjaan.</p>' +
       '<button type="button" class="vf-btn vf-red vf-wide">Mengerti</button>';
     card.querySelector('button').addEventListener('click', close);
   });
@@ -2455,11 +2458,11 @@ function openVerifikasiPilihJenis_(p) {
     }).join('');
     card.innerHTML =
       '<div class="vf-c-head"><span class="vf-c-ico">' + mdIcon('verified', 22) + '</span>' +
-      '<div class="vf-c-title"><h3>Pilih Jenis Verifikasi</h3><p>Tentukan skema verifikasi yang sesuai</p></div>' +
+      '<div class="vf-c-title"><h3>Pilih Jenis Validasi</h3><p>Tentukan skema validasi yang sesuai</p></div>' +
       '<button type="button" class="vf-x" aria-label="Tutup">' + mdIcon('close', 18) + '</button></div>' +
       '<div class="vf-c-body">' + opts + '</div>' +
       '<div class="vf-c-foot"><button type="button" class="vf-btn vf-ghost vf-cancel">Batal</button>' +
-      '<button type="button" class="vf-btn vf-primary vf-save"><span>Simpan Verifikasi</span>' + mdIcon('arrowForward', 18) + '</button></div>';
+      '<button type="button" class="vf-btn vf-primary vf-save"><span>Simpan Validasi</span>' + mdIcon('arrowForward', 18) + '</button></div>';
     card.querySelectorAll('.vf-opt input').forEach(function (inp) {
       inp.addEventListener('change', function () {
         card.querySelectorAll('.vf-opt').forEach(function (l) { l.classList.toggle('selected', l.querySelector('input').checked); });
@@ -2484,13 +2487,13 @@ function doVerifikasiPekerjaan_(btn, close, p, jenis) {
   close();
   google.script.run
     .withSuccessHandler(function (res) {
-      if (!res || !res.success) { cardBusyEnd_(id); showSnackbar((res && res.error) || 'Gagal memverifikasi.', 'error'); return; }
+      if (!res || !res.success) { cardBusyEnd_(id); showSnackbar((res && res.error) || 'Gagal memvalidasi.', 'error'); return; }
       vfApplyLocal_(p, 'VERIFIKASI', jenis);
-      showSnackbar('Pekerjaan terverifikasi.', 'success');
+      showSnackbar('Pekerjaan berhasil divalidasi.', 'success');
       cardBusyPhase_(id, 'refresh');
       silentRefreshThen_(id, refreshVerifikasiFeeds_);
     })
-    .withFailureHandler(function () { cardBusyEnd_(id); showSnackbar('Gagal memverifikasi. Periksa koneksi lalu coba lagi.', 'error'); })
+    .withFailureHandler(function () { cardBusyEnd_(id); showSnackbar('Gagal memvalidasi. Periksa koneksi lalu coba lagi.', 'error'); })
     .verifikasiPekerjaan(session.accessCode, p.pekerjaanId, jenis);
 }
 
@@ -2511,16 +2514,16 @@ function openVerifikasiDetail_(p) {
   var st = p.verifikasiStatus;
   var wait = st === 'MENUNGGU';
   var badgeCls = wait ? 'vf-st-wait' : (st === 'OTOMATIS' ? 'vf-st-auto' : 'vf-st-ok');
-  var badgeTxt = wait ? 'MENUNGGU VERIFIKASI' : (st === 'OTOMATIS' ? 'TERVERIFIKASI OTOMATIS' : 'TERVERIFIKASI');
+  var badgeTxt = wait ? 'MENUNGGU VALIDASI' : (st === 'OTOMATIS' ? 'TERVALIDASI OTOMATIS' : 'TERVALIDASI');
   var by = wait ? '-' : (st === 'OTOMATIS' ? 'Sistem (otomatis)' : (p.verifiedByName || '-'));
   var rows = [
-    ['shield', 'Status verifikasi', '<span class="vf-status ' + badgeCls + '">' + mdIcon(wait ? 'schedule' : 'check', 14) + '<span>' + badgeTxt + '</span></span>'],
-    ['refresh', 'Jenis verifikasi', vfEsc_(wait ? '-' : vfJenisLabel_(p.verifiedJenis))],
-    ['personCheck', 'Diverifikasi oleh', vfEsc_(by)],
+    ['shield', 'Status validasi', '<span class="vf-status ' + badgeCls + '">' + mdIcon(wait ? 'schedule' : 'check', 14) + '<span>' + badgeTxt + '</span></span>'],
+    ['refresh', 'Jenis validasi', vfEsc_(wait ? '-' : vfJenisLabel_(p.verifiedJenis))],
+    ['personCheck', 'Divalidasi oleh', vfEsc_(by)],
     ['schedule', 'Tanggal & waktu', vfEsc_(wait ? '-' : vfFormatWaktu_(p.verifiedAt))]
   ];
   var hist = p.verifikasiRiwayat || [];
-  var AKSI = { VERIFIKASI: 'Diverifikasi', BATAL: 'Verifikasi dibatalkan', RESET: 'Direset (penuntasan dibatalkan)' };
+  var AKSI = { VERIFIKASI: 'Divalidasi', BATAL: 'Validasi dibatalkan', RESET: 'Direset (penuntasan dibatalkan)' };
   var DOT = { VERIFIKASI: '', BATAL: ' danger', RESET: ' muted' };
   var histHtml = hist.length ?
     '<div class="vf-audit"><div class="vf-audit-title">' + mdIcon('history', 14) + '<span>RIWAYAT AUDIT</span></div><div class="vf-timeline">' +
@@ -2532,22 +2535,22 @@ function openVerifikasiDetail_(p) {
 
   vfOpenCustom_('vf-detail', function (card, close) {
     card.innerHTML =
-      '<div class="vf-d-head"><div class="vf-d-title"><span class="vf-d-ico">' + mdIcon('checkCircle', 22) + '</span><span>Detail Verifikasi</span></div>' +
+      '<div class="vf-d-head"><div class="vf-d-title"><span class="vf-d-ico">' + mdIcon('checkCircle', 22) + '</span><span>Detail Validasi</span></div>' +
       '<button type="button" class="vf-x" aria-label="Tutup">' + mdIcon('close', 18) + '</button></div>' +
       '<div class="vf-d-body"><div class="vf-info">' +
       rows.map(function (r) {
         return '<div class="vf-info-row"><span class="vf-info-label">' + mdIcon(r[0], 16) + '<span>' + r[1] + '</span></span><span class="vf-info-value">' + r[2] + '</span></div>';
       }).join('') + '</div>' + histHtml + '</div>' +
       '<div class="vf-d-foot">' +
-      (p.canBatalkanVerifikasi ? '<button type="button" class="vf-btn vf-outline-danger vf-batal">' + mdIcon('block', 16) + '<span>Batalkan Verifikasi</span></button>' : '') +
+      (p.canBatalkanVerifikasi ? '<button type="button" class="vf-btn vf-outline-danger vf-batal">' + mdIcon('block', 16) + '<span>Batalkan Validasi</span></button>' : '') +
       '<button type="button" class="vf-btn vf-secondary vf-tutup">Tutup</button></div>';
     card.querySelector('.vf-x').addEventListener('click', close);
     card.querySelector('.vf-tutup').addEventListener('click', close);
     var bt = card.querySelector('.vf-batal');
     if (bt) bt.addEventListener('click', function () {
-      showConfirmModal('Status pekerjaan akan kembali menjadi MENUNGGU VERIFIKASI. Informasi verifikasi sebelumnya tetap tersimpan sebagai riwayat audit.',
+      showConfirmModal('Status pekerjaan akan kembali menjadi MENUNGGU VALIDASI. Informasi validasi sebelumnya tetap tersimpan sebagai riwayat audit.',
         function () { doBatalkanVerifikasi_(p, close); }, 'warning', false, 'Membatalkan...',
-        { title: 'Batalkan Verifikasi?', confirm: 'Ya, Batalkan' });
+        { title: 'Batalkan Validasi?', confirm: 'Ya, Batalkan' });
     });
   });
 }
@@ -2564,13 +2567,13 @@ function doBatalkanVerifikasi_(p, closeDetail) {
   if (closeDetail) closeDetail();
   google.script.run
     .withSuccessHandler(function (res) {
-      if (!res || !res.success) { cardBusyEnd_(id); showSnackbar((res && res.error) || 'Gagal membatalkan verifikasi.', 'error'); return; }
+      if (!res || !res.success) { cardBusyEnd_(id); showSnackbar((res && res.error) || 'Gagal membatalkan validasi.', 'error'); return; }
       vfApplyLocal_(p, 'BATAL');
-      showSnackbar('Verifikasi dibatalkan.', 'success');
+      showSnackbar('Validasi dibatalkan.', 'success');
       cardBusyPhase_(id, 'refresh');
       silentRefreshThen_(id, refreshVerifikasiFeeds_);
     })
-    .withFailureHandler(function () { cardBusyEnd_(id); showSnackbar('Gagal membatalkan verifikasi. Coba lagi.', 'error'); })
+    .withFailureHandler(function () { cardBusyEnd_(id); showSnackbar('Gagal membatalkan validasi. Coba lagi.', 'error'); })
     .batalkanVerifikasiPekerjaan(session.accessCode, p.pekerjaanId);
 }
 
@@ -3267,7 +3270,7 @@ function renderKomentarSection_(p, body) {
   } else {
     document.getElementById('komentar-list').innerHTML = skeletonCommentsHtml_();
   }
-  // Cache < 30 dtk: cukup, hemat request. Selain itu verifikasi ke server tanpa menghapus tampilan yang ada.
+  // Cache < 30 dtk: cukup, hemat request. Selain itu cek ke server tanpa menghapus tampilan yang ada.
   if (!(cached && cached.t && (Date.now() - cached.t) < 30000)) loadKomentar_(p);
 }
 
@@ -3992,7 +3995,7 @@ function doAmbilPekerjaanInline_(buttonEl, p) {
   setP(10, 'Mengecek data penugasan...');
   // Merayap pelan selagi menunggu server (maks 60%); fase berikutnya mengikuti respons asli.
   creep = setInterval(function () {
-    if (cur < 60) setP(cur + (60 - cur) * 0.12, cur < 30 ? 'Memverifikasi hak akses & lokasi...' : 'Mengunci status tugas...');
+    if (cur < 60) setP(cur + (60 - cur) * 0.12, cur < 30 ? 'Memeriksa hak akses & lokasi...' : 'Mengunci status tugas...');
   }, 250);
 
   google.script.run
