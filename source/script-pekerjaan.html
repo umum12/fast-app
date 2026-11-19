@@ -2212,33 +2212,153 @@ function vfText_(txt) { var d = document.createElement('p'); d.className = 'vf-t
 
 var vfRowOf_ = (typeof WeakMap === 'function') ? new WeakMap() : null; // p -> {row, card, opts} (tidak ikut disimpan ke cache)
 
+/** Batas "REVIEW PEKERJAAN" (biru) sebelum berubah jadi "SEDANG DITINJAU" (oranye): 5 menit sejak selesai. */
+var VF_REVIEW_MS_ = 5 * 60 * 1000;
+
+/** 'dd/MM/yyyy HH:mm[:ss]' (WIB) -> ms epoch; NaN bila tidak terbaca. */
+function vfParseWib_(str) {
+  var m = /^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/.exec(String(str || ''));
+  if (!m) return NaN;
+  return Date.UTC(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]) - 7 * 3600000;
+}
+
+/** Waktu (ms) kapan kartu berubah jadi oranye. Menit server dipotong, jadi dianggap akhir menit (tidak pernah lebih awal dari 5 menit). */
+function vfDueMs_(p) {
+  var t = vfParseWib_(p.completedAt || p.createdAt);
+  return isNaN(t) ? NaN : t + 59999 + VF_REVIEW_MS_;
+}
+
+function vfStatusInfo_(p, now) {
+  if (p.verifikasiStatus === 'MENUNGGU') {
+    var due = vfDueMs_(p);
+    var reviewing = !isNaN(due) && (now || Date.now()) >= due;
+    return reviewing
+      ? { cls: 'vf-reviewing', icon: 'schedule', label: 'SEDANG DITINJAU', note: 'Admin sedang memproses validasi laporan pekerjaan.' }
+      : { cls: 'vf-review', icon: 'description', label: 'REVIEW PEKERJAAN', note: 'Menunggu admin memeriksa dan meninjau tugas ini (0–5 Menit).', due: due };
+  }
+  if (p.verifikasiStatus === 'OTOMATIS') return { cls: 'vf-done vf-auto', icon: 'verified', label: 'TERVERIFIKASI OTOMATIS', note: 'Diverifikasi otomatis oleh sistem.' };
+  var jn = p.verifiedJenis === 'HARIAN' ? 'HARIAN' : p.verifiedJenis === 'PERIODIK' ? 'PERIODIK' : 'DEFAULT';
+  return { cls: 'vf-done', icon: 'shield', label: 'PEKERJAAN ' + jn, note: 'Telah divalidasi dan disetujui oleh Admin.' };
+}
+
+/** Geser untuk membuka popup. Pegangan ditarik ke kanan; lepas sebelum ujung = kembali. Ketuk/Enter = petunjuk/langsung buka. */
+function vfAttachSlide_(box, handle, onComplete) {
+  var dragging = false, startX = 0, startLeft = 3, max = 0, done = false;
+  function measure() { max = Math.max(3, box.clientWidth - handle.offsetWidth - 3); }
+  function setLeft(x) { handle.style.left = x + 'px'; }
+  function snapBack() {
+    handle.style.transition = 'left .2s ease';
+    setLeft(3);
+    setTimeout(function () { handle.style.transition = ''; done = false; }, 220);
+  }
+  handle.addEventListener('pointerdown', function (e) {
+    if (done) return;
+    measure(); dragging = true; startX = e.clientX; startLeft = handle.offsetLeft;
+    handle.style.transition = '';
+    try { handle.setPointerCapture(e.pointerId); } catch (err) { /* abaikan */ }
+    e.stopPropagation();
+  });
+  handle.addEventListener('pointermove', function (e) {
+    if (!dragging) return;
+    var x = Math.min(max, Math.max(3, startLeft + (e.clientX - startX)));
+    setLeft(x);
+    if (x >= max - 4 && !done) { done = true; dragging = false; if (navigator.vibrate) { try { navigator.vibrate(12); } catch (err) { /* abaikan */ } } onComplete(); setTimeout(snapBack, 350); }
+  });
+  function end(e) {
+    if (!dragging) return;
+    dragging = false;
+    var moved = Math.abs(e.clientX - startX) < 6;
+    snapBack();
+    if (moved) { box.classList.remove('vf-nudge'); void box.offsetWidth; box.classList.add('vf-nudge'); }
+  }
+  handle.addEventListener('pointerup', end);
+  handle.addEventListener('pointercancel', end);
+  handle.addEventListener('click', function (e) { e.stopPropagation(); });
+  handle.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); onComplete(); }
+  });
+}
+
 function buildVerifikasiRow_(p, card, opts) {
   var row = document.createElement('div');
   row.className = 'lc-verif';
   row.addEventListener('click', function (e) { e.stopPropagation(); });
   var wait = p.verifikasiStatus === 'MENUNGGU';
+  var info = vfStatusInfo_(p);
 
-  var btn = document.createElement('button');
-  btn.type = 'button';
-  btn.className = 'lc-verif-btn ' + (wait ? 'verif-wait' : (p.verifikasiStatus === 'OTOMATIS' ? 'verif-done verif-auto' : 'verif-done'));
-  btn.innerHTML = mdIcon(wait ? 'schedule' : 'verified', 18) + '<span>' + vfButtonLabel_(p) + '</span>';
-  btn.addEventListener('click', function (e) {
-    e.stopPropagation();
-    if (!wait) { openVerifikasiDetail_(p); return; }
-    if (p.canVerifikasi) openVerifikasiPilihJenis_(p);
-    else openVerifikasiTerbatas_();
-  });
-  row.appendChild(btn);
+  var line = document.createElement('div');
+  line.className = 'lc-verif-line';
+  var main = document.createElement('div');
+  main.className = 'lc-verif-main';
+  var note = document.createElement('div');
+  note.className = 'lc-verif-note';
+  note.textContent = info.note;
+
+  function paintStatus_(box, inf, slider) {
+    box.className = 'vf-box ' + inf.cls + (slider ? ' vf-slider' : '');
+    var label = '<span class="vf-label">' + mdIcon(inf.icon, 16) + '<span>' + inf.label + '</span></span>';
+    box.innerHTML = (slider ? '<span class="vf-handle" role="button" tabindex="0" aria-label="Geser untuk memverifikasi">' + mdIcon('arrowForward', 18) + '</span>' : '') + label;
+    if (slider) vfAttachSlide_(box, box.querySelector('.vf-handle'), function () { openVerifikasiPilihJenis_(p); });
+  }
+
+  var box;
+  if (wait && p.canVerifikasi) {
+    box = document.createElement('div');
+    paintStatus_(box, info, true);
+  } else if (wait) {
+    box = document.createElement('button');
+    box.type = 'button';
+    paintStatus_(box, info, false);
+    box.addEventListener('click', function (e) { e.stopPropagation(); openVerifikasiTerbatas_(); });
+  } else {
+    box = document.createElement('button');
+    box.type = 'button';
+    paintStatus_(box, info, false);
+    box.addEventListener('click', function (e) { e.stopPropagation(); openVerifikasiDetail_(p); });
+  }
+  if (wait && info.due && !isNaN(info.due)) {
+    box.dataset.due = String(info.due);
+    box._vfRepaint = function () {
+      var next = vfStatusInfo_(p);
+      var slider = box.classList.contains('vf-slider');
+      paintStatus_(box, next, slider);
+      note.textContent = next.note;
+      delete box.dataset.due;
+    };
+    vfEnsureTicker_();
+  }
+  main.appendChild(box);
+  line.appendChild(main);
 
   var det = document.createElement('button');
   det.type = 'button';
   det.className = 'lc-verif-detail';
-  det.innerHTML = '<span>Detail Verifikasi</span>' + mdIcon('chevronRight', 16);
+  det.setAttribute('aria-label', 'Detail verifikasi');
+  det.title = 'Detail verifikasi';
+  det.innerHTML = mdIcon('search', 20);
   det.addEventListener('click', function (e) { e.stopPropagation(); openVerifikasiDetail_(p); });
-  row.appendChild(det);
+  line.appendChild(det);
+
+  row.appendChild(line);
+  row.appendChild(note);
   if (vfRowOf_) vfRowOf_.set(p, { row: row, card: card, opts: opts });
   return row;
 }
+
+/** Satu pengatur waktu ringan: mengubah REVIEW -> SEDANG DITINJAU di tempat saat batas 5 menit lewat; berhenti sendiri bila tak ada lagi. */
+var vfTicker_ = null;
+function vfTick_() {
+  var els = document.querySelectorAll('.vf-box[data-due]');
+  if (!els.length) { clearInterval(vfTicker_); vfTicker_ = null; return; }
+  var now = Date.now();
+  for (var i = 0; i < els.length; i++) {
+    if (now >= Number(els[i].dataset.due) && els[i]._vfRepaint) els[i]._vfRepaint();
+  }
+}
+function vfEnsureTicker_() {
+  if (!vfTicker_) vfTicker_ = setInterval(vfTick_, 15000);
+}
+document.addEventListener('visibilitychange', function () { if (!document.hidden) vfTick_(); });
 
 /** Waktu sekarang (WIB) format server: dd/MM/yyyy HH:mm:ss. */
 function vfNowWib_() {

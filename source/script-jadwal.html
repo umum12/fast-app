@@ -578,6 +578,12 @@ document.getElementById('btn-submit-jadwal').addEventListener('click', function 
       if (!response || !response.success) { if (editId) cardBusyEnd_(editId); errorEl.textContent = (response && response.error) || 'Gagal menyimpan jadwal.'; showSnackbar(errorEl.textContent, 'error'); return; }
       if (!editId) stickyKeyClear_('jdw:new');
       showSnackbar(editId ? 'Jadwal berhasil diubah.' : 'Jadwal berhasil ditambahkan.', 'success');
+      // Server memantulkan status yang benar-benar tersimpan. Bila tidak sama (mis. jadwal.gs lama masih terpasang),
+      // beri tahu jujur — jangan diam-diam menampilkan FIX.
+      var rd = response.data || {};
+      if (!rd.duplicate && rd.status !== data.status) {
+        showSnackbar('Status ' + data.status + ' belum tersimpan di server. Pasang jadwal.gs terbaru lalu deploy versi baru.', 'warning');
+      }
       closeJadwalForm();
       if (editId) {
         cardBusyPhase_(editId, 'refresh');
@@ -2379,6 +2385,14 @@ function buildPekerjaanListCard_(p, opts) {
     '<span class="badge-pill lc-jenis ' + jenisInfo.cls + '">' + mdIcon(jenisInfo.icon || 'description', 14) + '<span>' + jenisInfo.label + '</span></span>' +
     '<span class="badge badge-status-pulse ' + statusCls + '"><span class="dot pulse"></span>' + p.statusLabel + '</span>' +
     (p.assignmentMode === 'direct' && p.targetUserCode ? '<span class="badge badge-info">Direct \u2192 ' + escapeHtmlJk_(p.targetUserName || p.targetUserCode) + '</span>' : '');
+  var moreBtn = document.createElement('button');
+  moreBtn.type = 'button';
+  moreBtn.className = 'lc-menu-btn';
+  moreBtn.setAttribute('aria-label', 'Lihat detail');
+  moreBtn.title = 'Lihat detail';
+  moreBtn.innerHTML = mdIcon('moreVert', 20);
+  moreBtn.addEventListener('click', function (e) { e.stopPropagation(); openPekerjaanDetail(p, { actions: !!opts.actions }); });
+  badgeRow.appendChild(moreBtn);
   main.appendChild(badgeRow);
 
   // Arah Mandiri: utamakan performedAt (kapan pekerjaan BENAR-BENAR dilakukan).
@@ -2416,8 +2430,7 @@ function buildPekerjaanListCard_(p, opts) {
   var commentText = p.commentCount > 0 ? (p.commentCount + ' Komentar') : 'Belum ada komentar';
   foot.innerHTML =
     '<div class="lc-foot-info"><span>' + (photos.length > 0 ? (photos.length + ' Foto Lampiran') : 'Tanpa Foto') + '</span>' +
-    '<span class="lc-bar">|</span><span class="lc-comment">' + mdIcon('chatBubble', 14) + '<span>' + commentText + '</span></span></div>' +
-    '<span class="lc-detail">Lihat Detail' + mdIcon('chevronRight', 16) + '</span>';
+    '<span class="lc-bar">|</span><span class="lc-comment">' + mdIcon('chatBubble', 14) + '<span>' + commentText + '</span></span></div>';
   main.appendChild(foot);
 
   var pendingActions = null;

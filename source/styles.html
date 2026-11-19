@@ -4246,14 +4246,39 @@ header.app-header .app-title { letter-spacing: .03em; }
 .akun-hero .akun-row { border-bottom: none; }
 .akun-hero .akun-row + .akun-row { border-top: 1px solid var(--color-border); }
 
+/* ===== Kartu: ikon 3 titik (pojok kanan atas) ===== */
+.lc2 .op-card-top { align-items: center; }
+.lc-menu-btn { margin-left: auto; flex: 0 0 auto; width: 36px; height: 36px; border-radius: 50%; border: 0; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--md-surface-container, #f1f5f9); color: var(--color-text-muted, #475569); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.lc-menu-btn:active { transform: scale(.94); background: var(--color-primary-soft); color: var(--color-primary); }
+html[data-theme="dark"] .lc-menu-btn { background: rgba(255,255,255,.08); color: #cbd5e1; }
+
 /* Verifikasi Pekerjaan (Aktivitas) */
 .list-card.list-card-row.has-verif { flex-wrap: wrap; }
 .lc-verif { flex: 0 0 100%; width: 100%; display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid var(--color-border); }
-.lc-verif-btn { width: 100%; min-height: 46px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 12px; font: inherit; font-size: 13px; font-weight: 800; letter-spacing: .02em; color: #fff; cursor: pointer; text-align: center; padding: 8px 12px; }
-.lc-verif-btn:active { transform: scale(.98); }
-.lc-verif-btn.verif-wait { background: #f97316; box-shadow: 0 4px 12px rgba(249,115,22,.28); }
-.lc-verif-btn.verif-done { background: var(--color-success-solid); color: var(--color-on-success); box-shadow: 0 4px 12px rgba(156,194,71,.3); }
-.lc-verif-detail { align-self: flex-end; display: inline-flex; align-items: center; gap: 2px; border: 0; background: none; color: var(--color-primary); font: inherit; font-size: 12px; font-weight: 700; padding: 4px 2px; cursor: pointer; }
+.lc-verif-line { display: grid; grid-template-columns: 4fr 1fr; gap: 8px; align-items: center; }
+.lc-verif-main { min-width: 0; }
+.vf-box { position: relative; width: 100%; height: 44px; border: 0; border-radius: 12px; display: flex; align-items: center; justify-content: center; overflow: hidden; font: inherit; font-size: 12px; font-weight: 800; letter-spacing: .06em; color: #fff; text-align: center; touch-action: pan-y; user-select: none; -webkit-user-select: none; padding: 0; cursor: pointer; }
+.vf-box .vf-label { display: inline-flex; align-items: center; gap: 6px; pointer-events: none; min-width: 0; white-space: nowrap; }
+.vf-box.vf-slider { cursor: default; justify-content: flex-start; }
+.vf-box.vf-slider .vf-label { flex: 1; justify-content: center; padding-left: 44px; padding-right: 8px; }
+.vf-box.vf-review { background: var(--color-primary-solid, #1F4E9C); box-shadow: 0 4px 12px rgba(31,78,156,.28); }
+.vf-box.vf-reviewing { background: #f97316; box-shadow: 0 4px 12px rgba(249,115,22,.28); }
+.vf-box.vf-done { background: var(--color-success-solid, #9CC247); color: var(--color-on-success, #1B2A05); box-shadow: 0 4px 12px rgba(156,194,71,.3); }
+.vf-box.vf-done:active, .vf-box:not(.vf-slider):active { transform: scale(.98); }
+.vf-handle { position: absolute; top: 3px; left: 3px; bottom: 3px; width: 40px; border-radius: 9px; background: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,.22); cursor: grab; z-index: 2; touch-action: none; }
+.vf-handle:active { cursor: grabbing; }
+.vf-review .vf-handle { color: var(--color-primary-solid, #1F4E9C); }
+.vf-reviewing .vf-handle { color: #ea580c; }
+.vf-handle:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+.vf-slider .vf-handle svg, .vf-slider .vf-handle .material-symbols-outlined { animation: vf-hint 1.6s ease-in-out infinite; }
+@keyframes vf-hint { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
+.vf-box.vf-nudge .vf-handle { animation: vf-bump .5s ease; }
+@keyframes vf-bump { 0%, 100% { transform: translateX(0); } 40% { transform: translateX(14px); } }
+@media (prefers-reduced-motion: reduce) { .vf-slider .vf-handle svg, .vf-slider .vf-handle .material-symbols-outlined, .vf-box.vf-nudge .vf-handle { animation: none; } }
+.lc-verif-detail { width: 100%; height: 44px; border-radius: 12px; border: 1px solid var(--color-border); background: var(--md-surface-container, #f1f5f9); color: var(--color-text, #334155); display: inline-flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.lc-verif-detail:active { background: var(--color-primary-soft); color: var(--color-primary); }
+.lc-verif-note { font-size: 11px; line-height: 1.4; color: var(--color-text-faint, #94a3b8); padding-left: 2px; }
+html[data-theme="dark"] .lc-verif-detail { background: rgba(255,255,255,.08); color: #e2e8f0; }
 .vf-overlay { position: fixed; inset: 0; z-index: 290; background: rgba(0,0,0,.4); display: flex; align-items: center; justify-content: center; padding: 20px; }
 .vf-card { width: 100%; max-width: 420px; max-height: 88vh; overflow-y: auto; background: var(--color-surface, #fff); color: var(--color-text, #0f172a); border-radius: 20px; padding: 20px; box-shadow: 0 20px 50px rgba(0,0,0,.3); }
 .vf-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
@@ -4637,9 +4662,9 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible { outline: 
 .pk-w90 { width: 90px; } .pk-w70 { width: 70px; }
 @media (prefers-reduced-motion: reduce) { .pk-skel-card::after { animation: none; } }
 
-/* ===== Badge status jadwal FIX / TBD (mini, neon) ===== */
+/* ===== Badge status jadwal FIX (hijau logo FS) / TBD (oranye menyala) ===== */
 .jk-st { display: inline-flex; align-items: center; flex: 0 0 auto; font-size: 8.5px; font-weight: 800; letter-spacing: .06em; line-height: 1; padding: 2px 5px; border-radius: 6px; text-transform: uppercase; vertical-align: middle; }
-.jk-st.st-fix { background: #39ff14; color: #053300; box-shadow: 0 0 0 1px rgba(5,51,0,.18), 0 0 6px rgba(57,255,20,.55); }
+.jk-st.st-fix { background: var(--color-success-solid, #9CC247); color: var(--color-on-success, #1B2A05); box-shadow: 0 0 0 1px rgba(27,42,5,.14); }
 .jk-st.st-tbd { background: #ff9a1f; color: #3a1700; box-shadow: 0 0 0 1px rgba(58,23,0,.2), 0 0 6px rgba(255,140,0,.6); }
 .jk-chip-top { display: flex; align-items: center; gap: 6px; max-width: 100%; }
 .jk-chip-top b { min-width: 0; overflow-wrap: anywhere; }
