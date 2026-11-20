@@ -1324,30 +1324,32 @@ function initBerandaPage() {
 // BERANDA BERBASIS TUGAS — ringkasan "yang perlu dilakukan sekarang".
 // Memakai angka dashboard yang SUDAH ada di bundle Beranda (tanpa panggilan baru).
 // ============================================================
-/** Tombol Statistik & Download PDF di Beranda (semua peran; backend sudah membatasi data per peran). Idempoten. */
+/** Pintasan Statistik (Stat) & Download PDF (PDF) — kolom tengah Beranda, semua peran (backend sudah membatasi data per peran). Idempoten. */
 function initHomeReportButtons_() {
-  var box = document.getElementById('home-reports');
+  var box = document.getElementById('home-tasks');
   if (!box || !appBootstrap || box.dataset.ready === '1') return;
   box.dataset.ready = '1';
   var btnStat = document.getElementById('btn-open-statistik');
   var btnPdf = document.getElementById('btn-open-pdf-render');
   if (btnStat) {
-    btnStat.innerHTML = mdIcon('stats', 16) + '<span>Statistik</span>';
+    btnStat.innerHTML = mdIcon('stats', 18) + '<span>Stat</span>';
+    btnStat.title = 'Statistik'; btnStat.setAttribute('aria-label', 'Statistik');
     btnStat.addEventListener('click', function () { window.open(appBootstrap.webAppUrl + '?page=statistik', '_blank'); });
   }
   if (btnPdf) {
-    btnPdf.innerHTML = mdIcon('download', 16) + '<span>Download PDF</span>';
+    btnPdf.innerHTML = mdIcon('download', 18) + '<span>PDF</span>';
+    btnPdf.title = 'Download PDF'; btnPdf.setAttribute('aria-label', 'Download PDF');
     btnPdf.addEventListener('click', function () { window.open(appBootstrap.webAppUrl + '?page=pdfrender', '_blank'); });
   }
-  box.hidden = false;
 }
 
+/** Kartu kiri & kanan Beranda (Menunggu diambil | Saya kerjakan / Selesai minggu ini). Kolom tengah (Stat/PDF) statis di index.html. */
 function renderHomeTasks_(dash) {
-  var box = document.getElementById('home-tasks');
-  if (!box) return;
+  var left = document.getElementById('ht-left'), right = document.getElementById('ht-right');
+  if (!left || !right) return;
   var st = dash && dash.stats;
   var user = appBootstrap && appBootstrap.currentUser;
-  if (!st || !user) { box.hidden = true; box.innerHTML = ''; return; }
+  if (!st || !user) return; // placeholder tetap; tombol tengah tetap bisa dipakai
   var open = Number(st.tasksAvailableCount) || 0;
   var mine = Number(st.myClaimedCount) || 0;
   var tiles = [
@@ -1359,27 +1361,20 @@ function renderHomeTasks_(dash) {
     var done = Number(st.tasksCompletedThisWeek) || 0;
     tiles.push({ cls: 'ht-done' + (done ? ' has' : ''), icon: 'checkCircle', n: done, label: 'Selesai minggu ini', go: 'aktivitas' });
   }
-  box.innerHTML = '';
-  var title = document.createElement('div');
-  title.className = 'ht-title';
-  title.textContent = 'Perlu perhatian';
-  box.appendChild(title);
-  var row = document.createElement('div');
-  row.className = 'ht-row';
-  tiles.forEach(function (t) {
+  [left, right].forEach(function (slot, i) {
+    var t = tiles[i];
+    slot.innerHTML = '';
     var b = document.createElement('button');
     b.type = 'button';
     b.className = 'ht-tile ' + t.cls;
     b.setAttribute('aria-label', t.n + ' ' + t.label);
-    b.innerHTML = '<span class="ht-ico">' + mdIcon(t.icon, 20) + '</span>' +
+    b.innerHTML = '<span class="ht-ico">' + mdIcon(t.icon, 18) + '</span>' +
       '<span class="ht-txt"><span class="ht-num">' + t.n + '</span><span class="ht-lbl"></span></span>' +
-      '<span class="ht-go">' + mdIcon('chevronRight', 18) + '</span>';
+      '<span class="ht-go">' + mdIcon('chevronRight', 16) + '</span>';
     b.querySelector('.ht-lbl').textContent = t.label;
     b.addEventListener('click', function () { goToPage(t.go); });
-    row.appendChild(b);
+    slot.appendChild(b);
   });
-  box.appendChild(row);
-  box.hidden = false;
 }
 
 function loadHomeBootstrap(force) {

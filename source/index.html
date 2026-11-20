@@ -62,10 +62,15 @@
         <main class="app-content">
 
           <section class="page-section" data-page="beranda">
-            <div id="home-tasks" class="home-tasks" hidden></div>
-            <div id="home-reports" class="home-reports" hidden>
-              <button class="btn-outlined primary" id="btn-open-statistik" type="button"></button>
-              <button class="btn-outlined primary" id="btn-open-pdf-render" type="button"></button>
+            <div id="home-tasks" class="home-tasks">
+              <div class="ht-grid">
+                <div id="ht-left" class="ht-slot"><div class="ht-tile ht-skel" aria-hidden="true"></div></div>
+                <div class="ht-center">
+                  <button class="ht-act" id="btn-open-statistik" type="button"></button>
+                  <button class="ht-act" id="btn-open-pdf-render" type="button"></button>
+                </div>
+                <div id="ht-right" class="ht-slot"><div class="ht-tile ht-skel" aria-hidden="true"></div></div>
+              </div>
             </div>
             <div id="content-banner-container"></div>
 
