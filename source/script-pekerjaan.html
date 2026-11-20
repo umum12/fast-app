@@ -3333,6 +3333,7 @@ function renderKomentarList_(p, list) {
     var row = document.createElement('div');
     row.className = 'komentar-row ' + (isOwnerReport ? 'right' : 'left');
 
+    var av = avatarNode_(k.userCode, k.userName, 28);
     var item = document.createElement('div');
     item.className = 'komentar-bubble ' + (isOwnerReport ? 'owner' : 'other');
     if (k.komentarId) { item.dataset.pid = k.komentarId; if (loadingById[k.komentarId]) setTimeout(function () { cardBusyPaint_(item, k.komentarId); }, 0); }
@@ -3379,7 +3380,7 @@ function renderKomentarList_(p, list) {
         openBottomSheet(opts);
       });
     }
-    row.appendChild(item);
+    if (isOwnerReport) { row.appendChild(item); row.appendChild(av); } else { row.appendChild(av); row.appendChild(item); }
     chat.appendChild(row);
   });
   listEl.appendChild(chat);
@@ -3471,7 +3472,8 @@ function addPendingKomentar_(p, session, text) {
   when.textContent = 'Sedang mengirim komentar...';
   item.appendChild(body);
   item.appendChild(when);
-  row.appendChild(item);
+  var myAv = avatarNode_(session && session.userCode, session && session.displayName, 28);
+  if (isOwnerReport) { row.appendChild(item); row.appendChild(myAv); } else { row.appendChild(myAv); row.appendChild(item); }
   chat.appendChild(row);
   try { row.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) { /* abaikan */ }
   return row;

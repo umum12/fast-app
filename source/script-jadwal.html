@@ -1410,6 +1410,7 @@ function loadHomeBootstrap(force) {
     .withSuccessHandler(function (response) {
       if (reqDead_(gHome)) return;
       if (!response.success) return;
+      if (response.data && response.data.avatars) setAvatarMap_(response.data.avatars);
       if (!reqStale_(gHome)) {
         pageDataCache.dashboard = response.data.dashboard;
         pageDataCache.content = response.data.content;
@@ -2522,10 +2523,12 @@ function buildPekerjaanListCard_(p, opts) {
         prevDay = dk;
         var dl = document.createElement('div'); dl.className = 'chat-day'; dl.textContent = dayLabel_(m.ts); listEl.appendChild(dl);
       }
-      var row = document.createElement('div'); row.className = 'chat-msg' + (m.mine ? ' mine' : '');
-      if (!m.mine) { var nm = document.createElement('span'); nm.className = 'chat-name'; nm.textContent = m.name || m.userCode; row.appendChild(nm); }
-      var b = document.createElement('div'); b.className = 'chat-bubble'; b.textContent = m.text; row.appendChild(b);
-      var t = document.createElement('span'); t.className = 'chat-time'; t.textContent = fmtTime_(m.ts); row.appendChild(t);
+      var row = document.createElement('div'); row.className = 'chat-msg' + (m.mine ? ' mine' : ' has-av');
+      var col = m.mine ? row : document.createElement('div');   // pesan orang lain: avatar + kolom (nama, gelembung, jam)
+      if (!m.mine) { col.className = 'chat-col'; row.appendChild(avatarNode_(m.userCode, m.name, 30)); row.appendChild(col); }
+      if (!m.mine) { var nm = document.createElement('span'); nm.className = 'chat-name'; nm.textContent = m.name || m.userCode; col.appendChild(nm); }
+      var b = document.createElement('div'); b.className = 'chat-bubble'; b.textContent = m.text; col.appendChild(b);
+      var t = document.createElement('span'); t.className = 'chat-time'; t.textContent = fmtTime_(m.ts); col.appendChild(t);
       listEl.appendChild(row);
     });
     if (forceBottom || nearBottom || !hasRender) listEl.scrollTop = listEl.scrollHeight;

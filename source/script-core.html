@@ -1026,6 +1026,208 @@ var ROLE_LABELS = {
 
 var appBootstrap = null;
 
+// ============================================================
+// AVATAR — 15 emoticon preset (5 ekspresi × 3 warna logo FS), digambar sebagai
+// SVG di sisi klien (tanpa file gambar). Pilihan tiap pengguna disimpan di server
+// (avatar.gs); peta { userCode: avatarId } dibagikan ke semua pengguna supaya
+// avatar tampil di header, kartu Akun, Ruang Diskusi, dan komentar.
+// Tanpa pilihan = huruf inisial (perilaku lama).
+// ============================================================
+var AVATAR_EXPR_ = [
+  { key: 'smile', label: 'Senyum' }, { key: 'laugh', label: 'Ketawa' }, { key: 'tongue', label: 'Melet' },
+  { key: 'hardhat', label: 'Topi Pekerja' }, { key: 'think', label: 'Mikir' }
+];
+var AVATAR_COLORS_ = {
+  blue:  { label: 'Biru',  light: '#8FB3E8', main: '#1F4E9C', bg: '#E4ECF8', ring: '#A9C0E3' },
+  green: { label: 'Lime',  light: '#DDF1A8', main: '#8DB83A', bg: '#F1F8DD', ring: '#C5DE8F' },
+  red:   { label: 'Merah', light: '#F9BDB9', main: '#D6312B', bg: '#FDE9E8', ring: '#F3A29E' }
+};
+var AVATAR_PRESETS_ = [];
+var AVATAR_BY_ID_ = {};
+AVATAR_EXPR_.forEach(function (ex) {
+  Object.keys(AVATAR_COLORS_).forEach(function (ck) {
+    var p = { id: ex.key + '_' + ck, expr: ex.key, color: ck, name: ex.label + ' • ' + AVATAR_COLORS_[ck].label, short: ex.label };
+    AVATAR_PRESETS_.push(p); AVATAR_BY_ID_[p.id] = p;
+  });
+});
+var AVATAR_STORE_KEY_ = 'fs_avatars_v1';
+var appAvatars = {};
+try { var _avRaw = localStorage.getItem(AVATAR_STORE_KEY_); if (_avRaw) appAvatars = JSON.parse(_avRaw) || {}; } catch (e) { appAvatars = {}; }
+var _avUrlCache_ = {};
+
+function avatarSvgUrl_(id) {
+  if (_avUrlCache_[id]) return _avUrlCache_[id];
+  var p = AVATAR_BY_ID_[id]; if (!p) return '';
+  var c = AVATAR_COLORS_[p.color], INK = '#1e293b', k = p.expr;
+  function eye(cx, cy, r) { r = r || 3.3; return '<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + r + '" ry="' + (r + 0.9) + '" fill="' + INK + '"/><circle cx="' + (cx + 1.1) + '" cy="' + (cy - 1.5) + '" r="1.3" fill="#fff"/><circle cx="' + (cx - 1) + '" cy="' + (cy + 1.4) + '" r="0.6" fill="#fff"/>'; }
+  function blush(cx, cy) { return '<ellipse cx="' + cx + '" cy="' + cy + '" rx="3.6" ry="2.2" fill="#fb7185" opacity=".55"/>'; }
+  function face(cy, r) {
+    cy = cy || 35; r = r || 21;
+    return '<circle cx="32" cy="' + cy + '" r="' + r + '" fill="url(#g)" stroke="' + INK + '" stroke-width="2.8"/>' +
+      '<ellipse cx="' + (32 - r * 0.38) + '" cy="' + (cy - r * 0.55) + '" rx="' + (r * 0.28) + '" ry="' + (r * 0.14) + '" fill="#fff" opacity=".55" transform="rotate(-25 ' + (32 - r * 0.38) + ' ' + (cy - r * 0.55) + ')"/>';
+  }
+  var st = ' fill="none" stroke="' + INK + '" stroke-width="3" stroke-linecap="round"';
+  var parts = '';
+  if (k === 'smile') {
+    parts = face() + eye(24.5, 32) + eye(39.5, 32) + blush(18.5, 40) + blush(45.5, 40) + '<path d="M25 39.5 Q32 48.5 39 39.5"' + st + '/>';
+  } else if (k === 'laugh') {
+    parts = face() + '<path d="M20.5 33 Q24.5 27 28.5 33"' + st + '/><path d="M35.5 33 Q39.5 27 43.5 33"' + st + '/>' + blush(17.5, 41) + blush(46.5, 41) +
+      '<path d="M22 38.5 H42 C41.5 51 22.5 51 22 38.5 Z" fill="#7f1d1d" stroke="' + INK + '" stroke-width="2.6" stroke-linejoin="round"/><path d="M23.5 39.5 H40.5 V42.5 H23.5 Z" fill="#fff"/><path d="M27 48 Q32 43.5 37 48 Q32 51 27 48 Z" fill="#fb7185"/>' +
+      '<path d="M53 20 q2 3 0 5 q-2 -2 0 -5 Z" fill="#7dd3fc" stroke="' + INK + '" stroke-width="1.2"/><path d="M11 20 q2 3 0 5 q-2 -2 0 -5 Z" fill="#7dd3fc" stroke="' + INK + '" stroke-width="1.2"/>';
+  } else if (k === 'tongue') {
+    parts = face() + eye(24.5, 31.5) + '<path d="M35 31.5 Q39.5 26.5 44 31.5"' + st + '/>' + blush(18.5, 40) + blush(46, 40) + '<path d="M23 39 Q32 46 41 39"' + st + '/>' +
+      '<path d="M31 42.6 V49 A4.2 4.2 0 0 0 39.4 49 V41.5 Z" fill="#fb7185" stroke="' + INK + '" stroke-width="2.4" stroke-linejoin="round"/><path d="M35.2 44.5 V48" stroke="#be123c" stroke-width="1.6" stroke-linecap="round"/>';
+  } else if (k === 'hardhat') {
+    parts = face(38, 19.5) + eye(25.5, 36, 2.9) + eye(38.5, 36, 2.9) + blush(19.5, 43) + blush(44.5, 43) + '<path d="M26 43.5 Q32 50 38 43.5"' + st + '/>' +
+      '<path d="M14 27 C14 11 50 11 50 27 Z" fill="#facc15" stroke="' + INK + '" stroke-width="2.8" stroke-linejoin="round"/><path d="M26.5 12.5 C29 10 35 10 37.5 12.5 V26 H26.5 Z" fill="#fde047" stroke="' + INK + '" stroke-width="2.2" stroke-linejoin="round"/>' +
+      '<path d="M19 20 Q21 15.5 25 14.5" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" opacity=".8"/><rect x="10.5" y="25.5" width="43" height="5.5" rx="2.75" fill="#eab308" stroke="' + INK + '" stroke-width="2.6"/>';
+  } else if (k === 'think') {
+    parts = face(36, 20) + '<ellipse cx="25" cy="33" rx="3.2" ry="4.1" fill="' + INK + '"/><circle cx="26.4" cy="31" r="1.3" fill="#fff"/><ellipse cx="38.5" cy="33" rx="3.2" ry="4.1" fill="' + INK + '"/><circle cx="39.9" cy="31" r="1.3" fill="#fff"/>' +
+      '<path d="M33 25 Q38.5 21.5 44 25" fill="none" stroke="' + INK + '" stroke-width="2.8" stroke-linecap="round"/><path d="M20 26.5 H28" stroke="' + INK + '" stroke-width="2.6" stroke-linecap="round"/>' + blush(18.5, 41) + '<path d="M24 42.5 Q28 40 32 42.5"' + st + '/>' +
+      '<path d="M34 46 C34 41.5 44 41.5 44 46 V52 A5 5 0 0 1 34 52 Z" fill="#fde68a" stroke="' + INK + '" stroke-width="2.6" stroke-linejoin="round"/><path d="M37 46.5 V50 M41 46.5 V50" stroke="' + INK + '" stroke-width="1.8" stroke-linecap="round" opacity=".6"/>' +
+      '<circle cx="47" cy="15.5" r="1.4" fill="#fff" stroke="' + INK + '" stroke-width="1.2"/><circle cx="51" cy="11.5" r="2" fill="#fff" stroke="' + INK + '" stroke-width="1.3"/><circle cx="55.5" cy="6.8" r="4.8" fill="#fff" stroke="' + INK + '" stroke-width="1.5"/>' +
+      '<text x="55.5" y="9.4" font-size="7" font-weight="800" text-anchor="middle" fill="' + INK + '" font-family="Arial, sans-serif">?</text>';
+  }
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><radialGradient id="g" cx="35%" cy="28%" r="85%"><stop offset="0%" stop-color="' + c.light + '"/><stop offset="100%" stop-color="' + c.main + '"/></radialGradient></defs>' +
+    '<circle cx="32" cy="32" r="32" fill="' + c.bg + '"/><circle cx="32" cy="32" r="30.5" fill="none" stroke="' + c.ring + '" stroke-width="2"/>' + parts + '</svg>';
+  return (_avUrlCache_[id] = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg));
+}
+
+function avatarIdOf_(userCode) {
+  var id = userCode ? appAvatars[userCode] : '';
+  return (id && AVATAR_BY_ID_[id]) ? id : '';
+}
+
+/** Elemen avatar bulat: emoticon bila sudah memilih, huruf inisial bila belum. */
+function avatarNode_(userCode, name, size) {
+  var id = avatarIdOf_(userCode);
+  var el = document.createElement('span');
+  el.className = 'av ' + (id ? 'av-img' : 'av-init');
+  el.style.width = el.style.height = size + 'px';
+  el.setAttribute('aria-hidden', 'true');
+  if (id) {
+    var img = document.createElement('img');
+    img.src = avatarSvgUrl_(id); img.alt = ''; img.draggable = false;
+    el.appendChild(img);
+  } else {
+    el.style.fontSize = Math.round(size * 0.46) + 'px';
+    el.textContent = ((name || userCode || '?').trim().charAt(0) || '?').toUpperCase();
+  }
+  return el;
+}
+
+/** Terapkan avatar pengguna yang sedang login ke header & kartu Akun. */
+function avatarApplyMine_() {
+  var user = appBootstrap && appBootstrap.currentUser;
+  if (!user) return;
+  var id = avatarIdOf_(user.userCode);
+  var initial = ((user.displayName || user.userCode || '?').trim().charAt(0) || '?').toUpperCase();
+
+  var hdr = document.getElementById('header-avatar-initial');
+  if (hdr) {
+    hdr.textContent = '';
+    if (id) { hdr.appendChild(avatarNode_(user.userCode, user.displayName, 40)); } else { hdr.textContent = initial; }
+    var btn = hdr.closest('.profile-icon-btn'); if (btn) btn.classList.toggle('has-av', !!id);
+  }
+  var akun = document.getElementById('akun-avatar');
+  if (akun) {
+    akun.textContent = '';
+    var fill = document.createElement('span'); fill.className = 'av-fill';
+    if (id) { var img = document.createElement('img'); img.src = avatarSvgUrl_(id); img.alt = ''; img.draggable = false; fill.appendChild(img); }
+    else { fill.textContent = initial; }
+    akun.appendChild(fill);
+    var badge = document.createElement('span'); badge.className = 'akun-av-badge'; badge.innerHTML = mdIcon('photoCamera', 14);
+    akun.appendChild(badge);
+  }
+}
+
+function setAvatarMap_(map) {
+  if (!map || typeof map !== 'object') return;
+  appAvatars = map;
+  try { localStorage.setItem(AVATAR_STORE_KEY_, JSON.stringify(map)); } catch (e) {}
+  avatarApplyMine_();
+}
+
+function avatarsRefresh_() {
+  var s = loadSession(); if (!s || !s.accessCode) return;
+  google.script.run
+    .withSuccessHandler(function (res) { if (res && res.success && res.data) setAvatarMap_(res.data.avatars); })
+    .withFailureHandler(function () {})
+    .getAvatarMap(s.accessCode);
+}
+
+// ---- Pemilih avatar (halaman Akun) ----
+var avatarDraft_ = '';
+var avatarSaving_ = false;
+
+function avatarPickerRender_() {
+  var grid = document.getElementById('av-grid');
+  grid.textContent = '';
+  AVATAR_PRESETS_.forEach(function (p) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'av-tile' + (avatarDraft_ === p.id ? ' sel' : '');
+    b.setAttribute('role', 'radio');
+    b.setAttribute('aria-checked', avatarDraft_ === p.id ? 'true' : 'false');
+    b.setAttribute('aria-label', p.name);
+    var img = document.createElement('img'); img.src = avatarSvgUrl_(p.id); img.alt = ''; img.draggable = false;
+    var lb = document.createElement('span'); lb.textContent = p.short + ' (' + AVATAR_COLORS_[p.color].label + ')';
+    b.appendChild(img); b.appendChild(lb);
+    b.addEventListener('click', function () { avatarDraft_ = p.id; avatarPickerRender_(); });
+    grid.appendChild(b);
+  });
+  var user = appBootstrap && appBootstrap.currentUser || {};
+  var prev = document.getElementById('av-preview');
+  prev.textContent = '';
+  if (avatarDraft_) { var im = document.createElement('img'); im.src = avatarSvgUrl_(avatarDraft_); im.alt = ''; prev.appendChild(im); prev.className = 'av av-img'; }
+  else { prev.className = 'av av-init'; prev.textContent = ((user.displayName || user.userCode || '?').trim().charAt(0) || '?').toUpperCase(); }
+  document.getElementById('av-preview-name').textContent = avatarDraft_ ? AVATAR_BY_ID_[avatarDraft_].name : 'Huruf inisial';
+  document.getElementById('av-reset').classList.toggle('sel', !avatarDraft_);
+}
+
+function openAvatarPicker_() {
+  var user = appBootstrap && appBootstrap.currentUser;
+  if (!user) return;
+  if (user.role === 'demo') { if (typeof showSnackbar === 'function') showSnackbar('Akun Demo tidak dapat mengubah avatar.', 'info'); return; }
+  avatarDraft_ = avatarIdOf_(user.userCode);
+  avatarPickerRender_();
+  document.getElementById('avatar-overlay').classList.add('show');
+}
+
+function closeAvatarPicker_() {
+  if (avatarSaving_) return;
+  document.getElementById('avatar-overlay').classList.remove('show');
+}
+
+(function initAvatarPicker_() {
+  var ov = document.getElementById('avatar-overlay');
+  if (!ov) return;
+  document.getElementById('av-close').innerHTML = mdIcon('close', 18);
+  document.getElementById('av-close').addEventListener('click', closeAvatarPicker_);
+  document.getElementById('av-cancel').addEventListener('click', closeAvatarPicker_);
+  ov.addEventListener('click', function (e) { if (e.target === ov) closeAvatarPicker_(); });
+  document.getElementById('av-reset').addEventListener('click', function () { avatarDraft_ = ''; avatarPickerRender_(); });
+  var akunBtn = document.getElementById('akun-avatar');
+  if (akunBtn) akunBtn.addEventListener('click', openAvatarPicker_);
+  document.getElementById('av-apply').addEventListener('click', function () {
+    var user = appBootstrap && appBootstrap.currentUser, s = loadSession();
+    if (!user || !s || avatarSaving_) return;
+    if (avatarDraft_ === avatarIdOf_(user.userCode)) { closeAvatarPicker_(); return; }
+    var btn = this; avatarSaving_ = true; btn.disabled = true; btn.textContent = 'Menyimpan…';
+    function done_() { avatarSaving_ = false; btn.disabled = false; btn.textContent = 'Terapkan'; }
+    google.script.run
+      .withSuccessHandler(function (res) {
+        done_();
+        if (!res || !res.success) { if (typeof showSnackbar === 'function') showSnackbar((res && res.error) || 'Gagal menyimpan avatar.', 'error'); return; }
+        setAvatarMap_(res.data.avatars);
+        closeAvatarPicker_();
+        if (typeof showSnackbar === 'function') showSnackbar('Avatar diperbarui.', 'success');
+      })
+      .withFailureHandler(function () { done_(); if (typeof showSnackbar === 'function') showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error'); })
+      .ubahAvatar(s.accessCode, avatarDraft_);
+  });
+})();
+
 function renderApp(bootstrap, session) {
   appBootstrap = bootstrap;
 
@@ -1034,11 +1236,10 @@ function renderApp(bootstrap, session) {
 
   var user = bootstrap.currentUser;
   document.getElementById('header-username').textContent = user.displayName;
-  document.getElementById('header-avatar-initial').textContent = (user.displayName || '?').trim().charAt(0).toUpperCase();
+  if (bootstrap.avatars) setAvatarMap_(bootstrap.avatars); else avatarsRefresh_();
 
   document.getElementById('akun-nama').textContent = user.displayName;
-  var avatarEl = document.getElementById('akun-avatar');
-  if (avatarEl) avatarEl.textContent = ((user.displayName || user.userCode || '?').trim().charAt(0) || '?').toUpperCase();
+  avatarApplyMine_(); // header + kartu Akun (emoticon atau inisial)
   document.getElementById('akun-kode').textContent = user.userCode;   // Kode User (ID permanen)
   var loginCodeEl = document.getElementById('akun-login-code');       // Password Login (login_code yang dipakai masuk)
   if (loginCodeEl) loginCodeEl.textContent = (session && session.accessCode) || ((loadSession() || {}).accessCode) || '—';

@@ -406,7 +406,7 @@
             <div class="card akun-hero">
               <div class="akun-hero-top">
                 <button class="btn-logout akun-logout-icon" id="btn-logout" type="button" title="Keluar" aria-label="Keluar"></button>
-                <div class="akun-avatar" id="akun-avatar">?</div>
+                <button class="akun-avatar" id="akun-avatar" type="button" aria-label="Ganti avatar" title="Ganti avatar">?</button>
                 <div class="akun-hero-text">
                   <div class="akun-name" id="akun-nama">—</div>
                   <span class="akun-role-chip"><span class="akun-ico" data-ico="verifiedUser"></span><span id="akun-role">—</span></span>
@@ -674,6 +674,20 @@
         <button id="btn-close-activity-detail-x" class="btn-icon btn-icon-surface" type="button" aria-label="Tutup"></button>
       </div>
       <div id="activity-detail-body"></div>
+    </div>
+  </div>
+
+  <!-- Pemilih Avatar (halaman Akun) -->
+  <div class="jk-overlay" id="avatar-overlay">
+    <div class="jk-modal av-modal" role="dialog" aria-modal="true" aria-labelledby="av-title">
+      <div class="jk-modal-header"><h3 id="av-title">Pilih Avatar</h3><button class="jk-close" type="button" id="av-close" aria-label="Tutup"></button></div>
+      <div class="av-preview-row">
+        <span id="av-preview" class="av av-init" style="width:64px;height:64px;font-size:28px;"></span>
+        <div class="av-preview-text"><div class="av-pname" id="av-preview-name">Huruf inisial</div><div class="av-psub">Pilih satu lalu tekan Terapkan</div></div>
+      </div>
+      <div class="av-grid" id="av-grid" role="radiogroup" aria-label="Daftar avatar"></div>
+      <button type="button" class="av-reset" id="av-reset">Gunakan huruf inisial</button>
+      <div class="jk-actions"><button class="btn-outlined" type="button" id="av-cancel">Batal</button><button class="btn-primary" type="button" id="av-apply">Terapkan</button></div>
     </div>
   </div>
 

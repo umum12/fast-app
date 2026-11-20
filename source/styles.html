@@ -4696,3 +4696,35 @@ tr.cm-pending-row .cm-title { font-weight: 700; }
 .komentar-row.komentar-pending .komentar-bubble { position: relative; overflow: hidden; opacity: .75; }
 .komentar-row.komentar-pending .komentar-bubble::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(100deg, transparent 20%, rgba(127,127,127,.22) 50%, transparent 80%); background-size: 200% 100%; animation: card-busy-shimmer 1.3s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .busy-swap-ico, .is-busy-swap::after, tr.is-busy-swap td, .komentar-row.komentar-pending .komentar-bubble::after { animation: none; } }
+/* ===== Avatar (emoticon / inisial) ===== */
+.av { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; overflow: hidden; flex-shrink: 0; background: var(--color-primary-soft); color: var(--color-primary-dark); font-weight: 700; line-height: 1; user-select: none; }
+.av img { width: 100%; height: 100%; display: block; }
+.profile-icon-btn.has-av { padding: 0; background: transparent; overflow: hidden; }
+.profile-icon-btn .av { width: 100% !important; height: 100% !important; }
+.akun-avatar { position: relative; cursor: pointer; padding: 0; color: inherit; font-family: inherit; -webkit-appearance: none; appearance: none; overflow: visible; }
+.akun-avatar .av-fill { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+.akun-avatar .av-fill img { width: 100%; height: 100%; display: block; }
+.akun-avatar:focus-visible { outline: 3px solid var(--color-success-solid, #9CC247); outline-offset: 3px; }
+.akun-av-badge { position: absolute; right: -5px; bottom: -5px; width: 24px; height: 24px; border-radius: 50%; background: var(--color-success-solid, #9CC247); color: #1f2d0a; display: flex; align-items: center; justify-content: center; border: 2px solid var(--color-surface, #fff); box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+/* Pemilih avatar */
+.av-modal { max-width: 400px; }
+.av-preview-row { display: flex; align-items: center; gap: 14px; background: var(--md-surface-container); border: 1px solid var(--color-border); border-radius: 16px; padding: 12px; margin-bottom: 14px; }
+.av-preview-text { min-width: 0; }
+.av-pname { font-size: 14px; font-weight: 700; color: var(--color-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.av-psub { font-size: 12px; color: var(--color-text-muted); margin-top: 2px; }
+.av-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; max-height: 42vh; overflow-y: auto; padding: 3px; margin-bottom: 10px; -webkit-overflow-scrolling: touch; }
+.av-tile { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 4px; font: inherit; color: var(--color-text-muted); background: var(--md-surface-container); border: 2px solid var(--color-border); border-radius: 16px; cursor: pointer; min-height: 44px; }
+.av-tile img { width: 52px; height: 52px; border-radius: 50%; display: block; }
+.av-tile span { font-size: 10.5px; font-weight: 600; line-height: 1.2; text-align: center; }
+.av-tile.sel { border-color: var(--color-primary); background: var(--color-primary-soft); color: var(--color-text); }
+.av-tile:focus-visible, .av-reset:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.av-reset { display: block; width: 100%; min-height: 40px; margin: 0 0 14px; font: inherit; font-size: 13px; font-weight: 600; color: var(--color-text-muted); background: transparent; border: 1px dashed var(--color-border); border-radius: 12px; cursor: pointer; }
+.av-reset.sel { color: var(--color-primary); border-color: var(--color-primary); border-style: solid; }
+/* Avatar di Ruang Diskusi & komentar */
+.chat-msg.has-av { flex-direction: row; align-items: flex-end; gap: 6px; max-width: 92%; }
+.chat-col { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.komentar-row { gap: 6px; align-items: flex-end; }
+.komentar-row > .av { margin-bottom: 2px; }
+.komentar-bubble { max-width: calc(100% - 40px); }
+@media (prefers-reduced-motion: reduce) { .av-tile { transition: none; } }
+
