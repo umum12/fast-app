@@ -222,26 +222,9 @@ document.getElementById('activity-search').addEventListener('input', debounce_(r
  */
 
 
+/** Tombol Statistik & Download PDF kini di Beranda (initHomeReportButtons_, script-jadwal.html); di sini tinggal Ringkasan yang bisa dilipat. */
 function initPdfRenderButton_() {
   if (!appBootstrap) return;
-
-  var btn = document.getElementById('btn-open-pdf-render');
-  if (btn) {
-    btn.style.display = 'inline-flex';
-    btn.innerHTML = mdIcon('download', 16) + '<span>Download PDF</span>';
-    btn.addEventListener('click', function () {
-      window.open(appBootstrap.webAppUrl + '?page=pdfrender', '_blank');
-    });
-  }
-
-  var btnStat = document.getElementById('btn-open-statistik');
-  if (btnStat) {
-    btnStat.style.display = 'inline-flex';
-    btnStat.innerHTML = mdIcon('stats', 16) + '<span>Statistik</span>';
-    btnStat.addEventListener('click', function () {
-      window.open(appBootstrap.webAppUrl + '?page=statistik', '_blank');
-    });
-  }
 
   // Ringkasan collapsible; status diingat di localStorage (per perangkat).
   var toggle = document.getElementById('btn-toggle-ringkasan');

@@ -1315,6 +1315,7 @@ function initBerandaPage() {
 
   initJadwalPiketSection();
   initContentManagementSection();
+  initHomeReportButtons_();
 
   setTimeout(loadHomeBootstrap, 0);
 }
@@ -1323,6 +1324,24 @@ function initBerandaPage() {
 // BERANDA BERBASIS TUGAS — ringkasan "yang perlu dilakukan sekarang".
 // Memakai angka dashboard yang SUDAH ada di bundle Beranda (tanpa panggilan baru).
 // ============================================================
+/** Tombol Statistik & Download PDF di Beranda (semua peran; backend sudah membatasi data per peran). Idempoten. */
+function initHomeReportButtons_() {
+  var box = document.getElementById('home-reports');
+  if (!box || !appBootstrap || box.dataset.ready === '1') return;
+  box.dataset.ready = '1';
+  var btnStat = document.getElementById('btn-open-statistik');
+  var btnPdf = document.getElementById('btn-open-pdf-render');
+  if (btnStat) {
+    btnStat.innerHTML = mdIcon('stats', 16) + '<span>Statistik</span>';
+    btnStat.addEventListener('click', function () { window.open(appBootstrap.webAppUrl + '?page=statistik', '_blank'); });
+  }
+  if (btnPdf) {
+    btnPdf.innerHTML = mdIcon('download', 16) + '<span>Download PDF</span>';
+    btnPdf.addEventListener('click', function () { window.open(appBootstrap.webAppUrl + '?page=pdfrender', '_blank'); });
+  }
+  box.hidden = false;
+}
+
 function renderHomeTasks_(dash) {
   var box = document.getElementById('home-tasks');
   if (!box) return;

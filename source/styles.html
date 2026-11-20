@@ -4528,6 +4528,11 @@ html[data-theme="dark"] .cc-detail-badge { background: rgba(96,165,250,.16); col
 .ht-tile.has.ht-mine .ht-ico, .ht-tile.has.ht-done .ht-ico { background: var(--status-completed-bg); color: var(--color-success-ink); }
 .ht-tile.has.ht-mine .ht-num, .ht-tile.has.ht-done .ht-num { color: var(--color-success-ink); }
 .ht-tile.has { border-color: var(--md-outline); }
+/* Tombol laporan di Beranda (Statistik | Download PDF) */
+.home-reports { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 14px; }
+.home-tasks:not([hidden]) + .home-reports { margin-top: -4px; }
+.home-reports[hidden] { display: none; }
+.home-reports > button { width: 100%; min-height: 44px; padding: 0 12px; justify-content: center; align-items: center; gap: 6px; display: inline-flex; }
 
 /* Efek tekan halus pada kontrol yang bisa diketuk */
 .btn-outlined:active, .btn-card-action:active, .btn-success:active, .btn-danger-solid:active, .rw-chip:active, .jk-fchip:active, .jk-seg-btn:active, .seg button:active { transform: scale(.97); }
