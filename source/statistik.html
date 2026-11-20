@@ -100,7 +100,21 @@
   .dash-meta { margin-top: 3px; font-size: 12px; color: var(--color-text-muted); display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
   .chip-ro { display: inline-flex; align-items: center; gap: 3px; padding: 2px 8px; border-radius: 999px; background: var(--color-accent-soft); color: var(--color-accent-ink); font-weight: 700; font-size: 11px; }
   .chip-ro .ms { font-size: 13px; }
-  .updated { font-size: 11px; color: var(--color-text-muted); }
+  .snap-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+  .snap-info { font-size: 12px; color: var(--color-text-muted); display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .snap-info .ms { font-size: 16px; }
+  .snap-info strong { color: var(--color-text); }
+  .btn-ref { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--color-primary);
+             background: transparent; color: var(--color-primary); font-family: inherit; font-weight: 700; font-size: 13px; cursor: pointer; }
+  .btn-ref .ms { font-size: 18px; }
+  .btn-ref:disabled { opacity: .65; cursor: default; }
+  .btn-ref:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .btn-ref.busy .ms { animation: spin 0.9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .snap-msg { margin-top: 8px; font-size: 12px; color: var(--color-text-muted); min-height: 0; }
+  .snap-msg:empty { display: none; }
+  .snap-msg.err { color: var(--color-danger); }
+  .snap-msg.ok { color: var(--color-accent-ink); }
   .period-tabs { display: flex; gap: 6px; margin-top: 14px; background: var(--track); padding: 4px; border-radius: 999px; }
   .seg-btn { flex: 1; border: 0; background: transparent; color: var(--color-text-muted); font-family: inherit; font-weight: 600; font-size: 13px; line-height: 1;
              padding: 10px 6px; border-radius: 999px; cursor: pointer; min-height: 38px; }
@@ -219,7 +233,7 @@
   /* Skeleton */
   .sk { background: linear-gradient(90deg, var(--track) 25%, var(--color-border) 50%, var(--track) 75%); background-size: 200% 100%; animation: sk 1.2s linear infinite; border-radius: 10px; }
   @keyframes sk { to { background-position: -200% 0; } }
-  @media (prefers-reduced-motion: reduce) { .sk { animation: none; } .stack > span, .hb-fill, .tbar, .cmp-fill { transition: none; } }
+  @media (prefers-reduced-motion: reduce) { .sk, .btn-ref.busy .ms { animation: none; } .stack > span, .hb-fill, .tbar, .cmp-fill { transition: none; } }
 </style>
 </head>
 <body>
@@ -241,9 +255,13 @@
             </div>
           </div>
         </div>
-        <div class="updated">Diperbarui <strong id="generated-at">-</strong></div>
       </div>
       <div class="period-tabs" id="period-tabs" role="tablist" aria-label="Periode"></div>
+      <div class="snap-row">
+        <div class="snap-info"><span class="ms">schedule</span><span>Data per <strong id="generated-at">-</strong><span id="snap-src"></span></span></div>
+        <button type="button" class="btn-ref" id="btn-refresh"><span class="ms" id="btn-refresh-ico">refresh</span><span id="btn-refresh-txt">Perbarui</span></button>
+      </div>
+      <div class="snap-msg" id="snap-msg" role="status" aria-live="polite"></div>
     </header>
 
     <div id="dash-body"></div>
@@ -346,6 +364,7 @@
       b.addEventListener('click', function () {
         if (currentPeriod === tab.key) return;
         currentPeriod = tab.key;
+        setSnapMsg_('', '');
         renderPeriodTabs();
         fetchPeriod(tab.key, false);
       });
@@ -402,7 +421,9 @@
   // ============================================================
   function renderDashboard(data) {
     currentData = data;
-    $('generated-at').textContent = data.generatedAt || '-';
+    $('generated-at').textContent = data.snapshotAt || data.generatedAt || '-';
+    var srcMap = { terjadwal: ' \u00b7 otomatis harian', manual: ' \u00b7 diperbarui manual', awal: ' \u00b7 snapshot pertama' };
+    $('snap-src').textContent = srcMap[data.snapshotSource] || '';
     $('range-label').textContent = data.rangeLabel || '';
     var hasNew = !!data.ringkasan;
     var html = '';
@@ -629,6 +650,53 @@
       tile('Rata-rata diambil', r.avgMenit != null ? durasi_(r.avgMenit) : '—', r.n ? 'sejak dibuat (' + r.n + ' pekerjaan)' : 'belum ada data') +
       tile('Rata-rata selesai', p.avgMenit != null ? durasi_(p.avgMenit) : '—', p.n ? 'sejak mulai dikerjakan (' + p.n + ')' : 'belum ada data') + '</div></div>';
   }
+
+  // ============================================================
+  // PERBARUI SNAPSHOT — membaca ulang seluruh sheet di server
+  // ============================================================
+  var refreshing = false;
+
+  function setSnapMsg_(text, cls) {
+    var el = $('snap-msg');
+    el.textContent = text || '';
+    el.className = 'snap-msg' + (cls ? ' ' + cls : '');
+  }
+
+  function refreshSnapshot_() {
+    if (refreshing || !currentAccessCode) return;
+    refreshing = true;
+    var period = currentPeriod;
+    var btn = $('btn-refresh');
+    btn.disabled = true; btn.classList.add('busy');
+    $('btn-refresh-txt').textContent = 'Memperbarui\u2026';
+    setSnapMsg_('Membaca seluruh data, mohon tunggu sebentar.', '');
+    function done_() {
+      refreshing = false;
+      btn.disabled = false; btn.classList.remove('busy');
+      $('btn-refresh-txt').textContent = 'Perbarui';
+    }
+    google.script.run
+      .withSuccessHandler(function (response) {
+        done_();
+        if (!response || !response.success) {
+          setSnapMsg_((response && response.error) || 'Gagal memperbarui statistik.', 'err');
+          return;
+        }
+        dashboardCache = {};                        // periode lain ikut basi
+        dashboardCache[period] = response.data;
+        reqSeq++;                                   // abaikan respons lama yang masih jalan
+        if (currentPeriod === period) renderDashboard(response.data);
+        setSnapMsg_('Statistik diperbarui.', 'ok');
+        setTimeout(function () { if ($('snap-msg').classList.contains('ok')) setSnapMsg_('', ''); }, 4000);
+      })
+      .withFailureHandler(function () {
+        done_();
+        setSnapMsg_('Gagal terhubung ke server. Coba lagi.', 'err');
+      })
+      .refreshStatistikSnapshot(currentAccessCode, period);
+  }
+
+  $('btn-refresh').addEventListener('click', refreshSnapshot_);
 
   // ============================================================
   // INIT
