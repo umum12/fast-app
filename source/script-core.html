@@ -263,7 +263,7 @@ function clearSession() {
 // ============================================================
 // SPLASH SCREEN (loading awal: login & masuk kembali)
 // ============================================================
-var splashTimer_ = null, splashPct_ = 0, splashStep_ = 0, splashShownAt_ = 0;
+var splashClosing_ = false, splashTimer_ = null, splashPct_ = 0, splashStep_ = 0, splashShownAt_ = 0;
 var SPLASH_STEPS_ = ['Menghubungkan ke server...', 'Memeriksa akses petugas...', 'Menyiapkan dasbor & data...'];
 
 function showSplash_() {
@@ -271,9 +271,11 @@ function showSplash_() {
   var el = document.getElementById('splash-screen');
   if (!el) return;
   clearInterval(splashTimer_);
+  splashClosing_ = false;
   splashPct_ = 8; splashStep_ = 0; splashShownAt_ = Date.now();
   el.classList.remove('hide');
   el.classList.add('show');
+  el.setAttribute('data-stage', '1');
   setSplashProgress_(splashPct_, SPLASH_STEPS_[0]);
   // Merayap menuju 90% selagi menunggu server; selesai ditentukan hideSplash_().
   splashTimer_ = setInterval(function () {
@@ -283,7 +285,22 @@ function showSplash_() {
   }, 300);
 }
 
+/** Tahap logo FS menurut persen: 1 <20, 2 <40, 3 <55, 4 <70, 5 <80, 6 >=80 (shockwave saat masuk tahap 5). */
+function splashStage_(pct) { return pct < 20 ? 1 : pct < 40 ? 2 : pct < 55 ? 3 : pct < 70 ? 4 : pct < 80 ? 5 : 6; }
+function setSplashStage_(pct) {
+  var el = document.getElementById('splash-screen');
+  if (!el) return;
+  var st = splashStage_(pct), cur = +el.getAttribute('data-stage') || 1;
+  if (st === cur) return;
+  el.setAttribute('data-stage', String(st));
+  if (st >= 5 && cur < 5) {
+    var sw = document.getElementById('splash-shock');
+    if (sw) { sw.classList.remove('go'); void sw.offsetWidth; sw.classList.add('go'); }
+  }
+}
+
 function setSplashProgress_(pct, text) {
+  setSplashStage_(pct);
   var bar = document.getElementById('splash-bar');
   if (bar) bar.style.width = Math.min(100, pct) + '%';
   var pc = document.getElementById('splash-pct');
@@ -295,14 +312,28 @@ function setSplashProgress_(pct, text) {
 function hideSplash_(ok) {
   var el = document.getElementById('splash-screen');
   if (!el || !el.classList.contains('show')) return;
+  if (splashClosing_) return;
+  splashClosing_ = true;
   clearInterval(splashTimer_);
-  if (ok) { setSplashProgress_(100, 'Siap digunakan'); sfxFile_('online'); }
-  // Tampil minimal ~500 ms supaya tidak berkedip, lalu hilang otomatis.
-  var wait = Math.max(ok ? 250 : 0, 500 - (Date.now() - splashShownAt_));
-  setTimeout(function () {
-    el.classList.add('hide');
-    setTimeout(function () { el.classList.remove('show', 'hide'); }, 350);
-  }, wait);
+  function finish_(wait) {
+    // Tampil minimal ~500 ms supaya tidak berkedip, lalu hilang otomatis.
+    setTimeout(function () {
+      el.classList.add('hide');
+      setTimeout(function () { el.classList.remove('show', 'hide'); }, 350);
+    }, wait);
+  }
+  if (!ok) { finish_(Math.max(0, 500 - (Date.now() - splashShownAt_))); return; }
+  // Server sudah siap: lanjutkan cepat melalui sisa tahap logo (maks ~0,9 dtk) agar tahap final & denyut terlihat, baru 100%.
+  var p = splashPct_;
+  var ff = setInterval(function () {
+    p = Math.min(100, p + 7);
+    setSplashProgress_(p);
+    if (p >= 100) {
+      clearInterval(ff);
+      setSplashProgress_(100, 'Siap digunakan'); sfxFile_('online');
+      finish_(Math.max(350, 500 - (Date.now() - splashShownAt_)));
+    }
+  }, 55);
 }
 
 function showSpinner() {
