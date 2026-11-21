@@ -1146,6 +1146,7 @@ function setAvatarMap_(map) {
   appAvatars = map;
   try { localStorage.setItem(AVATAR_STORE_KEY_, JSON.stringify(map)); } catch (e) {}
   avatarApplyMine_();
+  if (typeof lcAvatarsRefresh_ === 'function') lcAvatarsRefresh_();   // kartu Riwayat/Aktivitas/Pekerjaan yang sudah tampil
 }
 
 function avatarsRefresh_() {

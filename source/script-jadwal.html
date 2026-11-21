@@ -2329,6 +2329,35 @@ function formatAktivitasDateShort_(ddmmyyyyHHmm) {
 
 /** Warna avatar inisial (stabil per nama). */
 var LC_AVATAR_TONES_ = [['#e0e7ff', '#4338ca'], ['#ccfbf1', '#0f766e'], ['#fef3c7', '#b45309'], ['#ffe4e6', '#be123c'], ['#e0f2fe', '#0369a1'], ['#ede9fe', '#6d28d9']];
+/** Avatar petugas di kartu daftar: emoticon bila sudah memilih, huruf inisial berwarna bila belum. data-uc dipakai untuk memperbarui saat peta avatar tiba. */
+function lcAvatarHtml_(userCode, officer, tone) {
+  var id = (typeof avatarIdOf_ === 'function') ? avatarIdOf_(userCode) : '';
+  var uc = ' data-uc="' + escapeHtmlJk_(userCode || '') + '"';
+  if (id) return '<span class="lc-avatar lc-avatar-img"' + uc + '><img src="' + avatarSvgUrl_(id) + '" alt="" draggable="false"></span>';
+  return '<span class="lc-avatar"' + uc + ' data-ini="1" style="background:' + tone[0] + ';color:' + tone[1] + ';">' + escapeHtmlJk_(String(officer || '?').trim().charAt(0).toUpperCase() || '?') + '</span>';
+}
+
+/** Setelah peta avatar berubah/tiba: perbarui avatar pada kartu yang sudah tampil (tanpa render ulang). */
+function lcAvatarsRefresh_() {
+  document.querySelectorAll('.lc-avatar[data-uc]').forEach(function (el) {
+    var uc = el.getAttribute('data-uc'), id = avatarIdOf_(uc);
+    var hasImg = el.classList.contains('lc-avatar-img');
+    if (id) {
+      var url = avatarSvgUrl_(id);
+      if (hasImg) { var im = el.querySelector('img'); if (im && im.getAttribute('src') !== url) im.setAttribute('src', url); return; }
+      el.classList.add('lc-avatar-img'); el.removeAttribute('style'); el.removeAttribute('data-ini');
+      el.innerHTML = '<img src="' + url + '" alt="" draggable="false">';
+    } else if (hasImg) {
+      // kembali ke inisial: nama tidak tersimpan di elemen, ambil dari teks nama di sebelahnya
+      var nm = el.parentNode && el.parentNode.querySelector('.lc-name');
+      var name = nm ? nm.textContent : uc, tone = lcAvatarTone_(name);
+      el.classList.remove('lc-avatar-img'); el.setAttribute('data-ini', '1');
+      el.style.background = tone[0]; el.style.color = tone[1];
+      el.textContent = (String(name || '?').trim().charAt(0).toUpperCase() || '?');
+    }
+  });
+}
+
 function lcAvatarTone_(name) {
   var h = 0, str = String(name || '');
   for (var i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) % 997;
@@ -2384,6 +2413,7 @@ function buildPekerjaanListCard_(p, opts) {
   var statusCls = STATUS_PEKERJAAN_BADGE_CLASS[p.status] || 'badge-neutral';
 
   var officer = (p.status === 'TERBUKA') ? p.createdByName : (p.handledByName || p.createdByName);
+  var officerCode = (p.status === 'TERBUKA') ? p.createdBy : (p.handledBy || p.createdBy);
   var photos = pilihFotoKartu_(p);
   var floorText = p.zoneCode ? (p.floorName + ' · ' + p.zoneCode) : (p.floorName || '');
 
@@ -2422,7 +2452,7 @@ function buildPekerjaanListCard_(p, opts) {
   var timeText = dtParts[1] ? escapeHtmlJk_(dtParts[1]) + ' WIB' : '';
   whoRow.innerHTML =
     '<div class="lc-person">' +
-      '<span class="lc-avatar" style="background:' + tone[0] + ';color:' + tone[1] + ';">' + escapeHtmlJk_(String(officer || '?').trim().charAt(0).toUpperCase() || '?') + '</span>' +
+      lcAvatarHtml_(officerCode, officer, tone) +
       '<div class="lc-who-text"><span class="lc-name">' + escapeHtmlJk_(officer || '') + '</span>' +
       (floorText ? '<span class="lc-floor">' + mdIcon('location', 13) + '<span>' + escapeHtmlJk_(floorText) + '</span></span>' : '') + '</div>' +
     '</div>' +
