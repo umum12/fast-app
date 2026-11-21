@@ -276,6 +276,7 @@ function showSplash_() {
   el.classList.remove('hide');
   el.classList.add('show');
   el.setAttribute('data-stage', '1');
+  splashShuffleStart_();
   setSplashProgress_(splashPct_, SPLASH_STEPS_[0]);
   // Merayap menuju 90% selagi menunggu server; selesai ditentukan hideSplash_().
   splashTimer_ = setInterval(function () {
@@ -285,15 +286,35 @@ function showSplash_() {
   }, 300);
 }
 
-/** Tahap logo FS menurut persen: 1 <20, 2 <40, 3 <55, 4 <70, 5 <80, 6 >=80 (shockwave saat masuk tahap 5). */
-function splashStage_(pct) { return pct < 20 ? 1 : pct < 40 ? 2 : pct < 55 ? 3 : pct < 70 ? 4 : pct < 80 ? 5 : 6; }
+/** Logo FS: <80% = tahap 1 (warna diacak mencari komposisi), >=80% = tahap 6 (warna final terkunci + kilau + denyut). */
+var splashShuffleTimer_ = null, splashShuffleLast_ = '';
+var SPLASH_PALETTE_ = ['#D6312B', '#9CC247', '#1F4E9C'];
+function splashShuffle_() {
+  var el = document.getElementById('splash-screen');
+  if (!el) return;
+  var c, key, tries = 0;
+  do { // permutasi 3 warna resmi, berbeda dari sebelumnya
+    c = SPLASH_PALETTE_.slice().sort(function () { return Math.random() - 0.5; });
+    key = c.join();
+  } while (key === splashShuffleLast_ && ++tries < 8);
+  splashShuffleLast_ = key;
+  el.style.setProperty('--sp-cf', c[0]); el.style.setProperty('--sp-cs', c[1]); el.style.setProperty('--sp-cb', c[2]);
+}
+function splashShuffleStart_() {
+  clearInterval(splashShuffleTimer_);
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  splashShuffle_();
+  if (!reduce) splashShuffleTimer_ = setInterval(splashShuffle_, 420);
+}
+function splashStage_(pct) { return pct < 80 ? 1 : 6; }
 function setSplashStage_(pct) {
   var el = document.getElementById('splash-screen');
   if (!el) return;
   var st = splashStage_(pct), cur = +el.getAttribute('data-stage') || 1;
   if (st === cur) return;
   el.setAttribute('data-stage', String(st));
-  if (st >= 5 && cur < 5) {
+  if (st === 6) {
+    clearInterval(splashShuffleTimer_);
     var sw = document.getElementById('splash-shock');
     if (sw) { sw.classList.remove('go'); void sw.offsetWidth; sw.classList.add('go'); }
   }
@@ -316,6 +337,7 @@ function hideSplash_(ok) {
   splashClosing_ = true;
   clearInterval(splashTimer_);
   function finish_(wait) {
+    clearInterval(splashShuffleTimer_);
     // Tampil minimal ~500 ms supaya tidak berkedip, lalu hilang otomatis.
     setTimeout(function () {
       el.classList.add('hide');

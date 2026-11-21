@@ -2767,33 +2767,25 @@ nav.bottom-nav .nav-item.nav-fab.active .nav-fab-circle { background: var(--colo
   .splash-ring, .lr-ring, .lr-sweep, .skeleton-card { animation: none !important; }
 }
 
-/* ===== Splash: logo FS bertahap (0-20 outline, 20-40 F merah/S biru, 40-55 badge naik, 55-70 tukar warna, 70-80 final + shockwave, 80-100 berdenyut) ===== */
-#splash-screen { --sp-outline: #0f172a; --sp-red: #D6312B; --sp-green: #9CC247; --sp-blue: #1F4E9C; --sp-grid: rgba(15,23,42,.14); }
-html[data-theme="dark"] #splash-screen { --sp-outline: #fff; --sp-grid: rgba(255,255,255,.16); }
-.sp-casing-wrap { position: relative; width: 260px; height: 160px; display: flex; align-items: center; justify-content: center; margin-bottom: 26px; }
-.sp-casing { position: absolute; inset: 0; border-radius: 20px; transform: skewX(-12deg); border: 3px solid var(--sp-red); background: rgba(248,250,252,.8); overflow: hidden; box-shadow: 0 0 22px rgba(214,49,43,.22), inset 0 0 14px rgba(214,49,43,.18); }
-html[data-theme="dark"] .sp-casing { background: rgba(15,23,42,.6); box-shadow: 0 0 25px rgba(214,49,43,.35), inset 0 0 15px rgba(214,49,43,.35); }
-.sp-casing::before { content: ''; position: absolute; inset: 0; opacity: .5; background-image: linear-gradient(var(--sp-grid) 1px, transparent 1px), linear-gradient(90deg, var(--sp-grid) 1px, transparent 1px); background-size: 20px 20px; }
-.sp-shock { position: absolute; inset: 0; border-radius: 20px; border: 2px solid var(--sp-blue); transform: skewX(-12deg); opacity: 0; pointer-events: none; }
-.sp-shock.go { animation: spShock .8s cubic-bezier(.16,1,.3,1) forwards; }
-@keyframes spShock { 0% { transform: skewX(-12deg) scale(.95); opacity: 1; border-color: #1F4E9C; } 50% { border-color: #9CC247; } 100% { transform: skewX(-12deg) scale(1.35); opacity: 0; } }
-.sp-logo { position: relative; z-index: 2; width: 200px; height: auto; overflow: visible; }
-.sp-f, .sp-s { transition: fill .4s ease, stroke .4s ease; fill: none; stroke: var(--sp-outline); stroke-width: 8; }
-.sp-bbg { transition: fill .4s ease; fill: var(--sp-green); }
-.sp-banner { opacity: 0; transform: translateY(200px); transition: opacity .4s ease, transform .5s cubic-bezier(.25,1,.5,1); }
-#splash-screen:not([data-stage="1"]) .sp-f, #splash-screen:not([data-stage="1"]) .sp-s { stroke: none; }
-#splash-screen[data-stage="2"] .sp-f { fill: var(--sp-red); }  #splash-screen[data-stage="2"] .sp-s { fill: var(--sp-blue); }
-#splash-screen[data-stage="3"] .sp-f { fill: var(--sp-red); }  #splash-screen[data-stage="3"] .sp-s { fill: var(--sp-blue); }
-#splash-screen[data-stage="4"] .sp-f { fill: var(--sp-green); } #splash-screen[data-stage="4"] .sp-s { fill: var(--sp-red); }
-#splash-screen[data-stage="5"] .sp-f, #splash-screen[data-stage="6"] .sp-f { fill: var(--sp-blue); }
-#splash-screen[data-stage="5"] .sp-s, #splash-screen[data-stage="6"] .sp-s { fill: var(--sp-green); }
-#splash-screen[data-stage="3"] .sp-banner, #splash-screen[data-stage="4"] .sp-banner, #splash-screen[data-stage="5"] .sp-banner, #splash-screen[data-stage="6"] .sp-banner { opacity: 1; transform: none; }
-#splash-screen[data-stage="4"] .sp-bbg { fill: var(--sp-blue); }
-#splash-screen[data-stage="5"] .sp-bbg, #splash-screen[data-stage="6"] .sp-bbg { fill: var(--sp-red); }
+/* ===== Splash: logo FS bersih (tanpa bingkai/grid). 0-80% warna diacak "mencari desain", >=80% warna final terkunci ===== */
+#splash-screen { --sp-red: #D6312B; --sp-green: #9CC247; --sp-blue: #1F4E9C; --sp-cf: #D6312B; --sp-cs: #1F4E9C; --sp-cb: #9CC247; }
+.sp-casing-wrap { position: relative; width: 240px; height: 140px; display: flex; align-items: center; justify-content: center; margin-bottom: 26px; }
+.sp-logo { position: relative; z-index: 2; width: 220px; height: auto; overflow: visible; }
+.sp-f, .sp-s, .sp-bbg { transition: fill .35s ease; }
+.sp-f { fill: var(--sp-cf); } .sp-s { fill: var(--sp-cs); } .sp-bbg { fill: var(--sp-cb); }
+.sp-banner { animation: spBannerUp .6s cubic-bezier(.25,1,.5,1) both; }
+@keyframes spBannerUp { from { opacity: 0; transform: translateY(160px); } to { opacity: 1; transform: none; } }
+#splash-screen[data-stage="6"] .sp-f { fill: var(--sp-blue); }
+#splash-screen[data-stage="6"] .sp-s { fill: var(--sp-green); }
+#splash-screen[data-stage="6"] .sp-bbg { fill: var(--sp-red); }
 #splash-screen[data-stage="6"] .sp-logo { animation: spLogoPulse 1.2s ease-in-out infinite alternate; }
-@keyframes spLogoPulse { 0% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(31,78,156,.6)); } 100% { transform: scale(1.05); filter: drop-shadow(0 0 14px rgba(156,194,71,.85)) drop-shadow(0 0 10px rgba(214,49,43,.7)); } }
-@media (max-width: 340px) { .sp-casing-wrap { width: 220px; height: 136px; } .sp-logo { width: 170px; } }
-@media (prefers-reduced-motion: reduce) { .sp-shock.go, #splash-screen[data-stage="6"] .sp-logo { animation: none !important; } .sp-banner, .sp-f, .sp-s, .sp-bbg { transition: none; } }
+/* Kilau lembut (bukan bingkai) saat warna final terkunci */
+.sp-burst { position: absolute; width: 100%; height: 100%; border-radius: 50%; opacity: 0; pointer-events: none; background: radial-gradient(circle, rgba(156,194,71,.45) 0%, rgba(31,78,156,.25) 45%, transparent 70%); }
+.sp-burst.go { animation: spBurst .9s cubic-bezier(.16,1,.3,1) forwards; }
+@keyframes spBurst { 0% { transform: scale(.5); opacity: .95; } 100% { transform: scale(1.6); opacity: 0; } }
+@keyframes spLogoPulse { 0% { transform: scale(1); filter: drop-shadow(0 0 4px rgba(31,78,156,.5)); } 100% { transform: scale(1.05); filter: drop-shadow(0 0 14px rgba(156,194,71,.8)) drop-shadow(0 0 10px rgba(214,49,43,.6)); } }
+@media (max-width: 340px) { .sp-casing-wrap { width: 200px; height: 120px; } .sp-logo { width: 180px; } }
+@media (prefers-reduced-motion: reduce) { .sp-burst.go, .sp-banner, #splash-screen[data-stage="6"] .sp-logo { animation: none !important; } .sp-f, .sp-s, .sp-bbg { transition: none; } }
 
 /* ===== Akun: profil, About, Data (mockup new-card-*) ===== */
 .akun-hero-top { position: relative; padding-right: 64px; }
