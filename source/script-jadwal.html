@@ -2475,7 +2475,7 @@ function buildPekerjaanListCard_(p, opts) {
   var commentText = p.commentCount > 0 ? (p.commentCount + ' Komentar') : 'Belum ada komentar';
   foot.innerHTML =
     '<div class="lc-foot-info"><span>' + (photos.length > 0 ? (photos.length + ' Foto Lampiran') : 'Tanpa Foto') + '</span>' +
-    '<span class="lc-bar">|</span><span class="lc-comment">' + mdIcon('chatBubble', 14) + '<span>' + commentText + '</span></span></div>';
+    '<span class="lc-comment">' + mdIcon('chatBubble', 14) + '<span>' + commentText + '</span></span></div>';
   main.appendChild(foot);
 
   var pendingActions = null;

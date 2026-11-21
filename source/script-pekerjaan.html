@@ -1400,16 +1400,16 @@ function markRiwayatStale_() {
  * (ukuran & posisi tetap) dan menahan ketukan sehingga tidak ada request ganda pada card itu. */
 var loadingById = {};
 var CARD_BUSY_META_ = {
-  create:   { icon: 'addCircle', text: 'Sedang menambahkan', short: 'Menambahkan...' },
-  update:   { icon: 'edit',      text: 'Sedang menyimpan perubahan', short: 'Menyimpan...' },
-  'delete': { icon: 'delete',    text: 'Sedang menghapus', short: 'Menghapus...' },
-  verify:   { icon: 'verified',  text: 'Sedang memvalidasi', short: 'Memvalidasi...' },
-  unverify: { icon: 'block',     text: 'Sedang membatalkan validasi', short: 'Membatalkan...' },
-  take:     { icon: 'taskAlt',   text: 'Sedang mengambil', short: 'Mengambil...' },
-  release:  { icon: 'logout',    text: 'Sedang melepas', short: 'Melepas...' },
-  reassign: { icon: 'arrowForward', text: 'Sedang mengalihkan', short: 'Mengalihkan...' },
-  undone:   { icon: 'block',     text: 'Sedang membatalkan penuntasan', short: 'Membatalkan...' },
-  refresh:  { icon: 'refresh',   text: 'Sedang memperbarui data', short: 'Memperbarui...' }
+  create:   { icon: 'addCircle', text: 'Sedang menambahkan', short: 'Menambahkan...', tone: 'ok',     anim: 'bounce', sub: 'Menyimpan laporan baru' },
+  update:   { icon: 'edit',      text: 'Sedang menyimpan perubahan', short: 'Menyimpan...', tone: 'info', anim: 'pulse', sub: 'Mohon tunggu sebentar' },
+  'delete': { icon: 'delete',    text: 'Sedang menghapus', short: 'Menghapus...', tone: 'danger', anim: 'pulse', sub: 'Laporan sedang dihapus' },
+  verify:   { icon: 'verified',  text: 'Sedang memvalidasi', short: 'Memvalidasi...', tone: 'ok', anim: 'pulse', sub: 'Menetapkan jenis pekerjaan' },
+  unverify: { icon: 'block',     text: 'Sedang membatalkan validasi', short: 'Membatalkan...', tone: 'warn', anim: 'pulse', sub: 'Mohon tunggu sebentar' },
+  take:     { icon: 'taskAlt',   text: 'Sedang mengambil', short: 'Mengambil...', tone: 'ok', anim: 'bounce', sub: 'Pekerjaan sedang diambil' },
+  release:  { icon: 'logout',    text: 'Sedang melepas', short: 'Melepas...', tone: 'warn', anim: 'pulse', sub: 'Pekerjaan sedang dilepas' },
+  reassign: { icon: 'arrowForward', text: 'Sedang mengalihkan', short: 'Mengalihkan...', tone: 'info', anim: 'bounce', sub: 'Penugasan sedang dialihkan' },
+  undone:   { icon: 'block',     text: 'Sedang membatalkan penuntasan', short: 'Membatalkan...', tone: 'warn', anim: 'pulse', sub: 'Mohon tunggu sebentar' },
+  refresh:  { icon: 'refresh',   text: 'Sedang memperbarui data', short: 'Memperbarui...', tone: 'info', anim: 'spin', sub: 'Menyegarkan daftar' }
 };
 var CARD_BUSY_TIMEOUT_MS_ = 60000;
 
@@ -1435,7 +1435,7 @@ function cardBusyPaint_(card, id) {
   var b = loadingById[id];
   if (!b || !card) return;
   var meta = CARD_BUSY_META_[b.action] || CARD_BUSY_META_.refresh;
-  var noun = b.noun || cardIdLabel_(id);
+  var noun = b.noun ? ' ' + b.noun : ''; // hanya objek eksplisit (komentar/jadwal/konten); ID laporan tidak ditampilkan
   // Mode "swap" (baris tabel / chip kecil): bagian tertentu diganti ikon + pesan singkat.
   var swapSel = card.dataset.busySwap;
   if (swapSel) {
@@ -1446,7 +1446,7 @@ function cardBusyPaint_(card, id) {
       tgt.querySelector('.busy-swap-txt').textContent = meta.short;
       card.classList.add('is-busy-swap');
       card.setAttribute('aria-busy', 'true');
-      card.title = meta.text + ' ' + noun + '...';
+      card.title = meta.text + noun + '...';
     }
     return;
   }
@@ -1456,12 +1456,15 @@ function cardBusyPaint_(card, id) {
     ov.className = 'card-busy';
     ov.setAttribute('role', 'status');
     ov.setAttribute('aria-live', 'polite');
-    ov.innerHTML = '<span class="card-busy-ico"></span><span class="card-busy-msg"></span>';
+    ov.innerHTML = '<span class="card-busy-ico"></span><span class="card-busy-txt"><span class="card-busy-msg"></span><span class="card-busy-sub"></span></span>';
     card.appendChild(ov);
   }
   card.classList.add('is-busy');
+  ov.dataset.tone = meta.tone || 'info';
+  ov.dataset.anim = meta.anim || 'pulse';
   ov.querySelector('.card-busy-ico').innerHTML = mdIcon(meta.icon, 20);
-  ov.querySelector('.card-busy-msg').textContent = meta.text + ' ' + noun + '...';
+  ov.querySelector('.card-busy-msg').textContent = meta.text + noun + '...';
+  ov.querySelector('.card-busy-sub').textContent = meta.sub || '';
 }
 
 /** Mulai loading untuk satu card. false bila card itu sedang diproses (cegah request ganda). */
@@ -2299,7 +2302,7 @@ function buildVerifikasiRow_(p, card, opts) {
 
   function paintStatus_(box, inf, slider) {
     box.className = 'vf-box ' + inf.cls + (slider ? ' vf-slider' : '');
-    var label = '<span class="vf-label">' + mdIcon(inf.icon, 16) + '<span>' + inf.label + '</span></span>';
+    var label = '<span class="vf-label"><span class="vf-ico vf-ico-' + inf.icon + '">' + mdIcon(inf.icon, 16) + '</span><span>' + inf.label + '</span></span>';
     box.innerHTML = (slider ? '<span class="vf-handle" role="button" tabindex="0" aria-label="Geser untuk memvalidasi">' + mdIcon('arrowForward', 18) + '</span>' : '') + label;
     if (slider) vfAttachSlide_(box, box.querySelector('.vf-handle'), function () { openVerifikasiPilihJenis_(p); });
   }
