@@ -2330,10 +2330,16 @@ function formatAktivitasDateShort_(ddmmyyyyHHmm) {
 /** Warna avatar inisial (stabil per nama). */
 var LC_AVATAR_TONES_ = [['#e0e7ff', '#4338ca'], ['#ccfbf1', '#0f766e'], ['#fef3c7', '#b45309'], ['#ffe4e6', '#be123c'], ['#e0f2fe', '#0369a1'], ['#ede9fe', '#6d28d9']];
 /** Avatar petugas di kartu daftar: emoticon bila sudah memilih, huruf inisial berwarna bila belum. data-uc dipakai untuk memperbarui saat peta avatar tiba. */
+/** Atribut cadangan untuk foto galeri: bila gagal dimuat, tampil huruf inisial (ditangani listener 'error' global). */
+function lcAvPhotoAttr_(id, name) {
+  if (!avatarIsPhoto_(id)) return '';
+  return ' data-avph="1" data-ini="' + escapeHtmlJk_((String(name || '?').trim().charAt(0) || '?').toUpperCase()) + '"';
+}
+
 function lcAvatarHtml_(userCode, officer, tone) {
   var id = (typeof avatarIdOf_ === 'function') ? avatarIdOf_(userCode) : '';
   var uc = ' data-uc="' + escapeHtmlJk_(userCode || '') + '"';
-  if (id) return '<span class="lc-avatar lc-avatar-img"' + uc + '><img src="' + avatarSvgUrl_(id) + '" alt="" draggable="false"></span>';
+  if (id) return '<span class="lc-avatar lc-avatar-img"' + uc + '><img src="' + avatarSrc_(id) + '" alt="" draggable="false"' + lcAvPhotoAttr_(id, officer) + '></span>';
   return '<span class="lc-avatar"' + uc + ' data-ini="1" style="background:' + tone[0] + ';color:' + tone[1] + ';">' + escapeHtmlJk_(String(officer || '?').trim().charAt(0).toUpperCase() || '?') + '</span>';
 }
 
@@ -2343,15 +2349,16 @@ function lcAvatarsRefresh_() {
     var uc = el.getAttribute('data-uc'), id = avatarIdOf_(uc);
     var hasImg = el.classList.contains('lc-avatar-img');
     if (id) {
-      var url = avatarSvgUrl_(id);
-      if (hasImg) { var im = el.querySelector('img'); if (im && im.getAttribute('src') !== url) im.setAttribute('src', url); return; }
-      el.classList.add('lc-avatar-img'); el.removeAttribute('style'); el.removeAttribute('data-ini');
-      el.innerHTML = '<img src="' + url + '" alt="" draggable="false">';
+      var url = avatarSrc_(id);
+      var nm0 = el.parentNode && el.parentNode.querySelector('.lc-name');
+      if (hasImg) { var im = el.querySelector('img'); if (im && im.getAttribute('src') === url) return; }
+      el.classList.remove('av-fallback'); el.classList.add('lc-avatar-img'); el.removeAttribute('style'); el.removeAttribute('data-ini');
+      el.innerHTML = '<img src="' + url + '" alt="" draggable="false"' + lcAvPhotoAttr_(id, nm0 ? nm0.textContent : uc) + '>';
     } else if (hasImg) {
       // kembali ke inisial: nama tidak tersimpan di elemen, ambil dari teks nama di sebelahnya
       var nm = el.parentNode && el.parentNode.querySelector('.lc-name');
       var name = nm ? nm.textContent : uc, tone = lcAvatarTone_(name);
-      el.classList.remove('lc-avatar-img'); el.setAttribute('data-ini', '1');
+      el.classList.remove('lc-avatar-img', 'av-fallback'); el.setAttribute('data-ini', '1');
       el.style.background = tone[0]; el.style.color = tone[1];
       el.textContent = (String(name || '?').trim().charAt(0).toUpperCase() || '?');
     }

@@ -1146,10 +1146,31 @@ function avatarSvgUrl_(id) {
   return (_avUrlCache_[id] = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg));
 }
 
+var AVATAR_PHOTO_RE_ = /^photo:([A-Za-z0-9_-]{10,100}):([a-z0-9]{1,12})$/;
+
+/** Nilai avatar sah: id emoticon, atau "photo:<driveId>:<versi>" (foto dari galeri). '' bila belum memilih. */
 function avatarIdOf_(userCode) {
   var id = userCode ? appAvatars[userCode] : '';
-  return (id && AVATAR_BY_ID_[id]) ? id : '';
+  return (id && (AVATAR_BY_ID_[id] || AVATAR_PHOTO_RE_.test(id))) ? id : '';
 }
+function avatarIsPhoto_(id) { return !!id && AVATAR_PHOTO_RE_.test(id); }
+
+/** URL gambar untuk nilai avatar (data-URL emoticon, atau thumbnail Drive untuk foto). */
+function avatarSrc_(id) {
+  var m = AVATAR_PHOTO_RE_.exec(id || '');
+  if (m) return 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w160';
+  return avatarSvgUrl_(id);
+}
+
+/** Foto gagal dimuat (offline / file dihapus): kembali ke huruf inisial tanpa mengubah data. */
+document.addEventListener('error', function (e) {
+  var img = e.target;
+  if (!img || img.tagName !== 'IMG' || !img.hasAttribute('data-avph')) return;
+  var host = img.parentNode; if (!host) return;
+  var ini = img.getAttribute('data-ini') || '?';
+  host.classList.add('av-fallback');
+  host.textContent = ini;
+}, true);
 
 /** Elemen avatar bulat: emoticon bila sudah memilih, huruf inisial bila belum. */
 function avatarNode_(userCode, name, size) {
@@ -1160,7 +1181,8 @@ function avatarNode_(userCode, name, size) {
   el.setAttribute('aria-hidden', 'true');
   if (id) {
     var img = document.createElement('img');
-    img.src = avatarSvgUrl_(id); img.alt = ''; img.draggable = false;
+    img.src = avatarSrc_(id); img.alt = ''; img.draggable = false;
+    if (avatarIsPhoto_(id)) { img.setAttribute('data-avph', '1'); img.setAttribute('data-ini', ((name || userCode || '?').trim().charAt(0) || '?').toUpperCase()); }
     el.appendChild(img);
   } else {
     el.style.fontSize = Math.round(size * 0.46) + 'px';
@@ -1186,7 +1208,7 @@ function avatarApplyMine_() {
   if (akun) {
     akun.textContent = '';
     var fill = document.createElement('span'); fill.className = 'av-fill';
-    if (id) { var img = document.createElement('img'); img.src = avatarSvgUrl_(id); img.alt = ''; img.draggable = false; fill.appendChild(img); }
+    if (id) { var img = document.createElement('img'); img.src = avatarSrc_(id); img.alt = ''; img.draggable = false; if (avatarIsPhoto_(id)) { img.setAttribute('data-avph', '1'); img.setAttribute('data-ini', initial); } fill.appendChild(img); }
     else { fill.textContent = initial; }
     akun.appendChild(fill);
     var badge = document.createElement('span'); badge.className = 'akun-av-badge'; badge.innerHTML = mdIcon('photoCamera', 14);
@@ -1210,8 +1232,38 @@ function avatarsRefresh_() {
     .getAvatarMap(s.accessCode);
 }
 
+/** Foto galeri -> persegi 256x256 (potong tengah) JPEG ±20-40 KB. Menolak berkas yang tidak bisa didekode. */
+function avatarPhotoFromFile_(file) {
+  return new Promise(function (resolve, reject) {
+    var SIDE = 256, MAX_BYTES = 120 * 1024;
+    function sizeOf(d) { return Math.round((d.length - 'data:image/jpeg;base64,'.length) * 3 / 4); }
+    function finish(src, sw, sh) {
+      var c = document.createElement('canvas'); c.width = SIDE; c.height = SIDE;
+      var ctx = c.getContext('2d');
+      ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, SIDE, SIDE);   // PNG transparan tidak menjadi hitam
+      var side = Math.min(sw, sh), sx = Math.round((sw - side) / 2), sy = Math.round((sh - side) / 2);
+      ctx.drawImage(src, sx, sy, side, side, 0, 0, SIDE, SIDE);
+      var q = 0.86, d = c.toDataURL('image/jpeg', q), n = 0;
+      while (sizeOf(d) > MAX_BYTES && q > 0.4 && n++ < 6) { q -= 0.1; d = c.toDataURL('image/jpeg', q); }
+      c.width = 0; c.height = 0;
+      if (!d || d.indexOf('data:image/jpeg;base64,') !== 0) { reject(new Error('encode')); return; }
+      resolve({ base64: d.split(',')[1], mimeType: 'image/jpeg', previewUrl: d });
+    }
+    function viaImage() {
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () { var w = img.naturalWidth, h = img.naturalHeight; if (!w || !h) { URL.revokeObjectURL(url); reject(new Error('size')); return; } finish(img, w, h); URL.revokeObjectURL(url); };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('decode')); };
+      img.src = url;
+    }
+    if (window.createImageBitmap) {
+      createImageBitmap(file, { imageOrientation: 'from-image' }).then(function (bmp) { finish(bmp, bmp.width, bmp.height); if (bmp.close) bmp.close(); }, viaImage);
+    } else { viaImage(); }
+  });
+}
+
 // ---- Pemilih avatar (halaman Akun) ----
 var avatarDraft_ = '';
+var avatarPhotoDraft_ = null;   // { base64, mimeType, previewUrl } foto galeri yang belum disimpan
 var avatarSaving_ = false;
 
 function avatarPickerRender_() {
@@ -1227,16 +1279,19 @@ function avatarPickerRender_() {
     var img = document.createElement('img'); img.src = avatarSvgUrl_(p.id); img.alt = ''; img.draggable = false;
     var lb = document.createElement('span'); lb.textContent = p.short + ' (' + AVATAR_COLORS_[p.color].label + ')';
     b.appendChild(img); b.appendChild(lb);
-    b.addEventListener('click', function () { avatarDraft_ = p.id; avatarPickerRender_(); });
+    b.addEventListener('click', function () { avatarDraft_ = p.id; avatarPhotoDraft_ = null; avatarPickerRender_(); });
     grid.appendChild(b);
   });
   var user = appBootstrap && appBootstrap.currentUser || {};
   var prev = document.getElementById('av-preview');
   prev.textContent = '';
-  if (avatarDraft_) { var im = document.createElement('img'); im.src = avatarSvgUrl_(avatarDraft_); im.alt = ''; prev.appendChild(im); prev.className = 'av av-img'; }
-  else { prev.className = 'av av-init'; prev.textContent = ((user.displayName || user.userCode || '?').trim().charAt(0) || '?').toUpperCase(); }
-  document.getElementById('av-preview-name').textContent = avatarDraft_ ? AVATAR_BY_ID_[avatarDraft_].name : 'Huruf inisial';
-  document.getElementById('av-reset').classList.toggle('sel', !avatarDraft_);
+  var ini = ((user.displayName || user.userCode || '?').trim().charAt(0) || '?').toUpperCase();
+  if (avatarPhotoDraft_) { var ip = document.createElement('img'); ip.src = avatarPhotoDraft_.previewUrl; ip.alt = ''; prev.appendChild(ip); prev.className = 'av av-img'; }
+  else if (avatarDraft_) { var im = document.createElement('img'); im.src = avatarSrc_(avatarDraft_); im.alt = ''; if (avatarIsPhoto_(avatarDraft_)) { im.setAttribute('data-avph', '1'); im.setAttribute('data-ini', ini); } prev.appendChild(im); prev.className = 'av av-img'; }
+  else { prev.className = 'av av-init'; prev.textContent = ini; }
+  document.getElementById('av-preview-name').textContent = avatarPhotoDraft_ ? 'Foto baru (belum disimpan)' : (avatarIsPhoto_(avatarDraft_) ? 'Foto dari galeri' : (avatarDraft_ ? AVATAR_BY_ID_[avatarDraft_].name : 'Huruf inisial'));
+  document.getElementById('av-reset').classList.toggle('sel', !avatarDraft_ && !avatarPhotoDraft_);
+  var upl = document.getElementById('av-upload'); if (upl) upl.classList.toggle('sel', !!avatarPhotoDraft_ || avatarIsPhoto_(avatarDraft_));
 }
 
 function openAvatarPicker_() {
@@ -1244,6 +1299,7 @@ function openAvatarPicker_() {
   if (!user) return;
   if (user.role === 'demo') { if (typeof showSnackbar === 'function') showSnackbar('Akun Demo tidak dapat mengubah avatar.', 'info'); return; }
   avatarDraft_ = avatarIdOf_(user.userCode);
+  avatarPhotoDraft_ = null;
   avatarPickerRender_();
   document.getElementById('avatar-overlay').classList.add('show');
 }
@@ -1260,13 +1316,27 @@ function closeAvatarPicker_() {
   document.getElementById('av-close').addEventListener('click', closeAvatarPicker_);
   document.getElementById('av-cancel').addEventListener('click', closeAvatarPicker_);
   ov.addEventListener('click', function (e) { if (e.target === ov) closeAvatarPicker_(); });
-  document.getElementById('av-reset').addEventListener('click', function () { avatarDraft_ = ''; avatarPickerRender_(); });
+  document.getElementById('av-reset').addEventListener('click', function () { avatarDraft_ = ''; avatarPhotoDraft_ = null; avatarPickerRender_(); });
+  var upBtn = document.getElementById('av-upload'), upFile = document.getElementById('av-file');
+  if (upBtn && upFile) {
+    upBtn.innerHTML = mdIcon('photoCamera', 18) + '<span>Ambil foto dari galeri</span>';
+    upBtn.addEventListener('click', function () { if (!avatarSaving_) upFile.click(); });
+    upFile.addEventListener('change', function () {
+      var f = upFile.files && upFile.files[0]; upFile.value = '';
+      if (!f) return;
+      if (!/^image\//i.test(f.type || '')) { if (typeof showSnackbar === 'function') showSnackbar('Pilih berkas gambar (JPG/PNG/WEBP).', 'error'); return; }
+      upBtn.disabled = true;
+      avatarPhotoFromFile_(f).then(function (ph) { avatarPhotoDraft_ = ph; avatarDraft_ = ''; avatarPickerRender_(); })
+        .catch(function () { if (typeof showSnackbar === 'function') showSnackbar('Foto tidak dapat dibaca. Coba foto lain (JPG/PNG).', 'error'); })
+        .then(function () { upBtn.disabled = false; });
+    });
+  }
   var akunBtn = document.getElementById('akun-avatar');
   if (akunBtn) akunBtn.addEventListener('click', openAvatarPicker_);
   document.getElementById('av-apply').addEventListener('click', function () {
     var user = appBootstrap && appBootstrap.currentUser, s = loadSession();
     if (!user || !s || avatarSaving_) return;
-    if (avatarDraft_ === avatarIdOf_(user.userCode)) { closeAvatarPicker_(); return; }
+    if (!avatarPhotoDraft_ && avatarDraft_ === avatarIdOf_(user.userCode)) { closeAvatarPicker_(); return; }
     var btn = this; avatarSaving_ = true; btn.disabled = true; btn.textContent = 'Menyimpan…';
     function done_() { avatarSaving_ = false; btn.disabled = false; btn.textContent = 'Terapkan'; }
     google.script.run
@@ -1278,7 +1348,7 @@ function closeAvatarPicker_() {
         if (typeof showSnackbar === 'function') showSnackbar('Avatar diperbarui.', 'success');
       })
       .withFailureHandler(function () { done_(); if (typeof showSnackbar === 'function') showSnackbar('Gagal terhubung ke server. Coba lagi.', 'error'); })
-      .ubahAvatar(s.accessCode, avatarDraft_);
+      [avatarPhotoDraft_ ? 'ubahAvatarFoto' : 'ubahAvatar'](s.accessCode, avatarPhotoDraft_ ? { base64: avatarPhotoDraft_.base64, mimeType: avatarPhotoDraft_.mimeType } : avatarDraft_);
   });
 })();
 

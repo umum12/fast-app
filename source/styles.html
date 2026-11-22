@@ -4798,3 +4798,12 @@ tr.cm-pending-row .cm-title { font-weight: 700; }
 @media (prefers-reduced-motion: reduce) { .av-tile { transition: none; } }
 .lc2 .lc-avatar.lc-avatar-img { background: transparent !important; padding: 0; overflow: hidden; }
 .lc2 .lc-avatar.lc-avatar-img img { width: 100%; height: 100%; display: block; border-radius: 50%; }
+
+/* ===== Avatar foto dari galeri ===== */
+.av-upload { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 44px; margin: 0 0 10px; font: inherit; font-size: 14px; font-weight: 700; color: var(--color-primary); background: var(--md-surface-container); border: 1.5px dashed var(--color-primary); border-radius: 14px; cursor: pointer; }
+.av-upload.sel { border-style: solid; background: color-mix(in srgb, var(--color-primary) 10%, transparent); }
+.av-upload:disabled { opacity: .6; cursor: default; }
+.av-upload:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.av.av-fallback, .lc-avatar.av-fallback, .av-fill.av-fallback { display: inline-flex; align-items: center; justify-content: center; font-weight: 700; background: #e2e8f0 !important; color: #475569 !important; }
+html[data-theme="dark"] .av.av-fallback, html[data-theme="dark"] .lc-avatar.av-fallback, html[data-theme="dark"] .av-fill.av-fallback { background: #334155 !important; color: #cbd5e1 !important; }
+.av img, .lc-avatar img, .av-fill img { object-fit: cover; }
