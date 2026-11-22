@@ -1168,27 +1168,37 @@ function openJadwalDetail_(entry) {
   var dateLong = formatJadwalDateLong_(entry.tanggal);
 
   var body = document.getElementById('jk-detail-body');
-  var isSelf = entry.createdBy === entry.userCode;
-  var creatorName = isSelf ? 'dirinya sendiri' : (entry.createdByName || entry.createdBy);
-  var html = '<div class="jk-detail-card">';
-  html += '<div class="jk-detail-head" style="color:' + colors.fg + ';">' + escapeHtmlJk_(entry.jenisLabel) + ' • ' + formatJadwalDateFull_(entry.tanggal) + '</div>';
-  var stDet = jkStatusOf_(entry);
-  html += '<hr class="jk-detail-hr"><p class="jk-detail-label">Status</p>' +
-    '<div class="jk-detail-status">' + jkStatusBadgeHtml_(entry, true) + '<small>' + JK_STATUS_NOTE_[stDet] + '</small></div>';
-  html += '<hr class="jk-detail-hr"><p class="jk-detail-label">Petugas</p>' +
-    '<div class="jk-detail-person">' + escapeHtmlJk_(entry.userName) + '</div>';
+  var creatorName = entry.createdByName || entry.createdBy || '-';
+  var stDet = jkStatusOf_(entry), stCls = stDet.toLowerCase();
+  var kubuLabel = jkKubuOfJenis_(entry.jenis) === 'piket' ? 'Petugas piket' : 'Ketidakhadiran';
+  var tone = (typeof lcAvatarTone_ === 'function') ? lcAvatarTone_(entry.userName) : ['#e2e8f0', '#475569'];
+  var html = '<div class="jkd">' +
+    '<div class="jkd-head"><h2 class="jkd-title" style="color:' + colors.fg + ';">' + escapeHtmlJk_(entry.jenisLabel) + '</h2>' +
+    '<p class="jkd-date">' + escapeHtmlJk_(formatJadwalDateFull_(entry.tanggal)) + '</p></div>' +
+    '<div class="jkd-body">' +
+      '<div class="jkd-person">' + lcAvatarHtml_(entry.userCode, entry.userName, tone) +
+        '<div class="jkd-who"><span class="jkd-name lc-name">' + escapeHtmlJk_(entry.userName) + '</span><span class="jkd-role">' + kubuLabel + '</span></div></div>' +
+      '<div class="jkd-stwrap">' +
+        '<button type="button" class="jkd-badge st-' + stCls + '" id="jkd-st-btn" aria-expanded="false" aria-controls="jkd-pop"><span>' + stDet + '</span>' + mdIcon(stDet === 'TBD' ? 'help' : 'checkCircle', 16) + '</button>' +
+        '<div class="jkd-pop" id="jkd-pop" role="status" hidden>' +
+          '<div class="jkd-pop-top"><span class="jkd-pop-title st-' + stCls + '">Status: ' + stDet + '</span>' +
+          '<button type="button" class="jkd-pop-x" id="jkd-pop-x" aria-label="Tutup keterangan">' + mdIcon('close', 14) + '</button></div>' +
+          '<p>' + JK_STATUS_NOTE_[stDet] + '</p></div>' +
+      '</div>' +
+    '</div>';
   if (entry.catatan) {
-    html += '<hr class="jk-detail-hr"><p class="jk-detail-label">Catatan</p>' +
-      '<div style="font-size:14px; white-space:pre-wrap;">' + escapeHtmlJk_(entry.catatan) + '</div>';
+    html += '<div class="jkd-note"><p class="jk-detail-label">Catatan</p><div>' + escapeHtmlJk_(entry.catatan) + '</div></div>';
   }
-  html += '<hr class="jk-detail-hr"><p class="jk-detail-label">Dibuat oleh</p>' +
-    '<div class="jk-creator"><span>' + escapeHtmlJk_(creatorName) + '</span><small>' + formatJadwalTimestamp_(entry.createdAt) + '</small></div>';
+  html += '<div class="jkd-foot">' +
+    '<div class="jkd-f"><div class="jkd-fl">' + mdIcon('personAdd', 14) + '<span>Dibuat oleh: <strong>' + escapeHtmlJk_(creatorName) + '</strong></span></div>' +
+      '<span class="jkd-ft">' + escapeHtmlJk_(formatJadwalTimestamp_(entry.createdAt)) + '</span></div>';
   if (entry.updatedBy) {
-    html += '<hr class="jk-detail-hr"><p class="jk-detail-label">Terakhir diubah</p>' +
-      '<div class="jk-creator"><span>' + escapeHtmlJk_(entry.updatedByName || entry.updatedBy) + '</span><small>' + formatJadwalTimestamp_(entry.updatedAt) + '</small></div>';
+    html += '<div class="jkd-f jkd-f-r"><div class="jkd-fl">' + mdIcon('edit', 14) + '<span>Di-edit oleh: <strong>' + escapeHtmlJk_(entry.updatedByName || entry.updatedBy) + '</strong></span></div>' +
+      '<span class="jkd-ft">' + escapeHtmlJk_(formatJadwalTimestamp_(entry.updatedAt)) + '</span></div>';
   }
-  html += '</div>';
+  html += '</div></div>';
   body.innerHTML = html;
+  jkdWirePopover_();
 
   if (canEdit) {
     var actions = document.createElement('div');
@@ -1217,6 +1227,33 @@ function openJadwalDetail_(entry) {
   }
 
   jkShow_('jk-detail-overlay');
+}
+
+/** Badge TBD/FIX di detail jadwal: ketuk -> keterangan singkat; ketuk di luar / tombol tutup / Esc -> tertutup. */
+function jkdPopClose_() {
+  var pop = document.getElementById('jkd-pop'), btn = document.getElementById('jkd-st-btn');
+  if (pop) pop.hidden = true;
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+var jkdPopGlobal_ = false;
+function jkdWirePopover_() {
+  var pop = document.getElementById('jkd-pop'), btn = document.getElementById('jkd-st-btn'), x = document.getElementById('jkd-pop-x');
+  if (!pop || !btn) return;
+  btn.addEventListener('click', function (e) {
+    e.stopPropagation();
+    var open = pop.hidden;
+    pop.hidden = !open;
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+  if (x) x.addEventListener('click', function (e) { e.stopPropagation(); jkdPopClose_(); });
+  if (!jkdPopGlobal_) {
+    jkdPopGlobal_ = true;
+    document.addEventListener('click', function (e) {
+      var pp = document.getElementById('jkd-pop');
+      if (pp && !pp.hidden && !pp.contains(e.target)) jkdPopClose_();
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') jkdPopClose_(); });
+  }
 }
 
 function escapeHtmlJk_(t) {
