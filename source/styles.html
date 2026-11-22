@@ -4849,3 +4849,39 @@ html[data-theme="dark"] .av.av-fallback, html[data-theme="dark"] .lc-avatar.av-f
 @media (max-width: 360px) { .jkd-foot { flex-direction: column; } .jkd-f-r { align-items: flex-start; text-align: left; } .jkd-f-r .jkd-fl { justify-content: flex-start; } .jkd-f-r .jkd-ft { padding: 0 0 0 18px; } }
 @media (prefers-reduced-motion: reduce) { .jkd-pop { animation: none; } }
 
+/* ===== Detail Validasi v2 (hero tengah + baris validator + keterangan) ===== */
+.vfd .vfd-top { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px 6px; }
+.vfd .vfd-kicker { font-size: 13px; font-weight: 800; letter-spacing: .08em; color: var(--color-text); }
+.vfd .vfd-x { width: 36px; height: 36px; background: rgba(148,163,184,.18); color: #64748b; }
+.vfd .vfd-x:hover { background: rgba(148,163,184,.3); }
+.vfd .vfd-body { padding: 6px 20px 8px; }
+.vfd-hero { text-align: center; padding: 6px 0 18px; border-bottom: 1px solid rgba(148,163,184,.28); }
+.vfd-title { margin: 0; font-size: 22px; font-weight: 800; line-height: 1.15; letter-spacing: .03em; text-transform: uppercase; color: var(--color-primary); }
+.vfd-title.vfd-pending { color: #c2410c; }
+.vfd-sub { margin: 6px 0 0; font-size: 13.5px; color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+.vfd-sub.is-empty { color: #94a3b8; }
+.vfd-entity { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 0; border-bottom: 1px solid rgba(148,163,184,.28); }
+.vfd-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.vfd-avatar { width: 44px; height: 44px; border-radius: 50%; flex: 0 0 auto; display: grid; place-items: center; font-size: 18px; font-weight: 800; border: 1px solid; }
+.vfd-av-auto { background: var(--md-primary-container, #eff6ff); border-color: #bfdbfe; color: var(--color-primary); }
+.vfd-av-manual { background: #dcfce7; border-color: #86efac; color: #166534; }
+.vfd-av-pending { background: #ffedd5; border-color: #fed7aa; color: #9a3412; }
+.vfd-meta { display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 3px; min-width: 0; }
+.vfd-name { font-size: 15.5px; font-weight: 800; line-height: 1.15; text-transform: uppercase; overflow-wrap: anywhere; color: var(--color-text); }
+.vfd-proc { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 500; color: var(--color-text-muted); }
+.vfd-proc .material-symbols-outlined { color: var(--color-primary); }
+.vfd-pill { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; padding: 7px 12px; border-radius: 999px; font-size: 12px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.vfd-pill-auto { background: #84cc16; color: #1a2e05; box-shadow: 0 4px 12px -4px rgba(132,204,22,.55); }
+.vfd-pill-manual { background: var(--color-primary); color: #fff; box-shadow: 0 4px 12px -4px rgba(29,78,216,.45); }
+.vfd-pill-wait { background: #ffedd5; color: #9a3412; border: 1px solid #fed7aa; }
+.vfd-note { margin: 0; padding: 16px 0 14px; font-size: 12.5px; line-height: 1.55; font-style: italic; color: var(--color-text-muted); }
+.vfd .vf-audit { margin-top: 2px; }
+html[data-theme="dark"] .vfd .vfd-x { color: #cbd5e1; }
+html[data-theme="dark"] .vfd-title.vfd-pending { color: #fdba74; }
+html[data-theme="dark"] .vfd-av-auto { background: rgba(59,130,246,.2); border-color: rgba(147,197,253,.4); color: #93c5fd; }
+html[data-theme="dark"] .vfd-av-manual { background: rgba(34,197,94,.18); border-color: rgba(74,222,128,.4); color: #4ade80; }
+html[data-theme="dark"] .vfd-av-pending { background: rgba(249,115,22,.2); border-color: rgba(253,186,116,.4); color: #fdba74; }
+html[data-theme="dark"] .vfd-pill-wait { background: rgba(249,115,22,.2); color: #fdba74; border-color: rgba(253,186,116,.4); }
+html[data-theme="dark"] .vfd-pill-manual { background: #3b82f6; }
+@media (max-width: 400px) { .vfd .vfd-body { padding-left: 16px; padding-right: 16px; } .vfd-title { font-size: 19px; } .vfd-name { font-size: 14.5px; } .vfd-pill { padding: 6px 10px; } }
+

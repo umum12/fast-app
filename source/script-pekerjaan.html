@@ -2646,18 +2646,101 @@ function vfFormatWaktu_(s) {
 
 function vfEsc_(t) { return escapeHtmlJk_(String(t == null ? '' : t)); }
 
+// ---- Teks keterangan validasi (bervariasi, tetap per laporan) ----
+// Dipilih deterministik dari ID laporan + kategori, jadi SAMA di semua perangkat & tidak berubah saat dibuka ulang.
+var VF_NOTES_ = {
+  harian: [
+    'Berdasarkan hasil peninjauan, pekerjaan ini ditetapkan sebagai kategori harian karena merupakan aktivitas rutin yang dilaksanakan secara berulang dalam operasional sehari-hari.',
+    'Pekerjaan ini diklasifikasikan sebagai pekerjaan harian berdasarkan frekuensi pelaksanaan dan karakteristik aktivitasnya yang berlangsung setiap hari.',
+    'Hasil pemeriksaan menunjukkan bahwa pekerjaan ini termasuk aktivitas operasional harian yang memerlukan pelaksanaan secara konsisten.',
+    'Setelah melalui proses peninjauan, pekerjaan ini ditetapkan sebagai kategori harian karena menjadi bagian dari rutinitas operasional yang berkelanjutan.',
+    'Pekerjaan ini masuk dalam kategori harian berdasarkan pola pelaksanaannya yang bersifat rutin dan tidak terikat pada interval periode tertentu.',
+    'Berdasarkan karakteristik aktivitasnya, pekerjaan ini dinilai sebagai pekerjaan harian yang menjadi bagian dari kebutuhan operasional reguler.',
+    'Hasil validasi menetapkan pekerjaan ini sebagai kategori harian karena pelaksanaannya merupakan bagian dari aktivitas rutin yang berlangsung setiap hari.',
+    'Pekerjaan ini dikategorikan sebagai pekerjaan harian berdasarkan kebutuhan pelaksanaan yang bersifat reguler dan berulang.',
+    'Peninjauan menunjukkan bahwa aktivitas ini memiliki karakteristik pekerjaan harian dengan pola pelaksanaan yang konsisten.',
+    'Pekerjaan ini ditetapkan sebagai kategori harian karena merupakan bagian dari aktivitas operasional yang secara konsisten perlu diperhatikan setiap hari.'
+  ],
+  periodik: [
+    'Berdasarkan hasil peninjauan, pekerjaan ini ditetapkan sebagai kategori periodik karena dilaksanakan secara berkala. Konsistensi yang patut diapresiasi, karena pekerjaan ini selalu tahu kapan harus kembali.',
+    'Pekerjaan ini diklasifikasikan sebagai pekerjaan periodik berdasarkan interval pelaksanaannya. Rupanya, ada pekerjaan yang memang tidak cukup diselesaikan sekali.',
+    'Hasil pemeriksaan menetapkan pekerjaan ini sebagai kategori periodik karena memiliki siklus pelaksanaan tertentu. Sebuah rutinitas yang punya jadwal untuk kembali merepotkan.',
+    'Pekerjaan ini termasuk kategori periodik berdasarkan pola pelaksanaan berkala sesuai kebutuhan operasional. Sampai jumpa di periode berikutnya.',
+    'Berdasarkan karakteristiknya, pekerjaan ini ditetapkan sebagai pekerjaan periodik karena membutuhkan tindak lanjut dalam interval waktu tertentu. Konsistensi memang membutuhkan komitmen.',
+    'Hasil validasi menunjukkan bahwa pekerjaan ini memiliki siklus pelaksanaan berulang. Bukan pekerjaan yang selesai sekali lalu menghilang begitu saja.',
+    'Pekerjaan ini ditetapkan sebagai kategori periodik karena pelaksanaannya mengikuti jadwal yang telah ditentukan. Waktunya mungkin berbeda, tetapi pekerjaannya tetap kembali.',
+    'Berdasarkan hasil evaluasi, pekerjaan ini termasuk aktivitas periodik yang membutuhkan perhatian secara berkala. Rupanya, pekerjaan ini memiliki agenda tetap untuk kembali hadir.',
+    'Pekerjaan ini dikategorikan sebagai pekerjaan periodik karena memiliki frekuensi pelaksanaan yang terjadwal. Konsistensi seperti ini tentu tidak datang dengan sendirinya.',
+    'Hasil peninjauan menetapkan pekerjaan ini sebagai kategori periodik berdasarkan siklus operasionalnya. Selesai untuk saat ini, sampai siklus berikutnya memanggil kembali.'
+  ],
+  // Otomatis oleh sistem (H+2 tanpa peninjauan manual) -> Default
+  default: [
+    'Pekerjaan ini ditetapkan ke dalam kategori default karena belum mendapatkan peninjauan manual dari administrator hingga batas waktu H+2 sejak laporan diterima.',
+    'Hingga batas waktu H+2, belum terdapat proses validasi manual oleh administrator sehingga sistem menetapkan kategori default secara otomatis.',
+    'Berdasarkan mekanisme validasi sistem, pekerjaan ini masuk kategori default karena tidak memperoleh peninjauan manual dalam jangka waktu H+2 sejak laporan diterima.',
+    'Pekerjaan ini menggunakan klasifikasi default sebagai konsekuensi tidak dilakukannya pemeriksaan manual oleh administrator hingga batas waktu yang ditentukan.',
+    'Sistem menetapkan kategori default karena proses peninjauan dan validasi manual belum dilakukan oleh administrator dalam periode H+2.',
+    'Tidak adanya peninjauan manual hingga batas waktu H+2 menyebabkan pekerjaan ini diklasifikasikan secara otomatis ke dalam kategori default.',
+    'Pekerjaan ini belum memperoleh penetapan kategori melalui pemeriksaan administrator. Oleh karena itu, sistem menerapkan klasifikasi default setelah melewati batas waktu H+2.',
+    'Sesuai mekanisme validasi yang berlaku, pekerjaan ini ditetapkan sebagai kategori default karena tidak mendapatkan tindak lanjut peninjauan manual dalam batas waktu H+2.',
+    'Proses peninjauan manual belum dilakukan hingga batas waktu yang ditentukan. Dengan demikian, sistem mengambil alih penetapan kategori melalui mekanisme default otomatis.',
+    'Pekerjaan ini memperoleh klasifikasi default setelah melewati periode H+2 tanpa adanya validasi manual dari administrator, sesuai dengan mekanisme penetapan kategori yang berlaku.'
+  ],
+  // Divalidasi manual oleh administrator dengan jenis Default
+  manual_default: [
+    'Setelah ditinjau oleh administrator, pekerjaan ini ditetapkan sebagai kategori default karena tidak termasuk pekerjaan harian maupun periodik.',
+    'Hasil peninjauan manual menunjukkan bahwa pekerjaan ini berada di luar pola harian dan periodik, sehingga diklasifikasikan sebagai default.',
+    'Administrator menetapkan pekerjaan ini ke kategori default berdasarkan karakteristiknya yang tidak memiliki pola pelaksanaan rutin tertentu.',
+    'Berdasarkan pemeriksaan manual, pekerjaan ini bersifat insidental dan tidak terikat siklus tertentu, sehingga masuk dalam kategori default.',
+    'Pekerjaan ini telah ditinjau secara manual dan dinilai tidak memenuhi kriteria pekerjaan harian maupun periodik, sehingga ditetapkan sebagai default.',
+    'Hasil validasi administrator menetapkan kategori default karena pekerjaan ini tidak memiliki frekuensi pelaksanaan yang berulang secara tetap.',
+    'Melalui peninjauan manual, pekerjaan ini dinilai sebagai aktivitas di luar rutinitas terjadwal dan dikategorikan sebagai default.',
+    'Administrator memeriksa pekerjaan ini dan menetapkannya sebagai kategori default sesuai sifat pelaksanaannya yang kondisional.',
+    'Setelah melalui validasi manual, pekerjaan ini ditempatkan pada kategori default karena tidak mengikuti pola harian ataupun periodik.',
+    'Peninjauan manual menyimpulkan bahwa pekerjaan ini paling sesuai dengan kategori default berdasarkan karakteristik dan kebutuhan pelaksanaannya.'
+  ],
+  // Belum divalidasi
+  menunggu: [
+    'Laporan ini sudah diterima dan sedang menunggu peninjauan administrator untuk menentukan kategori pekerjaannya.',
+    'Kategori pekerjaan belum ditetapkan. Administrator dapat memvalidasi laporan ini kapan saja sebelum batas waktu H+2.',
+    'Proses validasi belum dilakukan. Bila tidak ada peninjauan manual hingga H+2, sistem akan menetapkan kategori default secara otomatis.',
+    'Laporan berhasil dikirim dan kini berada dalam antrean validasi. Kategori akan ditentukan setelah peninjauan.',
+    'Pekerjaan ini belum memiliki kategori. Penetapan akan dilakukan oleh administrator atau otomatis oleh sistem setelah batas waktu H+2.',
+    'Peninjauan administrator masih ditunggu. Setelah divalidasi, kategori dan waktu validasi akan tampil di sini.',
+    'Status validasi masih menunggu. Informasi kategori akan diperbarui begitu laporan ini ditinjau.',
+    'Laporan telah tercatat dan menunggu giliran untuk divalidasi. Mohon tunggu hingga proses peninjauan selesai.',
+    'Belum ada keputusan kategori untuk pekerjaan ini. Administrator masih memiliki waktu hingga H+2 untuk meninjaunya.',
+    'Validasi belum diproses. Pekerjaan akan diklasifikasikan setelah administrator meninjau atau setelah batas waktu H+2 terlampaui.'
+  ]
+};
+
+/** Indeks teks deterministik dari kunci (hash sederhana) — stabil di semua perangkat. */
+function vfNoteFor_(p, key) {
+  var pool = VF_NOTES_[key] || VF_NOTES_.default;
+  var str = String(p.pekerjaanId || '') + '|' + key, h = 5381;
+  for (var i = 0; i < str.length; i++) h = ((h << 5) + h + str.charCodeAt(i)) >>> 0;
+  return pool[h % pool.length];
+}
+
+function vfJenisIcon_(v) {
+  for (var i = 0; i < VF_JENIS_.length; i++) if (VF_JENIS_[i].v === v) return VF_JENIS_[i].icon;
+  return 'autoAwesome';
+}
+
 function openVerifikasiDetail_(p) {
   var st = p.verifikasiStatus;
-  var wait = st === 'MENUNGGU';
-  var badgeCls = wait ? 'vf-st-wait' : (st === 'OTOMATIS' ? 'vf-st-auto' : 'vf-st-ok');
-  var badgeTxt = wait ? 'MENUNGGU VALIDASI' : (st === 'OTOMATIS' ? 'TERVALIDASI OTOMATIS' : 'TERVALIDASI');
-  var by = wait ? '-' : (st === 'OTOMATIS' ? 'Sistem (otomatis)' : (p.verifiedByName || '-'));
-  var rows = [
-    ['shield', 'Status validasi', '<span class="vf-status ' + badgeCls + '">' + mdIcon(wait ? 'schedule' : 'check', 14) + '<span>' + badgeTxt + '</span></span>'],
-    ['refresh', 'Jenis validasi', vfEsc_(wait ? '-' : vfJenisLabel_(p.verifiedJenis))],
-    ['personCheck', 'Divalidasi oleh', vfEsc_(by)],
-    ['schedule', 'Tanggal & waktu', vfEsc_(wait ? '-' : vfFormatWaktu_(p.verifiedAt))]
-  ];
+  var wait = st === 'MENUNGGU', auto = st === 'OTOMATIS';
+  var jenis = auto ? 'DEFAULT' : (p.verifiedJenis || 'DEFAULT');
+  var kind = wait ? 'pending' : (auto ? 'auto' : 'manual');
+  var heroTxt = wait ? 'MENUNGGU VALIDASI' : (auto ? 'TERVALIDASI OTOMATIS' : 'TERVALIDASI MANUAL');
+  var subTxt = wait ? 'Belum divalidasi' : vfFormatWaktu_(p.verifiedAt);
+  var name = wait ? 'Belum ditinjau' : (auto ? 'Sistem (otomatis)' : (p.verifiedByName || '-'));
+  var avatarTxt = wait ? '!' : (auto ? 'S' : ((String(p.verifiedByName || '?').trim().charAt(0) || '?').toUpperCase()));
+  var procLabel = wait ? 'Belum ditentukan' : (jenis === 'HARIAN' ? 'Pekerjaan Harian' : (jenis === 'PERIODIK' ? 'Pekerjaan Periodik' : 'Default'));
+  var procIcon = wait ? 'schedule' : vfJenisIcon_(jenis);
+  var pill = wait ? { cls: 'vfd-pill-wait', txt: 'MENUNGGU', icon: 'schedule' } : (auto ? { cls: 'vfd-pill-auto', txt: 'OTOMATIS', icon: 'smartToy' } : { cls: 'vfd-pill-manual', txt: 'MANUAL', icon: 'verifiedUser' });
+  var noteKey = wait ? 'menunggu' : (auto ? 'default' : (jenis === 'HARIAN' ? 'harian' : (jenis === 'PERIODIK' ? 'periodik' : 'manual_default')));
+
   var hist = p.verifikasiRiwayat || [];
   var AKSI = { VERIFIKASI: 'Divalidasi', BATAL: 'Validasi dibatalkan', RESET: 'Direset (penuntasan dibatalkan)' };
   var DOT = { VERIFIKASI: '', BATAL: ' danger', RESET: ' muted' };
@@ -2669,14 +2752,20 @@ function openVerifikasiDetail_(p) {
         ' · <strong>' + vfEsc_(x.oleh || '-') + '</strong><span class="vf-tl-time">' + vfEsc_(vfFormatWaktu_(x.waktu)) + '</span></div></div>';
     }).join('') + '</div></div>' : '';
 
-  vfOpenCustom_('vf-detail', function (card, close) {
+  vfOpenCustom_('vf-detail vfd', function (card, close) {
     card.innerHTML =
-      '<div class="vf-d-head"><div class="vf-d-title"><span class="vf-d-ico">' + mdIcon('checkCircle', 22) + '</span><span>Detail Validasi</span></div>' +
-      '<button type="button" class="vf-x" aria-label="Tutup">' + mdIcon('close', 18) + '</button></div>' +
-      '<div class="vf-d-body"><div class="vf-info">' +
-      rows.map(function (r) {
-        return '<div class="vf-info-row"><span class="vf-info-label">' + mdIcon(r[0], 16) + '<span>' + r[1] + '</span></span><span class="vf-info-value">' + r[2] + '</span></div>';
-      }).join('') + '</div>' + histHtml + '</div>' +
+      '<div class="vfd-top"><span class="vfd-kicker">DETAIL VALIDASI</span>' +
+      '<button type="button" class="vf-x vfd-x" aria-label="Tutup">' + mdIcon('close', 20) + '</button></div>' +
+      '<div class="vf-d-body vfd-body">' +
+        '<div class="vfd-hero"><h2 class="vfd-title vfd-' + kind + '">' + heroTxt + '</h2>' +
+        '<p class="vfd-sub' + (wait ? ' is-empty' : '') + '">' + vfEsc_(subTxt) + '</p></div>' +
+        '<div class="vfd-entity"><div class="vfd-left"><span class="vfd-avatar vfd-av-' + kind + '">' + vfEsc_(avatarTxt) + '</span>' +
+          '<div class="vfd-meta"><span class="vfd-name">' + vfEsc_(name) + '</span>' +
+          '<span class="vfd-proc">' + mdIcon(procIcon, 15) + '<span>' + procLabel + '</span></span></div></div>' +
+          '<span class="vfd-pill ' + pill.cls + '"><span>' + pill.txt + '</span>' + mdIcon(pill.icon, 16) + '</span></div>' +
+        '<p class="vfd-note">' + vfEsc_(vfNoteFor_(p, noteKey)) + '</p>' +
+        histHtml +
+      '</div>' +
       '<div class="vf-d-foot">' +
       (p.canBatalkanVerifikasi ? '<button type="button" class="vf-btn vf-outline-danger vf-batal">' + mdIcon('block', 16) + '<span>Batalkan Validasi</span></button>' : '') +
       '<button type="button" class="vf-btn vf-secondary vf-tutup">Tutup</button></div>';
