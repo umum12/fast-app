@@ -2519,6 +2519,7 @@ function vfApplyLocal_(p, aksi, jenis) {
   if (aksi === 'VERIFIKASI') {
     p.verifikasiStatus = 'ADMIN';
     p.verifiedByName = nama;
+    p.verifiedBy = (appBootstrap && appBootstrap.currentUser && appBootstrap.currentUser.userCode) || sess.userCode || '';
     p.verifiedAt = waktu;
     p.verifiedJenis = jenis || 'DEFAULT';
     p.canVerifikasi = false;
@@ -2526,6 +2527,7 @@ function vfApplyLocal_(p, aksi, jenis) {
   } else {
     p.verifikasiStatus = 'MENUNGGU';
     p.verifiedByName = '';
+    p.verifiedBy = '';
     p.verifiedAt = '';
     p.verifiedJenis = '';
     p.canVerifikasi = true;
@@ -2741,6 +2743,11 @@ function openVerifikasiDetail_(p) {
   var pill = wait ? { cls: 'vfd-pill-wait', txt: 'MENUNGGU', icon: 'schedule' } : (auto ? { cls: 'vfd-pill-auto', txt: 'OTOMATIS', icon: 'smartToy' } : { cls: 'vfd-pill-manual', txt: 'MANUAL', icon: 'verifiedUser' });
   var noteKey = wait ? 'menunggu' : (auto ? 'default' : (jenis === 'HARIAN' ? 'harian' : (jenis === 'PERIODIK' ? 'periodik' : 'manual_default')));
 
+  // Validator manual: avatar pilihannya (emoticon/foto) bila ada; kalau tidak, inisial berwarna.
+  var avHtml = '<span class="vfd-avatar vfd-av-' + kind + '">' + vfEsc_(avatarTxt) + '</span>';
+  if (kind === 'manual' && p.verifiedBy && typeof avatarIdOf_ === 'function' && avatarIdOf_(p.verifiedBy) && typeof lcAvatarHtml_ === 'function') {
+    avHtml = '<span class="vfd-avatar vfd-av-img">' + lcAvatarHtml_(p.verifiedBy, p.verifiedByName, ['#dcfce7', '#166534']) + '</span>';
+  }
   var hist = p.verifikasiRiwayat || [];
   var AKSI = { VERIFIKASI: 'Divalidasi', BATAL: 'Validasi dibatalkan', RESET: 'Direset (penuntasan dibatalkan)' };
   var DOT = { VERIFIKASI: '', BATAL: ' danger', RESET: ' muted' };
@@ -2759,7 +2766,7 @@ function openVerifikasiDetail_(p) {
       '<div class="vf-d-body vfd-body">' +
         '<div class="vfd-hero"><h2 class="vfd-title vfd-' + kind + '">' + heroTxt + '</h2>' +
         '<p class="vfd-sub' + (wait ? ' is-empty' : '') + '">' + vfEsc_(subTxt) + '</p></div>' +
-        '<div class="vfd-entity"><div class="vfd-left"><span class="vfd-avatar vfd-av-' + kind + '">' + vfEsc_(avatarTxt) + '</span>' +
+        '<div class="vfd-entity"><div class="vfd-left">' + avHtml + 
           '<div class="vfd-meta"><span class="vfd-name">' + vfEsc_(name) + '</span>' +
           '<span class="vfd-proc">' + mdIcon(procIcon, 15) + '<span>' + procLabel + '</span></span></div></div>' +
           '<span class="vfd-pill ' + pill.cls + '"><span>' + pill.txt + '</span>' + mdIcon(pill.icon, 16) + '</span></div>' +
