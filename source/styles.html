@@ -4645,6 +4645,25 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible { outline: 
 @media (prefers-reduced-motion: reduce) { .card-busy::after, .card-busy-ico { animation: none; } .card-busy { animation: none; } }
 
 
+/* ===== Kartu laporan v3: baris petugas + hitungan foto/komentar, geser Ubah/Hapus ===== */
+.lc2 .lc-dt { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500; color: #94a3b8; white-space: nowrap; }
+.lc2 .lc-dt .lc-sep { color: #cbd5e1; }
+.lc2 .lc-counts { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.lc2 .lc-cnt { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: #475569; }
+.lc2 .lc-cnt .material-symbols-outlined { color: #64748b; }
+html[data-theme="dark"] .lc2 .lc-dt { color: #7c88a1; }
+html[data-theme="dark"] .lc2 .lc-dt .lc-sep { color: #3b4763; }
+html[data-theme="dark"] .lc2 .lc-cnt { color: #b6c0d3; }
+html[data-theme="dark"] .lc2 .lc-cnt .material-symbols-outlined { color: #8896a9; }
+.lc2.has-swipe { position: relative; touch-action: pan-y; -webkit-user-select: none; user-select: none; }
+.lc-swipe-btn { display: none; position: absolute; top: 0; bottom: 0; border: 0; border-radius: 20px; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: #fff; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.lc2.swiping { content-visibility: visible; } /* content-visibility:auto memotong tombol yang berada di luar kotak kartu */
+.lc2.swiping .lc-swipe-btn { display: flex; }
+.lc-swipe-btn:active { filter: brightness(.92); }
+.lc-swipe-edit { background: #2563eb; }
+.lc-swipe-del { background: #e11d48; }
+@media (prefers-reduced-motion: reduce) { .lc2.has-swipe { transition: none !important; } }
+
 /* ===== Overlay kartu: nada per tindakan + cincin berputar (tanpa ID laporan) ===== */
 .card-busy { --bz: var(--color-primary-solid, #1F4E9C); flex-direction: row; }
 .card-busy[data-tone="ok"] { --bz: #5f8a1a; }

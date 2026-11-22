@@ -1394,6 +1394,139 @@ function markRiwayatStale_() {
   Object.keys(m).forEach(function (k) { if (m[k]) m[k].t = 0; });
 }
 
+
+// ============================================================
+// GESER KARTU: kanan = Ubah, kiri = Hapus (hanya bila petugas berhak: p.canUbah / p.canHapus).
+// Memakai alur yang sama dengan tombol di Detail (form Ubah & konfirmasi Hapus). Tombol ⋮ tetap ada.
+// ============================================================
+var lcSwipeOpen_ = null;
+var LC_SW_W_ = 84, LC_SW_GAP_ = 8, LC_SW_OPEN_ = LC_SW_W_ + LC_SW_GAP_;
+
+function lcSwipeSet_(card, x, anim) {
+  card.style.transition = anim ? 'transform .22s ease' : 'none';
+  card.style.transform = x ? 'translateX(' + x + 'px)' : '';
+  card._swX = x;
+  if (!x) {
+    clearTimeout(card._swT);
+    card._swT = setTimeout(function () { if (!card._swX) card.classList.remove('swiping'); card.style.transition = ''; }, anim ? 260 : 0);
+  }
+}
+function lcSwipeClose_(except) {
+  var c = lcSwipeOpen_;
+  if (c && c !== except) { lcSwipeSet_(c, 0, true); lcSwipeOpen_ = null; }
+}
+
+var lcSwipeGlobal_ = false;
+function lcSwipeGlobalInit_() {
+  if (lcSwipeGlobal_) return;
+  lcSwipeGlobal_ = true;
+  document.addEventListener('pointerdown', function (e) { if (lcSwipeOpen_ && !lcSwipeOpen_.contains(e.target)) lcSwipeClose_(); }, true);
+  window.addEventListener('scroll', function () { if (lcSwipeOpen_) lcSwipeClose_(); }, { passive: true, capture: true });
+}
+
+function lcSwipeBtn_(cls, icon, label, side) {
+  var b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'lc-swipe-btn ' + cls;
+  b.style[side] = '-' + LC_SW_OPEN_ + 'px';
+  b.style.width = LC_SW_W_ + 'px';
+  b.setAttribute('aria-label', label);
+  b.innerHTML = mdIcon(icon, 24) + '<span>' + label + '</span>';
+  return b;
+}
+
+function lcSwipeAttach_(card, p, opts) {
+  lcSwipeGlobalInit_();
+  var canL = !!p.canUbah, canR = !!p.canHapus; // L = geser ke kanan (Ubah), R = geser ke kiri (Hapus)
+  card.classList.add('has-swipe');
+  var bEdit = null, bDel = null;
+  if (canL) {
+    bEdit = lcSwipeBtn_('lc-swipe-edit', 'edit', 'Ubah', 'left');
+    bEdit.addEventListener('click', function (e) {
+      e.stopPropagation(); lcSwipeClose_();
+      openPekerjaanDetail(p, { actions: !!(opts && opts.actions) });
+      openPekerjaanEditForm_(p);
+    });
+    card.appendChild(bEdit);
+  }
+  if (canR) {
+    bDel = lcSwipeBtn_('lc-swipe-del', 'delete', 'Hapus', 'right');
+    bDel.addEventListener('click', function (e) {
+      e.stopPropagation(); lcSwipeClose_();
+      confirmHapusPekerjaan(p.pekerjaanId);
+    });
+    card.appendChild(bDel);
+  }
+  [bEdit, bDel].forEach(function (b) { if (b) b.addEventListener('pointerdown', function (e) { e.stopPropagation(); }); });
+
+  var sx = 0, sy = 0, base = 0, mode = '', pid = null, dragged = false;
+  card.addEventListener('pointerdown', function (e) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    if (e.target.closest && (e.target.closest('.vf-box') || e.target.closest('.lc-swipe-btn') || e.target.closest('input,textarea,select'))) return;
+    if (p.pekerjaanId && loadingById[p.pekerjaanId]) return;
+    if (e.clientX < 22 || e.clientX > window.innerWidth - 22) return; // sisakan tepi layar untuk gestur sistem
+    lcSwipeClose_(card);
+    sx = e.clientX; sy = e.clientY; base = card._swX || 0; mode = 'wait'; pid = e.pointerId; dragged = false;
+  });
+  card.addEventListener('pointermove', function (e) {
+    if (!mode || e.pointerId !== pid) return;
+    var dx = e.clientX - sx, dy = e.clientY - sy;
+    if (mode === 'wait') {
+      if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) { mode = ''; return; }
+      if (Math.abs(dx) < 10 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+      mode = 'drag'; dragged = true;
+      card.classList.add('swiping');
+      try { card.setPointerCapture(pid); } catch (err) { /* abaikan */ }
+    }
+    var x = base + dx, lo = canR ? -LC_SW_OPEN_ : 0, hi = canL ? LC_SW_OPEN_ : 0;
+    if (x > hi) x = hi + (x - hi) * 0.2;
+    if (x < lo) x = lo + (x - lo) * 0.2;
+    lcSwipeSet_(card, x, false);
+  });
+  function finish(e) {
+    if (!mode || (e && e.pointerId !== pid)) return;
+    var was = mode; mode = '';
+    if (was !== 'drag') return;
+    try { card.releasePointerCapture(pid); } catch (err) { /* abaikan */ }
+    var x = card._swX || 0;
+    if (x > LC_SW_OPEN_ / 2 && canL) { lcSwipeSet_(card, LC_SW_OPEN_, true); lcSwipeOpen_ = card; }
+    else if (x < -LC_SW_OPEN_ / 2 && canR) { lcSwipeSet_(card, -LC_SW_OPEN_, true); lcSwipeOpen_ = card; }
+    else { lcSwipeSet_(card, 0, true); if (lcSwipeOpen_ === card) lcSwipeOpen_ = null; }
+    if (navigator.vibrate && card._swX) { try { navigator.vibrate(8); } catch (err2) { /* abaikan */ } }
+  }
+  card.addEventListener('pointerup', finish);
+  card.addEventListener('pointercancel', finish);
+  // Setelah geser, ketukan lepas tidak boleh membuka Detail; kartu terbuka -> ketuk menutup.
+  card.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('.lc-swipe-btn')) return;
+    if (dragged) { dragged = false; e.stopPropagation(); e.preventDefault(); return; }
+    if (card._swX) { e.stopPropagation(); e.preventDefault(); lcSwipeClose_(); lcSwipeOpen_ = null; lcSwipeSet_(card, 0, true); }
+  }, true);
+
+  lcSwipeHint_(card, canL);
+}
+
+/** Petunjuk sekali seumur perangkat: kartu pertama yang tampil mengintip sebentar. */
+function lcSwipeHint_(card, toRight) {
+  var key = 'fs_swipe_hint_v1';
+  try { if (localStorage.getItem(key)) return; } catch (e) { return; }
+  if (window.__lcHintPending) return;
+  window.__lcHintPending = true;
+  setTimeout(function () {
+    window.__lcHintPending = false;
+    try {
+      if (!card.isConnected || lcSwipeOpen_ || card._swX) return;
+      var r = card.getBoundingClientRect();
+      if (r.bottom < 80 || r.top > window.innerHeight - 80) return;
+      localStorage.setItem(key, '1');
+      card.classList.add('swiping');
+      var d = toRight ? 40 : -40;
+      lcSwipeSet_(card, d, true);
+      setTimeout(function () { if (card._swX === d) lcSwipeSet_(card, 0, true); }, 750);
+    } catch (e) { /* abaikan */ }
+  }, 1500);
+}
+
 /* ===== Loading per-card (loadingById) =====
  * Hanya card yang sedang diproses (validasi/batal/hapus/ambil/lepas) yang ditutup lapisan
  * shimmer + ikon + pesan sesuai tindakan. Card lain tidak disentuh. Lapisan menutupi card

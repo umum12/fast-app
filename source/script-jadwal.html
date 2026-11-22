@@ -2444,19 +2444,23 @@ function buildPekerjaanListCard_(p, opts) {
   var displayDate = (p.arah === 'mandiri' && p.performedAt) ? p.performedAt : (p.completedAt || p.startedAt || p.createdAt);
   var dtParts = String(formatDateTimeFull_(displayDate) || '').split(' | ');
 
-  // Petugas (kiri) dan tanggal/jam (kanan) dalam satu baris -> kartu lebih ringkas.
+  // Kiri: avatar, nama, "Kam, 22 Nov 26 | 21:22". Kanan: jumlah foto & komentar (ikon + angka, rata kanan).
   var whoRow = document.createElement('div');
   whoRow.className = 'lc-who';
   var tone = lcAvatarTone_(officer);
-  var dateShort = escapeHtmlJk_(formatAktivitasDateShort_(displayDate) || dtParts[0] || '');
-  var timeText = dtParts[1] ? escapeHtmlJk_(dtParts[1]) + ' WIB' : '';
+  var dateShort = escapeHtmlJk_((formatAktivitasDateShort_(displayDate) || dtParts[0] || '').replace(/ (\d{2})(\d{2})$/, ' $2'));
+  var timeText = dtParts[1] ? escapeHtmlJk_(dtParts[1]) : '';
+  var nComments = p.commentCount > 0 ? p.commentCount : 0;
   whoRow.innerHTML =
     '<div class="lc-person">' +
       lcAvatarHtml_(officerCode, officer, tone) +
       '<div class="lc-who-text"><span class="lc-name">' + escapeHtmlJk_(officer || '') + '</span>' +
-      (floorText ? '<span class="lc-floor">' + mdIcon('location', 13) + '<span>' + escapeHtmlJk_(floorText) + '</span></span>' : '') + '</div>' +
+      '<span class="lc-dt" title="' + escapeHtmlJk_(dtParts[0] || '') + '"><span>' + dateShort + '</span>' + (timeText ? '<span class="lc-sep">|</span><span>' + timeText + '</span>' : '') + '</span></div>' +
     '</div>' +
-    '<div class="lc-when" title="' + escapeHtmlJk_(dtParts[0] || '') + '"><span class="lc-date">' + dateShort + '</span>' + (timeText ? '<span class="lc-time">' + timeText + '</span>' : '') + '</div>';
+    '<div class="lc-counts">' +
+      '<span class="lc-cnt lc-cnt-photo" title="Foto lampiran" aria-label="' + photos.length + ' foto lampiran"><span>' + photos.length + '</span>' + mdIcon('photoCamera', 18) + '</span>' +
+      '<span class="lc-cnt lc-cnt-comment" title="Komentar" aria-label="' + nComments + ' komentar"><span>' + nComments + '</span>' + mdIcon('chatBubble', 18) + '</span>' +
+    '</div>';
   main.appendChild(whoRow);
 
   var descText = p.completionNotes || p.description || '';
@@ -2468,15 +2472,7 @@ function buildPekerjaanListCard_(p, opts) {
   }
 
   var photoUrls = photos.map(function (photo) { return photo.url; });
-  main.appendChild(buildLcGallery_(photos, photoUrls));
-
-  var foot = document.createElement('div');
-  foot.className = 'lc-foot';
-  var commentText = p.commentCount > 0 ? (p.commentCount + ' Komentar') : 'Belum ada komentar';
-  foot.innerHTML =
-    '<div class="lc-foot-info"><span>' + (photos.length > 0 ? (photos.length + ' Foto Lampiran') : 'Tanpa Foto') + '</span>' +
-    '<span class="lc-comment">' + mdIcon('chatBubble', 14) + '<span>' + commentText + '</span></span></div>';
-  main.appendChild(foot);
+  if (photos.length > 0) main.appendChild(buildLcGallery_(photos, photoUrls));
 
   var pendingActions = null;
   if (opts.actions && typeof buildPekerjaanActionRow_ === 'function') {
@@ -2492,6 +2488,7 @@ function buildPekerjaanListCard_(p, opts) {
   }
 
   card.addEventListener('click', function () { openPekerjaanDetail(p, { actions: !!opts.actions }); });
+  if ((p.canUbah || p.canHapus) && typeof lcSwipeAttach_ === 'function') lcSwipeAttach_(card, p, opts);
   if (p.pekerjaanId && typeof loadingById !== 'undefined' && loadingById[p.pekerjaanId]) cardBusyPaint_(card, p.pekerjaanId);
   return card;
 }
