@@ -4888,3 +4888,14 @@ html[data-theme="dark"] .vfd-pill-manual { background: #3b82f6; }
 .vfd .lc-avatar { flex: 0 0 44px; width: 44px; height: 44px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 800; overflow: hidden; }
 .vfd .lc-avatar-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
+
+/* ===== Jadwal Kolaborasi v2: akhir pekan merah, badge di luar chip, chevron ===== */
+.jk-cal-day.is-weekend .jk-cal-date .dn, .jk-cal-day.is-weekend .jk-cal-date .dd { color: var(--jk-red); }
+html[data-theme="dark"] .jk-cal-day.is-weekend .jk-cal-date .dn, html[data-theme="dark"] .jk-cal-day.is-weekend .jk-cal-date .dd { color: #ff8a83; }
+.jk-ent { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; min-width: 0; }
+.jk-ent .jk-chip { flex-direction: row; align-items: center; gap: 7px; min-width: 0; }
+.jk-chip-ico { flex: none; display: inline-flex; opacity: .9; }
+.jk-chip-txt { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; line-height: 1.2; }
+.jk-chip-txt b { overflow-wrap: anywhere; }
+.jk-cal-add { width: 28px; height: 36px; border: 0; border-radius: 8px; background: transparent; color: var(--color-text-muted); opacity: .8; }
+.jk-cal-day.is-addable:active .jk-cal-add { background: transparent; color: var(--color-primary); border-style: none; }

@@ -962,19 +962,27 @@ function jkRenderCalendar_(list) {
     }
     entries.forEach(function (e) {
       var colors = JADWAL_JENIS_COLOR[e.jenis] || { bg: 'var(--status-neutral-bg)', fg: 'var(--status-neutral-fg)' };
+      var isPiket = jkKubuOfJenis_(e.jenis) === 'piket';
+      var ent = document.createElement('div');
+      ent.className = 'jk-ent';
       var chip = document.createElement('button');
       chip.type = 'button';
-      chip.className = 'jk-chip ' + (jkKubuOfJenis_(e.jenis) === 'piket' ? 'k-piket' : 'k-absen');
+      chip.className = 'jk-chip ' + (isPiket ? 'k-piket' : 'k-absen');
       chip.style.background = colors.bg;
       chip.style.color = colors.fg;
-      var top = document.createElement('span'); top.className = 'jk-chip-top';
+      var ico = document.createElement('span'); ico.className = 'jk-chip-ico';
+      ico.innerHTML = mdIcon(isPiket ? 'shield' : 'eventBusy', 16);
+      var txt = document.createElement('span'); txt.className = 'jk-chip-txt';
       var nm = document.createElement('b'); nm.textContent = e.userName;
-      top.appendChild(nm); top.insertAdjacentHTML('beforeend', jkStatusBadgeHtml_(e));
       var jn = document.createElement('small'); jn.textContent = e.jenisLabel;
-      chip.appendChild(top); chip.appendChild(jn);
+      txt.appendChild(nm); txt.appendChild(jn);
+      chip.appendChild(ico); chip.appendChild(txt);
       chip.addEventListener('click', function () { if (!e._tmp && !loadingById[e.jadwalId]) openJadwalDetail_(e); });
       if (e.jadwalId) { chip.dataset.pid = e.jadwalId; chip.dataset.busySwap = 'small'; if (loadingById[e.jadwalId]) cardBusyPaint_(chip, e.jadwalId); }
-      items.appendChild(chip);
+      ent.appendChild(chip);
+      // Badge FIX/TBD di luar kotak chip (sebelah kanan)
+      ent.insertAdjacentHTML('beforeend', jkStatusBadgeHtml_(e));
+      items.appendChild(ent);
     });
     row.appendChild(items);
     // Klik kolom tanggal -> form Tambah Jadwal dengan tanggal terisi. Tidak untuk Demo dan minggu Arsip (hanya dilihat).
@@ -982,8 +990,8 @@ function jkRenderCalendar_(list) {
       row.classList.add('is-addable');
       var addBtn = document.createElement('button');
       addBtn.type = 'button'; addBtn.className = 'jk-cal-add';
-      addBtn.setAttribute('aria-label', 'Tambah jadwal tanggal ' + ds);
-      addBtn.innerHTML = mdIcon('add', 18);
+      addBtn.setAttribute('aria-label', 'Buat jadwal tanggal ' + ds);
+      addBtn.innerHTML = mdIcon('chevronRight', 22);
       row.appendChild(addBtn);
       (function (dateStr) {
         row.addEventListener('click', function (ev) {
