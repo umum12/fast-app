@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;500;700&family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,500,0..1,0&icon_names=account_circle,add,add_a_photo,add_circle,add_to_drive,admin_panel_settings,alarm,apartment,apps,architecture,arrow_back,assignment_turned_in,badge,bar_chart,bookmark,build,build_circle,calculate,calendar_month,calendar_today,chat_bubble,check_circle,chevron_left,chevron_right,cleaning_services,close,cloud_upload,dark_mode,dashboard,database,delete,description,developer_board,download,edit,edit_calendar,edit_note,error,event_available,event_busy,expand_more,file_download,folder_open,group,handshake,history,home,image,inbox,info,integration_instructions,inventory_2,key,keyboard_arrow_down,keyboard_arrow_up,landscape,layers,light_mode,lightbulb,list,location_on,lock,login,logout,monitoring,more_horiz,more_vert,notifications,notifications_active,notifications_off,open_in_new,palette,person,person_add,person_check,person_remove,person_search,photo_camera,photo_library,picture_as_pdf,post_add,print,refresh,save,savings,schedule,search,send,sensors,settings,shield,sync,system_update,task,task_alt,terminal,today,trophy,tune,upload,verified,verified_user,visibility,warning,work&display=block" rel="stylesheet">
-<title>Unduh PDF Rekap</title>
+<title>Laporan &amp; Dokumentasi</title>
 <style>
   :root {
     --color-primary: #2563eb;
@@ -74,6 +74,8 @@
   .form-label { display: block; font-size: 12px; font-weight: 600; color: #475569; }
   .form-input { width: 100%; min-height: 46px; border: 1px solid #e2e8f0; border-radius: 14px; padding: 0 14px; font-size: 13px; font-weight: 500;
     font-family: inherit; background: #fff; color: #334155; transition: border-color .15s, box-shadow .15s; }
+  .req-star { color: #D6312B; font-weight: 800; margin-left: 2px; }
+  .form-input.is-invalid { border-color: #D6312B; box-shadow: 0 0 0 3px rgba(214,49,43,.16); }
   .form-input:focus { outline: none; border-color: #1F4E9C; box-shadow: 0 0 0 3px rgba(31,78,156,.18); }
   select.form-input { appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 38px;
     background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%2394a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>');
@@ -239,8 +241,8 @@ html[data-theme="dark"] .fa-date-btn-ok { background: #2f5fd0; }
       <div class="ph-left">
         <div class="ph-icon"><span class="ms">picture_as_pdf</span></div>
         <div>
-          <h1>Unduh PDF Rekap</h1>
-          <p>Filter &amp; Ekspor Laporan</p>
+          <h1>Laporan &amp; Dokumentasi</h1>
+          <p>Lihat, cetak, dan simpan laporan dalam PDF</p>
         </div>
       </div>
       <a class="back-link" id="btn-back-to-app"><span class="ms">arrow_back</span><span>Kembali</span></a>
@@ -276,9 +278,9 @@ html[data-theme="dark"] .fa-date-btn-ok { background: #2f5fd0; }
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="filter-date-from-fmt">Dari Tanggal</label>
+          <label class="form-label" for="filter-date-from-fmt">Dari Tanggal <span class="req-star" aria-hidden="true">*</span></label>
           <div class="date-wrap">
-            <input id="filter-date-from-fmt" class="form-input date-fmt is-empty" type="text" readonly placeholder="Pilih tanggal">
+            <input id="filter-date-from-fmt" class="form-input date-fmt is-empty" type="text" readonly placeholder="Pilih tanggal (wajib)" aria-required="true">
             <span class="ms date-ico">calendar_month</span>
             <input id="filter-date-from" type="date" aria-label="Dari Tanggal">
           </div>
@@ -658,8 +660,8 @@ function bootstrapPage(isManualLogin) {
     if (saved.jenis) jenisSelect.value = saved.jenis;
     if (saved.floorCode) floorSelect.value = saved.floorCode;
     if (isAdminOrDemo && saved.ownerCode) document.getElementById('filter-owner').value = saved.ownerCode;
-    if (saved.dateFrom) document.getElementById('filter-date-from').value = saved.dateFrom;
-    if (saved.dateTo) document.getElementById('filter-date-to').value = saved.dateTo;
+    // Dari Tanggal WAJIB diisi pengguna (tidak diprefill). Sampai Tanggal default = hari ini (bisa diubah).
+    document.getElementById('filter-date-to').value = todayIso_();
     updateFormattedDate('filter-date-from');
     updateFormattedDate('filter-date-to');
   }
@@ -669,6 +671,28 @@ function bootstrapPage(isManualLogin) {
   // Tampilan tanggal terformat (mis. "Selasa, 27 Okt 2026"); nilai asli tetap di input type=date.
   var DAYS_ID = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
   var MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agt', 'Sep', 'Okt', 'Nov', 'Des'];
+
+  function todayIso_() {
+    var n = new Date();
+    return n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0');
+  }
+
+  /** Validasi sebelum membuat PDF. Mengembalikan true bila lolos; bila gagal menampilkan pesan error. */
+  function validateRange_() {
+    var from = document.getElementById('filter-date-from');
+    var to = document.getElementById('filter-date-to');
+    var fromFmt = document.getElementById('filter-date-from-fmt');
+    fromFmt.classList.remove('is-invalid');
+    var msg = '';
+    if (!from.value) msg = 'Field "Dari Tanggal" wajib diisi sebelum membuat PDF.';
+    else if (to.value && to.value < from.value) msg = '"Sampai Tanggal" tidak boleh lebih awal dari "Dari Tanggal".';
+    if (!msg) return true;
+    fromFmt.classList.add('is-invalid');
+    showStatus('error', msg);
+    var wrap = fromFmt.closest('.form-group');
+    if (wrap && wrap.scrollIntoView) wrap.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return false;
+  }
 
   function updateFormattedDate(dateId) {
     var input = document.getElementById(dateId);
@@ -683,7 +707,7 @@ function bootstrapPage(isManualLogin) {
   // Pemilih tanggal kustom (awal pekan Senin, Sabtu/Minggu merah) menggantikan pemilih bawaan peramban.
   ['filter-date-from', 'filter-date-to'].forEach(function (id) {
     var input = document.getElementById(id);
-    input.addEventListener('change', function () { updateFormattedDate(id); });
+    input.addEventListener('change', function () { updateFormattedDate(id); document.getElementById('filter-date-from-fmt').classList.remove('is-invalid'); });
     FaDatePicker.attach(input, { trigger: input.parentNode, clearable: true });
   });
 
@@ -884,6 +908,7 @@ function bootstrapPage(isManualLogin) {
   }
 
   document.getElementById('btn-download-device').addEventListener('click', function () {
+    if (!validateRange_()) return;
     var BTN = 'btn-download-device', CNT = 'device-btn-content';
     showStatus('info', 'Membuat PDF, mohon tunggu');
     setButtonBusy(BTN, CNT, 'Membuat PDF', true);
@@ -932,6 +957,7 @@ function bootstrapPage(isManualLogin) {
   // ============================================================
 
   document.getElementById('btn-save-drive').addEventListener('click', function () {
+    if (!validateRange_()) return;
     showStatus('info', 'Membuat PDF & menyimpan ke Drive');
     setButtonBusy('btn-save-drive', 'drive-btn-content', 'Menyimpan...', true);
 
