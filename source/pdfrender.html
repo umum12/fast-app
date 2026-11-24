@@ -35,28 +35,10 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  #screen-login {
-    min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px;
-  }
-  .login-card {
-    width: 100%; max-width: 340px; background: var(--color-surface); border-radius: 22px;
-    padding: 32px 24px; box-shadow: 0 12px 32px rgba(15,23,42,0.08); text-align: center;
-  }
-  .login-card h1 { font-size: 19px; margin: 0 0 6px; }
-  .login-card p { color: var(--color-text-muted); font-size: 13px; margin: 0 0 20px; }
-  #input-access-code {
-    width: 100%; min-height: 50px; text-align: center; letter-spacing: 2px; font-size: 15px;
-    border: 1.5px solid #bfdbfe; border-radius: 12px; padding: 0 12px; margin-bottom: 14px;
-  }
-  .login-error { color: var(--color-danger); font-size: 13px; margin-top: 10px; min-height: 16px; }
-
-  .login-page-badge {
-    display: inline-flex; align-items: center; gap: 6px;
-    background: #fef2f2; color: #dc2626; border: 1px solid #fecaca;
-    font-size: 11.5px; font-weight: 700; letter-spacing: 0.02em;
-    padding: 6px 14px; border-radius: 999px; margin: 14px 0 6px;
-  }
-  .login-icon { display: flex; align-items: center; justify-content: center; margin: 0 auto 14px; }
+  /* ===================== LOGIN (identik halaman utama / index) ===================== */
+  #screen-login { --color-primary: #1F4E9C; --color-primary-soft: #E8EEF8; --color-danger: #D6312B; --color-text-faint: #9ca3af; }
+<?!= include('login-shared'); ?>
+  html[data-theme="dark"] #screen-login { --color-primary: #6F9AE0; --color-primary-soft: #1b2a4a; --color-bg: #0f1624; --color-surface: #151c2d; --color-text: #e6ebf5; --color-text-muted: #9aa7bd; }
 
   body { background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%); min-height: 100vh; }
   /* text-transform/letter-spacing WAJIB netral: judul seksi huruf besar akan merusak ligature ikon (tampil teks "TUNE") */
@@ -114,6 +96,32 @@
   .btn-action.device { background: #1F4E9C; color: #fff; }
   .btn-action.drive { background: #9CC247; color: #1f2d05; }
   .btn-action.drive .spinner-sm { border-color: rgba(31,45,5,.3); border-top-color: #1f2d05; }
+
+  /* ===== Animasi tombol & banner status (referensi pdf-tombol) ===== */
+  .btn-action { position: relative; overflow: hidden; }
+  .btn-action > span { position: relative; z-index: 1; }
+  .btn-action .btn-pfill { position: absolute; z-index: 0; top: 0; left: 0; bottom: 0; width: 0; background: rgba(255,255,255,.28); transition: width .12s ease-out; pointer-events: none; }
+  .btn-action.device.is-busy { background: #8faee0; opacity: 1; }
+  .btn-action.drive.is-busy { background: #c9de9c; opacity: 1; }
+  .btn-action:disabled.is-busy { opacity: 1; }
+  .btn-action.is-busy .btn-label { animation: textPulse 1.6s ease-in-out infinite; }
+  .btn-action .btn-pct { font-size: 12.5px; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 3.2ch; text-align: right; opacity: .95; }
+  .btn-action:not(.is-busy) .btn-pct { display: none; }
+  .btn-action .spinner-sm { width: 18px; height: 18px; border-color: rgba(255,255,255,.4); border-top-color: #fff; }
+  .animated-dots::after { content: ''; display: inline-block; width: 16px; text-align: left; animation: animatedDots 1.5s steps(4, end) infinite; }
+  @keyframes animatedDots { 0% { content: ''; } 25% { content: '.'; } 50% { content: '..'; } 75% { content: '...'; } 100% { content: ''; } }
+  @keyframes textPulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+  .status-box { transition: opacity .3s ease, transform .3s ease; }
+  .status-box.show { animation: statusIn .3s ease both; }
+  @keyframes statusIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .status-box.info { display: none; }
+  .status-box.info.show { display: flex; align-items: center; gap: 14px; background: #ecf3fe; color: #334155; border: 1px solid rgba(31,78,156,.15); border-radius: 18px; padding: 14px 16px; font-weight: 500; }
+  .status-box.info .st-text { animation: textPulse 1.6s ease-in-out infinite; }
+  .ai-grid { display: grid; grid-template-columns: repeat(2, 6px); grid-gap: 4px; width: 16px; height: 16px; flex-shrink: 0; align-items: center; justify-content: center; }
+  .ai-dot { width: 6px; height: 6px; border-radius: 50%; background: #1F4E9C; opacity: .3; transform: scale(.85); animation: aiPulse 1.4s infinite ease-in-out; }
+  .ai-dot:nth-child(1) { animation-delay: 0s; } .ai-dot:nth-child(2) { animation-delay: .2s; } .ai-dot:nth-child(4) { animation-delay: .4s; } .ai-dot:nth-child(3) { animation-delay: .6s; }
+  @keyframes aiPulse { 0%, 100% { opacity: .3; transform: scale(.85); } 50% { opacity: 1; transform: scale(1.3); box-shadow: 0 0 6px rgba(31,78,156,.55); } }
+  @media (prefers-reduced-motion: reduce) { .ai-dot, .animated-dots::after, .btn-action.is-busy .btn-label, .status-box.info .st-text, .status-box.show { animation: none; } .animated-dots::after { content: '...'; } }
   .action-hint { font-size: 11px; color: #94a3b8; text-align: center; margin: 0 0 12px; padding: 0 8px; line-height: 1.45; }
 
   .status-box { border-radius: 14px; padding: 12px 14px; font-size: 13px; display: none; }
@@ -222,41 +230,7 @@ html[data-theme="dark"] .fa-date-btn-ok { background: #2f5fd0; }
 <body>
 
   <div id="screen-login">
-    <div class="login-card">
-      <div class="login-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="84" height="84">
-          <defs>
-            <style>
-              .cube-edge { fill: none; stroke: #2563EB; stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; }
-              .icon-style { fill: none; stroke: #2563EB; stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
-              .icon-fill { fill: #2563EB; stroke: none; }
-            </style>
-          </defs>
-          <path class="cube-edge" d="M100 22 L168 60 L168 140 L100 178 L32 140 L32 60 Z"/>
-          <path class="cube-edge" d="M100 178 L100 100 M100 100 L32 60 M100 100 L168 60"/>
-          <g transform="translate(100, 52) scale(0.85)">
-            <path class="icon-style" d="M-6 -14 A 8 8 0 0 1 6 -14 L 3 -2 L 8 12 C 8 15 4 17 0 17 C -4 17 -8 15 -8 12 L -3 -2 Z"/>
-            <circle cx="0" cy="-14" r="3" class="icon-fill"/>
-          </g>
-          <g transform="translate(64, 122) scale(0.85)">
-            <path class="icon-style" d="M-8 -18 L2 -18 M-3 -18 L-3 -12"/>
-            <path class="icon-style" d="M-7 -12 L3 -12 L7 14 C7 17 4 19 -2 19 C-8 19 -11 17 -11 14 Z"/>
-          </g>
-          <g transform="translate(136, 122) scale(0.85)">
-            <path class="icon-style" d="M0 -16 L0 -13"/>
-            <path class="icon-style" d="M-14 3 C-14 -9 14 -9 14 3 Z"/>
-            <path class="icon-style" d="M-17 9 L17 9"/>
-          </g>
-        </svg>
-      </div>
-      <h1>FAST APP &trade;</h1>
-      <p>Aplikasi Kebersihan, Perbaikan &amp; Layanan Kantor</p>
-      <span class="login-page-badge">🔴 Anda masuk di halaman PDF</span>
-      <label class="form-label" style="margin:18px 0 8px;">KODE AKSES</label>
-      <input id="input-access-code" type="text" placeholder="Ketik kode..." maxlength="20" autocomplete="off">
-      <button class="btn-action device" id="btn-login" style="margin-bottom:0;">Masuk</button>
-      <div class="login-error" id="login-error"></div>
-    </div>
+    <?!= include('login-card'); ?>
   </div>
 
   <div id="screen-main">
@@ -727,20 +701,64 @@ function bootstrapPage(isManualLogin) {
   function showStatus(type, message) {
     var box = document.getElementById('status-box');
     box.className = 'status-box show ' + type;
-    box.textContent = message;
+    if (type === 'info') {
+      // status proses: 2x2 titik berdenyut + teks berdenyut + titik-titik bergerak
+      var clean = String(message).replace(/[.…]+$/, '').replace(/,\s*$/, '');
+      box.innerHTML = '<div class="ai-grid" aria-hidden="true"><div class="ai-dot"></div><div class="ai-dot"></div><div class="ai-dot"></div><div class="ai-dot"></div></div>' +
+        '<div class="st-text"><span class="st-msg"></span><span class="animated-dots"></span></div>';
+      box.querySelector('.st-msg').textContent = clean;
+      box.setAttribute('role', 'status');
+    } else {
+      box.textContent = message;
+      box.setAttribute('role', 'alert');
+    }
   }
 
   function setButtonBusy(btnId, contentId, busyLabel, busy) {
     var btn = document.getElementById(btnId);
     var content = document.getElementById(contentId);
     btn.disabled = busy;
+    btn.classList.toggle('is-busy', busy);
+    // tombol tujuan lain dikunci selama proses (hindari proses ganda)
+    var other = document.getElementById(btnId === 'btn-download-device' ? 'btn-save-drive' : 'btn-download-device');
+    if (other) other.disabled = busy;
     if (busy) {
-      content.dataset.original = content.innerHTML;
-      content.innerHTML = '<span class="spinner-sm"></span><span>' + busyLabel + '</span>';
-    } else if (content.dataset.original) {
-      content.innerHTML = content.dataset.original;
+      if (!content.dataset.busy) content.dataset.original = content.innerHTML;
+      content.dataset.busy = '1';
+      var lbl = String(busyLabel).replace(/[.…]+$/, '');
+      content.innerHTML = '<span class="spinner-sm"></span><span><span class="btn-label"></span><span class="animated-dots"></span></span><span class="btn-pct" aria-hidden="true"></span>';
+      content.querySelector('.btn-label').textContent = lbl;
+    } else {
+      delete content.dataset.busy;
+      if (content.dataset.original) content.innerHTML = content.dataset.original;
+      setButtonProgress_(btnId, -1);
     }
   }
+
+  /** Isi progres di dalam tombol (0-100); -1 = sembunyikan. Persen SIMULASI (kosmetik), bukan progres server. */
+  function setButtonProgress_(btnId, pct) {
+    var btn = document.getElementById(btnId);
+    var fill = btn.querySelector('.btn-pfill');
+    var pctEl = btn.querySelector('.btn-pct');
+    if (pct < 0) { if (fill) fill.style.width = '0'; if (pctEl) pctEl.textContent = ''; return; }
+    if (!fill) { fill = document.createElement('div'); fill.className = 'btn-pfill'; btn.insertBefore(fill, btn.firstChild); }
+    fill.style.width = pct + '%';
+    if (pctEl) pctEl.textContent = pct + '%';
+  }
+
+  var fakeProgTimer_ = null;
+  function fakeProgressStart_(btnId) {
+    var pct = 0;
+    fakeProgressStop_();
+    setButtonProgress_(btnId, 0);
+    fakeProgTimer_ = setInterval(function () {
+      // cepat di awal, melambat mendekati 92% (menunggu server)
+      pct += Math.max(0.4, (92 - pct) * 0.06);
+      if (pct > 92) pct = 92;
+      setButtonProgress_(btnId, Math.floor(pct));
+    }, 120);
+  }
+  function fakeProgressStop_() { if (fakeProgTimer_) { clearInterval(fakeProgTimer_); fakeProgTimer_ = null; } }
 
   // ============================================================
   // OPSI 1 — UNDUH KE PERANGKAT (TIDAK menyentuh Google Drive)
@@ -866,34 +884,44 @@ function bootstrapPage(isManualLogin) {
   }
 
   document.getElementById('btn-download-device').addEventListener('click', function () {
-    showStatus('info', 'Membuat PDF, mohon tunggu...');
-    setButtonBusy('btn-download-device', 'device-btn-content', 'Membuat PDF...', true);
+    var BTN = 'btn-download-device', CNT = 'device-btn-content';
+    showStatus('info', 'Membuat PDF, mohon tunggu');
+    setButtonBusy(BTN, CNT, 'Membuat PDF', true);
+    fakeProgressStart_(BTN);
+    function resetBtn() { fakeProgressStop_(); setButtonBusy(BTN, CNT, '', false); }
 
     google.script.run
       .withSuccessHandler(function (response) {
-        setButtonBusy('btn-download-device', 'device-btn-content', '', false);
         if (!response.success) {
+          resetBtn();
           showStatus('error', response.error);
           return;
         }
-        try {
-          var byteChars = atob(response.data.base64);
-          var byteArray = new Uint8Array(byteChars.length); // langsung Uint8Array: hemat memori untuk PDF besar
-          for (var i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
-          var total = response.data.totalRows;
-          showStatus('info', 'Menyiapkan pratinjau cetak...');
-          setButtonBusy('btn-download-device', 'device-btn-content', 'Menyiapkan...', true);
-          openPrintPreview_(byteArray, response.data.fileName, function (ok, how) {
-            setButtonBusy('btn-download-device', 'device-btn-content', '', false);
-            if (ok) showStatus('success', 'Dialog cetak dibuka (' + total + ' pekerjaan). Pilih Cetak atau Simpan sebagai PDF.');
-            else showStatus('error', 'Pratinjau cetak gagal dibuka di browser ini. Gunakan "Simpan ke Google Drive" lalu buka tautannya.');
-          });
-        } catch (err) {
-          showStatus('error', 'Gagal memproses file PDF di perangkat ini.');
-        }
+        fakeProgressStop_();
+        setButtonProgress_(BTN, 100);
+        setTimeout(function () {
+          try {
+            var byteChars = atob(response.data.base64);
+            var byteArray = new Uint8Array(byteChars.length); // langsung Uint8Array: hemat memori untuk PDF besar
+            for (var i = 0; i < byteChars.length; i++) byteArray[i] = byteChars.charCodeAt(i);
+            var total = response.data.totalRows;
+            // Tahap 2: tombol "Menyiapkan" + banner berganti teks
+            setButtonProgress_(BTN, -1);
+            setButtonBusy(BTN, CNT, 'Menyiapkan', true);
+            showStatus('info', 'Menyiapkan pratinjau cetak');
+            openPrintPreview_(byteArray, response.data.fileName, function (ok, how) {
+              resetBtn();
+              if (ok) showStatus('success', 'Dialog cetak dibuka (' + total + ' pekerjaan). Pilih Cetak atau Simpan sebagai PDF.');
+              else showStatus('error', 'Pratinjau cetak gagal dibuka di browser ini. Gunakan "Simpan ke Google Drive" lalu buka tautannya.');
+            });
+          } catch (err) {
+            resetBtn();
+            showStatus('error', 'Gagal memproses file PDF di perangkat ini.');
+          }
+        }, 350);
       })
       .withFailureHandler(function () {
-        setButtonBusy('btn-download-device', 'device-btn-content', '', false);
+        resetBtn();
         showStatus('error', 'Gagal terhubung ke server. Coba lagi.');
       })
       .generatePekerjaanPdfBase64(currentAccessCode, getFilters());
@@ -904,7 +932,7 @@ function bootstrapPage(isManualLogin) {
   // ============================================================
 
   document.getElementById('btn-save-drive').addEventListener('click', function () {
-    showStatus('info', 'Membuat PDF & menyimpan ke Drive...');
+    showStatus('info', 'Membuat PDF & menyimpan ke Drive');
     setButtonBusy('btn-save-drive', 'drive-btn-content', 'Menyimpan...', true);
 
     google.script.run
