@@ -4251,7 +4251,7 @@ html[data-theme="dark"] .lc2.has-actions .lc-detail { background: transparent; }
 .jk-cal-day.is-addable:active .jk-cal-add { background: var(--color-primary-solid); color: #fff; border-style: solid; opacity: 1; }
 
 /* Splash: angka persentase besar di bawah spinner */
-#splash-pct { margin-top: 10px; font-size: 40px; font-weight: 800; line-height: 1; letter-spacing: .02em; color: var(--color-text); font-variant-numeric: tabular-nums; }
+#splash-pct { font-size: 12px; font-weight: 800; line-height: 1; color: var(--color-text); font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
 
 /* Header: nama aplikasi FAST APP ™ */
 header.app-header .app-title { letter-spacing: .03em; }
@@ -4899,3 +4899,33 @@ html[data-theme="dark"] .jk-cal-day.is-weekend .jk-cal-date .dn, html[data-theme
 .jk-chip-txt b { overflow-wrap: anywhere; }
 .jk-cal-add { width: 28px; height: 36px; border: 0; border-radius: 8px; background: transparent; color: var(--color-text-muted); opacity: .8; }
 .jk-cal-day.is-addable:active .jk-cal-add { background: transparent; color: var(--color-primary); border-style: none; }
+
+/* ===== Form Buat: border hijau saat terisi + stepper progres (hijau logo FS #9CC247) ===== */
+:root { --fs-blue: #1F4E9C; --fs-blue-glow: rgba(31,78,156,.25); --fs-blue-deep: #1F4E9C; }
+#buat-form-card .select-field-wrap.is-filled,
+#buat-form-card .select-field-wrap.is-filled:focus-within,
+#buat-form-card .form-input.is-filled,
+#buat-form-card .form-input.is-filled:focus,
+#buat-form-card .performed-at-collapsed.is-filled,
+#buat-form-card .photo-slot-v2.is-filled {
+  border-color: var(--fs-blue); box-shadow: 0 0 0 3px var(--fs-blue-glow), 0 0 10px rgba(31,78,156,.2);
+}
+#buat-form-card .photo-slot-v2.is-filled { border-style: solid; }
+#buat-form-card #photo-slots.is-filled { border-radius: 14px; }
+.buat-stepper { display: flex; align-items: flex-start; margin: 2px 0 14px; padding: 0 2px; }
+.bs-step { position: relative; flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.bs-step::before { content: ''; position: absolute; top: 11px; right: 50%; width: 100%; height: 3px; border-radius: 2px; background: var(--color-border); z-index: 0; }
+.bs-step::after { content: ''; position: absolute; top: 11px; right: 50%; width: 100%; height: 3px; border-radius: 2px; background: var(--fs-blue); transform: scaleX(0); transform-origin: right center; transition: transform .45s cubic-bezier(.4,0,.2,1); z-index: 0; }
+.bs-step:first-child::before, .bs-step:first-child::after { display: none; }
+.bs-step.is-done::after { transform: scaleX(1); }
+.bs-dot { position: relative; z-index: 1; width: 25px; height: 25px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--color-border); background: var(--color-surface, #fff); display: inline-flex; align-items: center; justify-content: center; transition: background .3s, border-color .3s, box-shadow .3s, transform .3s; }
+.bs-dot svg { width: 14px; height: 14px; fill: none; stroke: #fff; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 24; stroke-dashoffset: 24; transition: stroke-dashoffset .35s ease .15s; }
+.bs-step.is-done .bs-dot { background: var(--fs-blue); border-color: var(--fs-blue); box-shadow: 0 0 0 3px var(--fs-blue-glow); transform: scale(1.06); }
+.bs-step.is-done .bs-dot svg { stroke-dashoffset: 0; }
+.bs-lbl { font-size: 11px; font-weight: 600; color: var(--color-text-muted); text-align: center; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; transition: color .3s; }
+.bs-step.is-done .bs-lbl { color: var(--fs-blue-deep); font-weight: 700; }
+html[data-theme="dark"] :root, html[data-theme="dark"] { --fs-blue: #5a8ce6; --fs-blue-glow: rgba(90,140,230,.3); --fs-blue-deep: #9fbcf2; }
+html[data-theme="dark"] .bs-step.is-done .bs-lbl { color: #9fbcf2; }
+html[data-theme="dark"] .bs-dot { background: transparent; }
+@media (max-width: 360px) { .bs-lbl { font-size: 10px; } }
+@media (prefers-reduced-motion: reduce) { .bs-step::after, .bs-dot, .bs-dot svg { transition: none; } }

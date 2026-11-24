@@ -610,7 +610,50 @@ function updateFormProgress() {
   var requiredDone = (jenis ? 1 : 0) + (floor ? 1 : 0) + (desc ? 1 : 0);
   var percent = Math.round((requiredDone / 3) * 100);
   progressEl.textContent = 'Kolom wajib: ' + percent + '% | ' + photoCount + ' Foto (opsional)';
+  buatStepperUpdate_(!!jenis, !!floor, !!desc, photoCount > 0);
 }
+
+/**
+ * Penanda visual pengisian form Buat: border hijau (kolom terisi) + stepper 5 tahap.
+ * Murni tampilan — tidak mempengaruhi validasi/kirim. "Waktu" otomatis terpenuhi begitu
+ * Jenis dipilih (waktu = sekarang), atau saat waktu susulan diisi manual.
+ */
+function buatStepperUpdate_(hasJenis, hasFloor, hasDesc, hasPhoto) {
+  var card = document.getElementById('buat-form-card');
+  if (!card) return;
+  var setFilled = function (el, on) { if (el) el.classList.toggle('is-filled', !!on); };
+  var wrapOf = function (id) { var e = document.getElementById(id); return e && e.closest ? e.closest('.select-field-wrap') : null; };
+  setFilled(wrapOf('form-jenis'), hasJenis);
+  setFilled(wrapOf('form-floor'), hasFloor);
+  setFilled(document.getElementById('form-description'), hasDesc);
+  var subj = document.getElementById('form-subject');
+  setFilled(subj, subj && subj.value.trim());
+  var paInput = document.getElementById('form-performed-at');
+  var paExpanded = document.getElementById('performed-at-expanded');
+  var paCustom = !!(paInput && paInput.value && paExpanded && paExpanded.style.display !== 'none');
+  setFilled(document.getElementById('performed-at-collapsed'), hasJenis);
+  setFilled(paInput, paCustom);
+  var photos = document.getElementById('photo-slots');
+  setFilled(photos, hasPhoto);
+  var done = { jenis: hasJenis, lantai: hasFloor, waktu: hasJenis, keterangan: hasDesc, foto: hasPhoto };
+  var steps = card.querySelectorAll('#buat-stepper .bs-step');
+  var n = 0;
+  for (var i = 0; i < steps.length; i++) {
+    var on = !!done[steps[i].getAttribute('data-step')];
+    steps[i].classList.toggle('is-done', on);
+    if (on) n++;
+  }
+  var st = document.getElementById('buat-stepper');
+  if (st) st.setAttribute('aria-label', 'Progres pengisian: ' + n + ' dari 5 tahap');
+}
+(function () {
+  var card = document.getElementById('buat-form-card');
+  if (!card) return;
+  ['input', 'change'].forEach(function (ev) { card.addEventListener(ev, function () { updateFormProgress(); }); });
+  card.addEventListener('click', function (e) {
+    if (e.target.closest && e.target.closest('#btn-performed-at-edit, #btn-performed-at-reset')) setTimeout(updateFormProgress, 0);
+  });
+})();
 
 // ------------------- PHOTO SLOTS (foto kondisi awal) -------------------
 
@@ -702,7 +745,7 @@ function renderPhotoSlots() {
 
   for (var i = 0; i < MAX_PHOTOS; i++) {
     var slot = document.createElement('div');
-    slot.className = 'photo-slot-v2';
+    slot.className = 'photo-slot-v2' + (selectedPhotos[i] ? ' is-filled' : '');
     makeSlotAccessible_(slot, PHOTO_SLOT_CAPTIONS_[i], !!selectedPhotos[i]);
 
     if (selectedPhotos[i]) {
