@@ -776,13 +776,8 @@ function jkRender_() {
     else if (jkKubuOfJenis_(e.jenis) === 'piket') counts.piket++;
     else counts.absen++;
   });
-  var windowDays = jkWindowDays_();
-  var filtered = jkFilter_.mine || jkFilter_.user;
-  document.getElementById('jadwal-piket-summary').innerHTML =
-    '<div class="jk-info">' +
-      '<span>' + mdIcon('reminder', 16) + Math.round(windowDays / 7) + ' minggu ke depan</span>' +
-      '<span>' + mdIcon('description', 16) + list.length + (filtered ? ' jadwal (terfilter)' : ' jadwal aktif') + '</span>' +
-    '</div>';
+  // Ringkasan (X minggu ke depan / X jadwal aktif) dihapus: kotak ringkasan dikosongkan & disembunyikan (CSS :empty).
+  document.getElementById('jadwal-piket-summary').innerHTML = '';
 
   jkRenderToolbar_();
 
@@ -801,21 +796,14 @@ function jkRender_() {
   }
 }
 
-function jkRenderCounts_(counts, beforeEl) {
+/** Ringkasan "X Piket / X Ketidakhadiran" dihapus; fungsi dipertahankan agar pemanggil lama aman. */
+function jkRenderCounts_() {
   var countsBar = document.getElementById('jk-counts');
-  if (!counts) { if (countsBar) countsBar.style.display = 'none'; return; }
-  if (!countsBar) {
-    countsBar = document.createElement('div');
-    countsBar.id = 'jk-counts';
-    countsBar.className = 'jk-counts';
-    beforeEl.parentNode.insertBefore(countsBar, beforeEl);
-  }
-  countsBar.style.display = '';
-  countsBar.innerHTML =
-    '<div class="jk-count"><span class="jk-count-ico piket">' + mdIcon('shield', 20) + '</span><span class="jk-count-txt">' + counts.piket + ' Piket</span></div>' +
-    '<span class="jk-count-sep">•</span>' +
-    '<div class="jk-count"><span class="jk-count-txt">' + (counts.absen + counts.libur) + ' Ketidakhadiran</span><span class="jk-count-ico hadir">' + mdIcon('personCheck', 20) + '</span></div>';
+  if (countsBar) countsBar.style.display = 'none';
 }
+
+// Ikon "chat + telepon" (gambar sendiri, bukan logo resmi WhatsApp)
+var JK_WA_ICON_ = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3a9 9 0 0 0-7.8 13.5L3 21l4.6-1.2A9 9 0 1 0 12 3z"/><path d="M9.2 8.6c.3 2.9 2.3 5 5.2 5.6l1.2-1.3-1.9-1-.9.7a4.3 4.3 0 0 1-1.9-1.9l.7-.9-1-1.9-1.4 1z"/></svg>';
 
 function jkRenderToolbar_() {
   var bar = document.getElementById('jk-toolbar');
@@ -846,46 +834,42 @@ function jkRenderToolbar_() {
   });
   row1.appendChild(seg);
 
-  var copyBtn = document.createElement('button');
-  copyBtn.type = 'button';
-  copyBtn.className = 'jk-copy-btn';
-  copyBtn.setAttribute('aria-label', 'Salin jadwal untuk WhatsApp');
-  copyBtn.innerHTML = mdIcon('copy', 16) + '<span>Salin</span>';
-  copyBtn.addEventListener('click', jkCopySchedule_);
-  row1.appendChild(copyBtn);
-  bar.appendChild(row1);
+  var waBtn = document.createElement('button');
+  waBtn.type = 'button';
+  waBtn.className = 'jk-wa-btn';
+  waBtn.setAttribute('aria-label', 'Salin jadwal untuk WhatsApp');
+  waBtn.title = 'Salin jadwal untuk WhatsApp';
+  waBtn.innerHTML = JK_WA_ICON_;
+  waBtn.addEventListener('click', jkCopySchedule_);
+  row1.appendChild(waBtn);
 
-  var row2 = document.createElement('div');
-  row2.className = 'jk-tb-row jk-fchips';
-  function chip(label, active, onClick, withArrow) {
-    var c = document.createElement('button');
-    c.type = 'button';
-    c.className = 'jk-fchip' + (active ? ' active' : '');
-    c.setAttribute('aria-pressed', active ? 'true' : 'false');
-    c.innerHTML = '<span></span>' + (withArrow ? mdIcon('chevronDown', 16) : '');
-    c.firstChild.textContent = label;
-    c.addEventListener('click', onClick);
-    row2.appendChild(c);
-  }
-  chip('Semua', !jkFilter_.mine && !jkFilter_.user, function () { jkFilter_ = { mine: false, user: '' }; jkRender_(); });
-  if (role !== 'demo') {
-    chip('Jadwal Saya', jkFilter_.mine, function () { jkFilter_ = { mine: true, user: '' }; jkRender_(); });
-  }
-  // Petugas: hanya yang punya jadwal dalam jendela (daftar pendek & relevan).
+  // Satu dropdown filter: Semua / Jadwal Saya / Petugas (daftar petugas yang punya jadwal dalam jendela).
   var seen = {}, people = [];
-  jkWindowList_.forEach(function (e) { if (!seen[e.userCode]) { seen[e.userCode] = 1; people.push({ key: e.userCode, label: e.userName }); } });
+  jkWindowList_.forEach(function (e) { if (!seen[e.userCode]) { seen[e.userCode] = 1; people.push({ key: 'u:' + e.userCode, label: e.userName }); } });
   people.sort(function (a, b) { return String(a.label).localeCompare(String(b.label)); });
-  if (people.length > 1) {
-    var cur = people.filter(function (p) { return p.key === jkFilter_.user; })[0];
-    chip(cur ? cur.label : 'Petugas', !!cur, function () {
-      if (typeof openFilterPicker_ !== 'function') return;
-      openFilterPicker_('Pilih Petugas', [{ key: '', label: 'Semua petugas' }].concat(people), jkFilter_.user, function (key) {
-        jkFilter_ = { mine: false, user: key };
-        jkRender_();
-      });
-    }, true);
-  }
-  bar.appendChild(row2);
+  var opts = [{ key: 'all', label: 'Semua' }];
+  if (role !== 'demo') opts.push({ key: 'mine', label: 'Jadwal Saya' });
+  if (people.length > 1) opts = opts.concat(people);
+  var curKey = jkFilter_.mine ? 'mine' : (jkFilter_.user ? 'u:' + jkFilter_.user : 'all');
+  var cur = opts.filter(function (o) { return o.key === curKey; })[0] || opts[0];
+  var dd = document.createElement('button');
+  dd.type = 'button';
+  dd.className = 'jk-fdd' + (curKey !== 'all' ? ' active' : '');
+  dd.setAttribute('aria-haspopup', 'listbox');
+  dd.setAttribute('aria-label', 'Filter jadwal: ' + cur.label);
+  dd.innerHTML = '<span class="jk-fdd-txt"></span>' + mdIcon('chevronDown', 16);
+  dd.firstChild.textContent = cur.label;
+  dd.addEventListener('click', function () {
+    if (typeof openFilterPicker_ !== 'function') return;
+    openFilterPicker_('Filter Jadwal', opts, curKey, function (key) {
+      if (key === 'mine') jkFilter_ = { mine: true, user: '' };
+      else if (key.indexOf('u:') === 0) jkFilter_ = { mine: false, user: key.slice(2) };
+      else jkFilter_ = { mine: false, user: '' };
+      jkRender_();
+    });
+  });
+  row1.appendChild(dd);
+  bar.appendChild(row1);
 }
 
 function jkRenderCalendar_(list) {
@@ -910,7 +894,11 @@ function jkRenderCalendar_(list) {
   next.addEventListener('click', function () { jkWeekIdx_++; jkRender_(); });
   var label = document.createElement('div');
   label.className = 'jk-cal-label';
-  label.textContent = jkShortDate_(startMs) + ' – ' + jkShortDate_(endMs) + (jkWeekIdx_ === 0 ? ' · Minggu ini' : (jkWeekIdx_ < 0 ? ' · Arsip' : ''));
+  var tag = jkWeekIdx_ === 0 ? 'Minggu ini' : (jkWeekIdx_ === 1 ? 'Minggu depan' : (jkWeekIdx_ < 0 ? 'Arsip' : jkWeekIdx_ + ' minggu lagi'));
+  var tagEl = document.createElement('span'); tagEl.className = 'jk-cal-tag'; tagEl.textContent = tag;
+  var rangeEl = document.createElement('span'); rangeEl.className = 'jk-cal-range'; rangeEl.textContent = jkShortDate_(startMs) + ' – ' + jkShortDate_(endMs);
+  label.appendChild(tagEl); label.appendChild(rangeEl);
+  label.setAttribute('aria-live', 'polite');
   nav.appendChild(prev); nav.appendChild(label); nav.appendChild(next);
   cal.appendChild(nav);
 
@@ -1108,19 +1096,7 @@ function renderJadwalTable_(list, counts) {
   container.style.display = '';
   if (emptyEl) emptyEl.style.display = 'none';
 
-  var countsBar = document.getElementById('jk-counts');
-  if (!countsBar) {
-    countsBar = document.createElement('div');
-    countsBar.id = 'jk-counts';
-    countsBar.className = 'jk-counts';
-    container.parentNode.insertBefore(countsBar, container);
-  }
-  counts = counts || { piket: 0, absen: 0, libur: 0 };
-  countsBar.style.display = '';
-  countsBar.innerHTML =
-    '<div class="jk-count"><span class="jk-count-ico piket">' + mdIcon('shield', 20) + '</span><span class="jk-count-txt">' + counts.piket + ' Piket</span></div>' +
-    '<span class="jk-count-sep">\u2022</span>' +
-    '<div class="jk-count"><span class="jk-count-txt">' + (counts.absen + counts.libur) + ' Ketidakhadiran</span><span class="jk-count-ico hadir">' + mdIcon('personCheck', 20) + '</span></div>';
+  jkRenderCounts_();
 
   var today = todayDateStr_();
   var table = document.createElement('table');

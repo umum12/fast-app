@@ -4929,3 +4929,19 @@ html[data-theme="dark"] .bs-step.is-done .bs-lbl { color: #9fbcf2; }
 html[data-theme="dark"] .bs-dot { background: transparent; }
 @media (max-width: 360px) { .bs-lbl { font-size: 10px; } }
 @media (prefers-reduced-motion: reduce) { .bs-step::after, .bs-dot, .bs-dot svg { transition: none; } }
+
+/* ===== Jadwal Kolaborasi v3: ringkas & bersih ===== */
+#jadwal-piket-summary:empty { display: none; }
+.jk-toolbar { margin-top: 10px; gap: 0; }
+.jk-toolbar .jk-tb-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 8px; }
+.jk-wa-btn { justify-self: center; width: 40px; height: 40px; min-width: 40px; border-radius: 50%; border: 1px solid rgba(156,194,71,.55); background: rgba(156,194,71,.16); color: #4a6a10; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.jk-wa-btn:active { background: rgba(156,194,71,.3); }
+html[data-theme="dark"] .jk-wa-btn { color: #c6e68a; }
+.jk-fdd { justify-self: end; display: inline-flex; align-items: center; gap: 4px; max-width: 100%; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 13px; font-weight: 600; padding: 0 10px 0 14px; min-height: 36px; border-radius: 999px; cursor: pointer; }
+.jk-fdd-txt { max-width: 104px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jk-fdd.active { background: var(--color-primary-soft); border-color: var(--color-primary); color: var(--color-primary); }
+.jk-cal-nav { margin-bottom: 6px; }
+.jk-cal-label { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; }
+.jk-cal-tag { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--color-text-muted); line-height: 1.2; }
+.jk-cal-range { font-size: 18px; font-weight: 800; letter-spacing: .01em; text-transform: uppercase; color: var(--color-text); line-height: 1.2; white-space: nowrap; }
+@media (max-width: 340px) { .jk-cal-range { font-size: 16px; } .jk-fdd-txt { max-width: 80px; } }
