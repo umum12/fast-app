@@ -2360,7 +2360,7 @@ function lcAvPhotoAttr_(id, name) {
 function lcAvatarHtml_(userCode, officer, tone) {
   var id = (typeof avatarIdOf_ === 'function') ? avatarIdOf_(userCode) : '';
   var uc = ' data-uc="' + escapeHtmlJk_(userCode || '') + '"';
-  if (id) return '<span class="lc-avatar lc-avatar-img"' + uc + '><img src="' + avatarSrc_(id) + '" alt="" draggable="false"' + lcAvPhotoAttr_(id, officer) + '></span>';
+  if (id) return '<span class="lc-avatar lc-avatar-img"' + uc + '><img src="' + avatarSrc_(id) + '" alt="" draggable="false" loading="lazy" decoding="async"' + lcAvPhotoAttr_(id, officer) + '></span>';
   return '<span class="lc-avatar"' + uc + ' data-ini="1" style="background:' + tone[0] + ';color:' + tone[1] + ';">' + escapeHtmlJk_(String(officer || '?').trim().charAt(0).toUpperCase() || '?') + '</span>';
 }
 
@@ -2374,7 +2374,7 @@ function lcAvatarsRefresh_() {
       var nm0 = el.parentNode && el.parentNode.querySelector('.lc-name');
       if (hasImg) { var im = el.querySelector('img'); if (im && im.getAttribute('src') === url) return; }
       el.classList.remove('av-fallback'); el.classList.add('lc-avatar-img'); el.removeAttribute('style'); el.removeAttribute('data-ini');
-      el.innerHTML = '<img src="' + url + '" alt="" draggable="false"' + lcAvPhotoAttr_(id, nm0 ? nm0.textContent : uc) + '>';
+      el.innerHTML = '<img src="' + url + '" alt="" draggable="false" loading="lazy" decoding="async"' + lcAvPhotoAttr_(id, nm0 ? nm0.textContent : uc) + '>';
     } else if (hasImg) {
       // kembali ke inisial: nama tidak tersimpan di elemen, ambil dari teks nama di sebelahnya
       var nm = el.parentNode && el.parentNode.querySelector('.lc-name');
