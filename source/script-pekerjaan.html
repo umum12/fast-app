@@ -2371,6 +2371,7 @@ function vfOpenModal_(cfg) {
     if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
   }
   function onKey(e) { if (e.key === 'Escape') close(); }
+  overlay._vfClose = close; // dipakai tombol Back (closeTopLayer_)
   (cfg.actions || []).forEach(function (a) {
     var b = document.createElement('button');
     b.type = 'button';
@@ -2597,6 +2598,7 @@ function vfOpenCustom_(cardCls, buildFn) {
     if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
   }
   function onKey(e) { if (e.key === 'Escape') close(); }
+  overlay._vfClose = close; // dipakai tombol Back (closeTopLayer_)
   buildFn(card, close);
   overlay.appendChild(card);
   overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });

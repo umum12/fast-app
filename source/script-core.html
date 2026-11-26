@@ -978,6 +978,14 @@ function closeTopLayer_() {
     if (cancelBtn && !cancelBtn.disabled) hideConfirmModal(); // sedang memproses: abaikan, jangan tutup
     return true;
   }
+  // Modal Validasi (Pilih Jenis / Detail) yang dibuat dinamis: tutup yang paling atas.
+  var vfs = document.querySelectorAll('.vf-overlay');
+  if (vfs.length) {
+    var topVf = vfs[vfs.length - 1];
+    if (typeof topVf._vfClose === 'function') topVf._vfClose(); else if (topVf.parentNode) topVf.parentNode.removeChild(topVf);
+    return true;
+  }
+  if (isShown('avatar-overlay')) { closeAvatarPicker_(); return true; } // saat menyimpan: Back diabaikan (ditahan di dalam closeAvatarPicker_)
   if (isShown('bottom-sheet-overlay')) { closeBottomSheet(); return true; }
   var jkIds = ['chat-overlay', 'jk-picker-overlay', 'jk-form-overlay', 'jk-detail-overlay', 'about-overlay', 'philosophy-overlay'];
   for (var i = 0; i < jkIds.length; i++) {

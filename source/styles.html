@@ -4945,3 +4945,14 @@ html[data-theme="dark"] .jk-wa-btn { color: #c6e68a; }
 .jk-cal-tag { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--color-text-muted); line-height: 1.2; }
 .jk-cal-range { font-size: 18px; font-weight: 800; letter-spacing: .01em; text-transform: uppercase; color: var(--color-text); line-height: 1.2; white-space: nowrap; }
 @media (max-width: 340px) { .jk-cal-range { font-size: 16px; } .jk-fdd-txt { max-width: 80px; } }
+
+/* ===== Perbaikan audit UI/UX 26 Nov (U2-U5) ===== */
+.jk-toolbar .jk-tb-row > * { min-width: 0; }                 /* U2: item grid boleh menyusut -> tak ada geser horizontal di 320px */
+.jk-seg { min-width: 0; }
+.jk-fdd { min-width: 0; }
+@media (max-width: 340px) { .jk-toolbar .jk-tb-row { gap: 6px; } .jk-fdd { padding: 0 8px 0 10px; } .jk-fdd-txt { max-width: 64px; } }
+.lc2 .lc-dt { color: #64748b; }                              /* U3: kontras >= 4,5:1 di atas putih */
+.lc2 .lc-dt .lc-sep { color: #94a3b8; }
+.jk-cal-add { width: 40px; height: 44px; }                   /* U4: area ketuk lebih besar (visual tetap sama) */
+.jk-cal-day.is-weekend .jk-cal-date .dn { color: #b3261e; }  /* U5: merah sedikit lebih gelap utk kontras di latar abu-abu */
+html[data-theme="dark"] .jk-cal-day.is-weekend .jk-cal-date .dn { color: #ff8a83; }
