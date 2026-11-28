@@ -4956,3 +4956,25 @@ html[data-theme="dark"] .jk-wa-btn { color: #c6e68a; }
 .jk-cal-add { width: 40px; height: 44px; }                   /* U4: area ketuk lebih besar (visual tetap sama) */
 .jk-cal-day.is-weekend .jk-cal-date .dn { color: #b3261e; }  /* U5: merah sedikit lebih gelap utk kontras di latar abu-abu */
 html[data-theme="dark"] .jk-cal-day.is-weekend .jk-cal-date .dn { color: #ff8a83; }
+
+/* ===== EU: Sticky Bottom Action Button (Buat / Selesai / Konten) ===== */
+:root { --bnav-h: 57px; }
+.sticky-bar {
+  position: sticky;
+  bottom: calc(var(--bnav-h) + 8px);
+  z-index: 15;
+  margin: 12px -14px -14px;
+  padding: 10px 14px 12px;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  border-radius: 0 0 var(--radius) var(--radius);
+  box-shadow: 0 -6px 14px rgba(15,23,42,.08);
+}
+.sticky-bar .form-error:empty { display: none; }
+.sticky-bar .form-error { margin-top: 8px; }
+/* Keyboard terbuka: lepas sticky agar tidak menutup kolom isian */
+body.kb-open .sticky-bar { position: static; box-shadow: none; }
+@media (min-width: 768px) {
+  .sticky-bar { bottom: 0; }
+}
+#buat-form-card .sticky-bar, #selesai-form-card .sticky-bar { margin: 14px -18px -18px; padding: 10px 18px 14px; }

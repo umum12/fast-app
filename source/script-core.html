@@ -2202,3 +2202,34 @@ var FaDatePicker = (function () {
   return { attach: attach, setVisible: setVisible, close: close, isOpen: isOpen };
 })();
 </script>
+
+<script>
+/* Sticky action bar: ukur tinggi bottom nav + lepas sticky saat keyboard terbuka */
+(function () {
+  function measure() {
+    try {
+      var nav = document.querySelector('nav.bottom-nav');
+      var h = nav && nav.offsetHeight ? nav.offsetHeight : 0;
+      document.documentElement.style.setProperty('--bnav-h', h + 'px');
+    } catch (e) {}
+  }
+  measure();
+  window.addEventListener('load', measure);
+  window.addEventListener('resize', measure);
+  window.addEventListener('orientationchange', measure);
+  try { var navEl = document.querySelector('nav.bottom-nav'); if (navEl && window.ResizeObserver) new ResizeObserver(measure).observe(navEl); } catch (e) {}
+  var kbTimer = null;
+  function isField(el) { return el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) && el.type !== 'file' && el.type !== 'checkbox' && el.type !== 'radio' && el.type !== 'button'; }
+  document.addEventListener('focusin', function (e) {
+    if (!isField(e.target) || !e.target.closest('.card')) return;
+    clearTimeout(kbTimer);
+    document.body.classList.add('kb-open');
+  });
+  document.addEventListener('focusout', function () {
+    clearTimeout(kbTimer);
+    kbTimer = setTimeout(function () {
+      if (!isField(document.activeElement)) document.body.classList.remove('kb-open');
+    }, 120);
+  });
+})();
+</script>
