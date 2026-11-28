@@ -338,8 +338,9 @@ function updatePerformedAtFieldVisibility() {
   var group = document.getElementById('form-performed-at-group');
   if (!group) return;
   var isMandiri = !buatPrefillContext && JENIS_MANDIRI_SET_.indexOf(jenisSelect.value) !== -1;
-  group.style.display = isMandiri ? 'block' : 'none';
-  if (isMandiri) {
+  var showWaktu = isMandiri || (!buatPrefillContext && !jenisSelect.value);
+  group.style.display = showWaktu ? 'block' : 'none';
+  if (showWaktu) {
     attachPerformedAtListenersOnce_();
     setPerformedAtBounds_();
   } else {
@@ -531,7 +532,7 @@ function draftApply_() {
     setSel('form-floor', d.floor);
     setSel('form-assignment-mode', d.mode);
     setSel('form-target-user', d.target);
-    var sub = document.getElementById('form-subject'); if (sub && d.subject) sub.value = String(d.subject).slice(0, 100);
+    /* Subjek disembunyikan dari form Buat: draf lama tidak memulihkannya */
     var desc = document.getElementById('form-description');
     if (desc && d.desc) {
       desc.value = String(d.desc).slice(0, 500);
@@ -631,11 +632,15 @@ function buatStepperUpdate_(hasJenis, hasFloor, hasDesc, hasPhoto) {
   var paInput = document.getElementById('form-performed-at');
   var paExpanded = document.getElementById('performed-at-expanded');
   var paCustom = !!(paInput && paInput.value && paExpanded && paExpanded.style.display !== 'none');
-  setFilled(document.getElementById('performed-at-collapsed'), hasJenis);
+  setFilled(document.getElementById('performed-at-collapsed'), true);
   setFilled(paInput, paCustom);
   var photos = document.getElementById('photo-slots');
   setFilled(photos, hasPhoto);
-  var done = { jenis: hasJenis, lantai: hasFloor, waktu: hasJenis, keterangan: hasDesc, foto: hasPhoto };
+  var done = { jenis: hasJenis, lantai: hasFloor, waktu: true, keterangan: hasDesc, foto: hasPhoto };
+  var grp = document.getElementById('form-performed-at-group');
+  var waktuShown = !grp || grp.style.display !== 'none';
+  var fdState = { waktu: true, jenis: hasJenis, lantai: hasFloor, keterangan: hasDesc, foto: hasPhoto };
+  card.querySelectorAll('.fd-lbl').forEach(function (l) { l.classList.toggle('fd-ok', !!fdState[l.getAttribute('data-fd')]); });
   var steps = card.querySelectorAll('#buat-stepper .bs-step');
   var n = 0;
   for (var i = 0; i < steps.length; i++) {

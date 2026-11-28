@@ -282,30 +282,10 @@
                 Melengkapi laporan untuk Pekerjaan <b id="buat-context-pekerjaan-id"></b>
               </div>
 
-              <div class="form-group form-jenis-lantai-row">
-                <div class="form-jenis-lantai-col">
-                  <label class="form-label" for="form-jenis">Jenis</label>
-                  <div class="select-field-wrap">
-                    <span class="select-field-icon" id="form-jenis-icon"></span>
-                    <select id="form-jenis"></select>
-                  </div>
-                </div>
-                <div class="form-jenis-lantai-col">
-                  <label class="form-label" for="form-floor">Lantai</label>
-                  <div class="select-field-wrap">
-                    <span class="select-field-icon" id="form-floor-icon"></span>
-                    <select id="form-floor">
-                      <option value="">Pilih lantai</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-
-              <div class="form-group" id="form-performed-at-group" style="display:none;">
+              <div class="form-group" id="form-performed-at-group" >
                 <div class="performed-at-label-row">
                   <span class="icon-slot" id="performed-at-label-icon"></span>
-                  <label class="form-label" style="margin:0;">Waktu Laporan</label>
+                  <label class="form-label fd-lbl" data-fd="waktu" style="margin:0;">Waktu Laporan</label>
                 </div>
 
                 <div id="performed-at-collapsed" class="performed-at-collapsed">
@@ -320,6 +300,26 @@
                   <button type="button" class="performed-at-link" id="btn-performed-at-reset" style="margin-top:4px; padding-left:0;">Gunakan waktu sekarang</button>
                 </div>
               </div>
+
+              <div class="form-group form-jenis-lantai-row">
+                <div class="form-jenis-lantai-col">
+                  <label class="form-label fd-lbl" data-fd="jenis" for="form-jenis">Jenis</label>
+                  <div class="select-field-wrap">
+                    <span class="select-field-icon" id="form-jenis-icon"></span>
+                    <select id="form-jenis"></select>
+                  </div>
+                </div>
+                <div class="form-jenis-lantai-col">
+                  <label class="form-label fd-lbl" data-fd="lantai" for="form-floor">Lantai</label>
+                  <div class="select-field-wrap">
+                    <span class="select-field-icon" id="form-floor-icon"></span>
+                    <select id="form-floor">
+                      <option value="">Pilih lantai</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
 
               <div class="form-group" id="form-assignment-mode-group" style="display:none;">
                 <label class="form-label" for="form-assignment-mode">Mode Penugasan</label>
@@ -341,19 +341,19 @@
                 </div>
               </div>
 
-              <div class="form-group">
+              <div class="form-group" id="form-subject-group" style="display:none;">
                 <label class="form-label" id="form-subject-label" for="form-subject">Subjek (opsional)</label>
                 <input id="form-subject" aria-label="Subjek pekerjaan" class="form-input" type="text" maxlength="100" placeholder="Contoh: Zona A">
               </div>
 
               <div class="form-group">
-                <label class="form-label" id="form-description-label" for="form-description">Keterangan</label>
+                <label class="form-label fd-lbl" data-fd="keterangan" id="form-description-label" for="form-description">Keterangan</label>
                 <textarea id="form-description" aria-label="Deskripsi pekerjaan" class="form-input" rows="4" maxlength="500" placeholder="Jelaskan secara singkat tentang pekerjaan ini..."></textarea>
                 <div class="char-counter" id="form-description-counter">0/500</div>
               </div>
 
               <div class="form-group">
-                <label class="form-label" id="form-photo-label">Foto Kondisi Awal (opsional, maks. 3)</label>
+                <label class="form-label fd-lbl" data-fd="foto" id="form-photo-label">Foto Kondisi Awal (opsional, maks. 3)</label>
                 <div class="photo-slots-v2" id="photo-slots"></div>
                 <input type="file" id="photo-file-input" accept="image/*" style="display:none">
               </div>
@@ -363,9 +363,9 @@
               </div>
 
               <div class="buat-stepper" id="buat-stepper" role="list" aria-label="Progres pengisian">
+                <div class="bs-step" role="listitem" data-step="waktu"><span class="bs-dot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="bs-lbl">Waktu</span></div>
                 <div class="bs-step" role="listitem" data-step="jenis"><span class="bs-dot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="bs-lbl">Jenis</span></div>
                 <div class="bs-step" role="listitem" data-step="lantai"><span class="bs-dot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="bs-lbl">Lantai</span></div>
-                <div class="bs-step" role="listitem" data-step="waktu"><span class="bs-dot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="bs-lbl">Waktu</span></div>
                 <div class="bs-step" role="listitem" data-step="keterangan"><span class="bs-dot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="bs-lbl">Keterangan</span></div>
                 <div class="bs-step" role="listitem" data-step="foto"><span class="bs-dot"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="bs-lbl">Foto</span></div>
               </div>
