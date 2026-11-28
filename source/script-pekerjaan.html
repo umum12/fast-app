@@ -836,23 +836,68 @@ function triggerPhotoFileInput_(useCamera, targetInputId) {
   } else {
     input.removeAttribute('capture');
   }
+  // Galeri untuk foto laporan/penuntasan: boleh pilih beberapa sekaligus (maks. MAX_PHOTOS). Kamera: satu foto.
+  if (input.id === 'photo-file-input' || input.id === 'selesai-photo-input') input.multiple = !useCamera;
   input.click();
 }
 
-document.getElementById('photo-file-input').addEventListener('change', function (e) {
-  var file = e.target.files[0];
-  e.target.value = '';
-  if (!file) return;
+/**
+ * Masukkan foto hasil pilihan (satu atau banyak) ke slot.
+ *  - 1 file  : perilaku lama — masuk/ganti di slot yang diketuk (tappedIdx).
+ *  - >1 file : mengisi slot KOSONG berurutan (Foto 1, 2, 3), tidak menimpa foto yang sudah ada.
+ *              Kelebihan dari sisa slot dibuang dengan pemberitahuan (maks. MAX_PHOTOS foto).
+ * getArr() mengembalikan array foto saat ini; rerender() menggambar ulang slot.
+ */
+function ingestPhotoFiles_(fileList, getArr, tappedIdx, rerender) {
+  var files = Array.prototype.slice.call(fileList || []).filter(function (f) { return f && (!f.type || f.type.indexOf('image/') === 0); });
+  if (!files.length) return;
+
+  if (files.length === 1) {
+    beginAction(null);
+    compressImage(files[0]).then(function (result) {
+      endAction(null);
+      getArr()[tappedIdx] = result;
+      rerender();
+    }).catch(function () {
+      endAction(null);
+      showSnackbar('Gagal memproses foto. Coba foto lain.', 'error');
+    });
+    return;
+  }
+
+  var empties = [];
+  var cur = getArr();
+  for (var i = 0; i < MAX_PHOTOS; i++) if (!cur[i]) empties.push(i);
+  if (!empties.length) {
+    showSnackbar('Slot foto sudah penuh (maksimal ' + MAX_PHOTOS + '). Hapus salah satu foto untuk menambah.', 'warning');
+    return;
+  }
+  var over = files.length > empties.length;
+  files = files.slice(0, empties.length);
 
   beginAction(null);
-  compressImage(file).then(function (result) {
+  var done = [], failed = 0;
+  files.reduce(function (chain, f) {
+    return chain.then(function () {
+      return compressImage(f).then(function (r) { done.push(r); }).catch(function () { failed++; });
+    });
+  }, Promise.resolve()).then(function () {
     endAction(null);
-    selectedPhotos[activePhotoSlotIndex] = result;
-    renderPhotoSlots();
-  }).catch(function (err) {
-    endAction(null);
-    showSnackbar('Gagal memproses foto. Coba foto lain.', 'error');
+    var arr = getArr();
+    var slots = [];
+    for (var j = 0; j < MAX_PHOTOS; j++) if (!arr[j]) slots.push(j);
+    done.forEach(function (r, k) { if (k < slots.length) arr[slots[k]] = r; });
+    rerender();
+    if (over) showSnackbar('Maksimal ' + MAX_PHOTOS + ' foto. Hanya ' + done.length + ' foto yang dimuat sesuai slot kosong.', 'warning');
+    else if (failed) showSnackbar(failed + ' foto gagal diproses. Coba pilih ulang.', 'error');
   });
+}
+
+document.getElementById('photo-file-input').addEventListener('change', function (e) {
+  var files = Array.prototype.slice.call(e.target.files || []);
+  e.target.value = '';
+  if (!files.length) return;
+  ingestPhotoFiles_(files, function () { return selectedPhotos; }, activePhotoSlotIndex, renderPhotoSlots);
 });
 
 /**
@@ -1162,19 +1207,10 @@ function leaveSelesaiForm_() {
   });
 
   document.getElementById('selesai-photo-input').addEventListener('change', function (e) {
-    var file = e.target.files[0];
+    var files = Array.prototype.slice.call(e.target.files || []);
     e.target.value = '';
-    if (!file) return;
-    var slotIdx = selesaiActiveSlot;
-    beginAction(null);
-    compressImage(file).then(function (result) {
-      endAction(null);
-      selesaiPhotos[slotIdx] = result;
-      renderSelesaiPhotoSlots_();
-    }).catch(function () {
-      endAction(null);
-      showSnackbar('Gagal memproses foto. Coba foto lain.', 'error');
-    });
+    if (!files.length) return;
+    ingestPhotoFiles_(files, function () { return selesaiPhotos; }, selesaiActiveSlot, renderSelesaiPhotoSlots_);
   });
 
   document.getElementById('btn-selesai-back').addEventListener('click', function () {
